@@ -4,10 +4,12 @@ extends SceneTree
 const Catalog = preload("res://scripts/level_catalog.gd")
 const PlayerScript = preload("res://scripts/player.gd")
 const EnemyScript = preload("res://scripts/enemy.gd")
+const RangeScript = preload("res://scripts/levels/range.gd")
 
 var _scene: Node3D
 var _player: RigidBody3D
 var _world: Node3D
+var _range: Node3D
 var _failures: int = 0
 var _checks: int = 0
 var _loot_total: int = 0
@@ -15,6 +17,8 @@ var _loot_events: int = 0
 var _loot_kinds: Array[String] = []
 var _salvage: int = 0
 var _extraction_events: Array[bool] = []
+var _hint_events: int = 0
+var _range_loot: int = 0
 
 
 func _initialize() -> void:
@@ -43,6 +47,7 @@ func _run() -> void:
 	await _test_hound_damage()
 	await _test_sentry_telegraph()
 	await _test_raid_population()
+	await _test_features()
 	_scene.queue_free()
 	await _frames(3)
 	print("WORLD TEST: %d checks, %d failures" % [_checks, _failures])
@@ -55,10 +60,10 @@ func _test_framework() -> void:
 	var details: Dictionary = Catalog.info("l01")
 	_check(details["available"] and details["title"] == "SLUICE GATE" and details["zone"] == "floodworks", "catalog merges the level INFO")
 	_check(not Catalog.info("l02")["available"], "levels without a script are unavailable")
-	_check(Catalog.info("range")["practice"] and not Catalog.info("range")["available"], "the range is known to be practice before it exists")
+	_check(Catalog.info("range")["practice"] and Catalog.info("range")["available"], "the range is practice and available now that its script exists")
 	_check(Catalog.info("bogus").is_empty() and Catalog.create("bogus") == null and Catalog.create("l02") == null, "unknown or missing levels give empty info and no instance")
 	_check(Catalog.next_id("l01") == "" and Catalog.next_id("range") == "", "no level follows the last available one")
-	_check(Catalog.zone_ids("floodworks") == ["l01"] and Catalog.zone_ids("foundry").is_empty(), "zone lists hold available levels only")
+	_check(Catalog.zone_ids("floodworks") == ["l01", "range"] and Catalog.zone_ids("foundry").is_empty(), "zone lists hold available levels only")
 	var info: Dictionary = _world.get("info")
 	_check(_world.get("level_id") == "l01" and info["title"] == "SLUICE GATE", "created level knows its id and INFO")
 	_check(int(info["cases"]) == int(_world.get("total_loot")) and int(info["bonus"]) == int(_world.get("total_bonus")), "INFO case and bonus counts match the built level")
@@ -246,6 +251,115 @@ func _test_raid_population() -> void:
 	for enemy in get_nodes_in_group("enemies"):
 		all_inactive = all_inactive and not bool(enemy.get("active"))
 	_check(all_inactive, "world deactivates every raid enemy")
+
+
+## Level features on a fresh practice range, with real physics. Hazards, lights and the restock
+## check use builder calls made after build(); those only add nodes and registry entries.
+func _test_features() -> void:
+	await _move_player(Vector3(0.0, 0.95, 25.0))
+	_range = Catalog.create("range")
+	_scene.add_child(_range)
+	_range.connect("hint_requested", _on_hint)
+	_range.connect("loot_collected", _on_range_loot)
+	_range.call("build", _player, true)
+	await _frames(3)
+	var anchors: Array[Node] = get_nodes_in_group("anchor")
+	_check(anchors.size() == 4 and _all_static_bodies(anchors), "anchors are in group anchor as StaticBody3D plates")
+	var range_info: Dictionary = _range.get("info")
+	_check(bool(range_info["repeatable"]) and bool(range_info["practice"]) and _range.has_method("reset_cases"), "range INFO is repeatable practice and it can reset its cases")
+
+	# Hazards: damage per second is dps x damage_scale, and only inside the volume.
+	var hazard_spot := Vector3(-24.0, 0.95, 6.0)
+	_range.call("hazard", Vector3(-24.0, 1.5, 6.0), Vector3(4.0, 3.0, 4.0), "heat", 30.0)
+	_check(bool(_range.call("is_hazard_at", hazard_spot)) and not bool(_range.call("is_hazard_at", Vector3(-24.0, 0.95, 20.0))), "is_hazard_at is true inside a hazard volume and false outside it")
+	_range.set("damage_scale", 1.0)
+	var full: float = float(_range.call("hazard_damage_at", hazard_spot, 1.0))
+	_range.set("damage_scale", 0.5)
+	var relaxed: float = float(_range.call("hazard_damage_at", hazard_spot, 1.0))
+	_range.set("damage_scale", 1.5)
+	var hardened: float = float(_range.call("hazard_damage_at", hazard_spot, 1.0))
+	_check(is_equal_approx(full, 30.0) and is_equal_approx(relaxed, 15.0) and is_equal_approx(hardened, 45.0), "hazard damage per second scales with damage_scale (30 / 15 / 45)")
+	_check(is_zero_approx(float(_range.call("hazard_damage_at", Vector3(-24.0, 0.95, 20.0), 1.0))), "no hazard damage outside the volume")
+
+	# Real physics: the range hurts the player on every physics step, scaled by difficulty.
+	_range.call("set_active", true)
+	await _move_player(hazard_spot)
+	_range.set("damage_scale", 0.5)
+	_player.set("health", 100.0)
+	await _frames(9)
+	var lost_relaxed: float = 100.0 - float(_player.get("health"))
+	_range.set("damage_scale", 1.5)
+	_player.set("health", 100.0)
+	await _frames(9)
+	var lost_hardened: float = 100.0 - float(_player.get("health"))
+	_check(lost_relaxed > 0.0 and is_equal_approx(lost_hardened, lost_relaxed * 3.0), "standing in a hazard costs 3x as much at damage_scale 1.5 as at 0.5")
+	_range.set("damage_scale", 1.0)
+	await _move_player(Vector3(0.0, 0.95, 25.0))
+
+	# Hint zones: the welcome zone asks for its hint once, however often the player re-enters it.
+	var zone_spot := Vector3(RangeScript.HINT_ZONE_CENTER.x, 0.95, RangeScript.HINT_ZONE_CENTER.z)
+	_hint_events = 0
+	await _move_player(zone_spot)
+	var first_entry: int = _hint_events
+	await _frames(10)
+	await _move_player(Vector3(0.0, 0.95, 25.0))
+	await _move_player(zone_spot)
+	_check(first_entry == 1 and _hint_events == 1, "a hint zone emits its hint once, not on every entry")
+
+	# Updraft: a RigidBody3D inside the column rises, while a control body outside it falls.
+	var lifted: RigidBody3D = _test_body(RangeScript.UPDRAFT_BASE + Vector3(0.0, 2.0, 0.0), true)
+	var control: RigidBody3D = _test_body(RangeScript.UPDRAFT_BASE + Vector3(4.0, 2.0, 0.0), false)
+	await _frames(10)
+	_check(lifted.linear_velocity.y > 0.5 and lifted.global_position.y > RangeScript.UPDRAFT_BASE.y + 2.0 and lifted.linear_velocity.y > control.linear_velocity.y + 1.0, "an updraft lifts a RigidBody3D in its column while a control body falls")
+	lifted.queue_free()
+	control.queue_free()
+
+	# Lights: the range has three, and four more requests stop at the cap of six.
+	for index in range(4):
+		_range.call("light", Vector3(float(index) * 3.0 - 20.0, 3.0, 0.0), Color.WHITE)
+	_check(_range.find_children("*", "OmniLight3D", true, false).size() == 6, "lights stop at the cap of six")
+
+	# Repeats: the case pays once, and reset_cases puts it back on the floor for another run.
+	await _move_player(Vector3(14.0, 0.95, -98.0))
+	var collected_once: int = _range_loot
+	_range.call("reset_cases")
+	await _move_player(Vector3(0.0, 0.95, 25.0))
+	await _move_player(Vector3(14.0, 0.95, -98.0))
+	_check(collected_once == 1 and _range_loot == 2 and int(_range.get("collected_loot")) == 1, "reset_cases puts the case back so it can be collected again")
+	_range.queue_free()
+	await _frames(3)
+
+
+func _test_body(location: Vector3, cast_weight: bool) -> RigidBody3D:
+	var body := RigidBody3D.new()
+	body.mass = 1.0
+	body.can_sleep = false
+	var shape := CollisionShape3D.new()
+	var ball := SphereShape3D.new()
+	ball.radius = 0.3
+	shape.shape = ball
+	body.add_child(shape)
+	if cast_weight:
+		body.add_to_group("cast_weight")
+	_scene.add_child(body)
+	body.global_position = location
+	return body
+
+
+func _all_static_bodies(nodes: Array[Node]) -> bool:
+	for node: Node in nodes:
+		if not (node is StaticBody3D):
+			return false
+	return true
+
+
+func _on_hint(_text: String, _duration: float) -> void:
+	_hint_events += 1
+
+
+func _on_range_loot(kind: String, _value: int) -> void:
+	if kind == "case":
+		_range_loot += 1
 
 
 func _new_enemy(kind: String, location: Vector3) -> CharacterBody3D:

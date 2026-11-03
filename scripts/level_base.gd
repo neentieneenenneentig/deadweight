@@ -24,7 +24,8 @@ extends Node3D
 ## primitives lives in one StaticBody3D (layer 1). Moving a node returned by a builder call
 ## changes how it looks but not its collision; pass `yaw` to the builder instead.
 ##
-## Not here yet (task F8): anchor, updraft, hazard, water, hint_zone, light, skyline, perimeter.
+## Features (task F8): anchor, updraft, hazard, water, hint_zone, light, skyline, perimeter. They
+## are described in the "Level features" section near the end of this file.
 ## Not here yet (task F9): navigation baking.
 
 signal loot_collected(kind: String, value: int)    # kind "case" | "bonus"; value = salvage
@@ -49,6 +50,11 @@ const GLOW_KEYS := ["cyan", "amber", "red", "orange", "white"]
 const NO_SHADOW_KEYS := ["cyan", "amber", "red", "orange", "white", "water", "glass"]
 const GRIME_KEYS := ["concrete", "light_concrete", "dark", "rust", "metal", "stripe"]
 const GRIME_SCALE := 0.08
+
+const MAX_LIGHTS := 6                                # lights cost draw calls and shader work on mobile
+const HAZARD_KINDS := ["electric", "heat", "water"]
+const HAZARD_ZAP_INTERVAL := 0.5                     # seconds between hazard_zap sounds
+const WATER_DPS := 25.0                              # deep water damage per second (before damage_scale)
 
 ## Per-zone look. "colors" must define every material key (CONTRACT 4.11).
 const ZONES := {
@@ -126,6 +132,12 @@ var _label_count: int = 0
 var _pending_count: int = 0                          # statics before merging (for budgets/logs)
 var _merged_count: int = 0
 var _built: bool = false
+var _case_spots: Array[Dictionary] = []              # {floor_point, title}: restock_cases() respawns them
+var _hazards: Array[Dictionary] = []                 # volume records with "dps"
+var _updrafts: Array[Dictionary] = []                # volume records with "strength" (m/s^2)
+var _hint_zones: Array[Dictionary] = []              # {box, text, duration, fired}
+var _light_count: int = 0
+var _zap_time: float = -10.0                         # clock time of the last hazard_zap
 
 
 # --- Lifecycle ----------------------------------------------------------------------------------
@@ -164,6 +176,11 @@ func _reset_build_state() -> void:
 	collected_loot = 0
 	total_bonus = 0
 	collected_bonus.clear()
+	_case_spots.clear()
+	_hazards.clear()
+	_updrafts.clear()
+	_hint_zones.clear()
+	_light_count = 0
 	_label_count = 0
 	_has_extraction = false
 	if is_instance_valid(_stage):
@@ -324,6 +341,7 @@ func label(text: String, position: Vector3, font_size: int = 32, color: Color = 
 ## A required case: all of them must be collected before extraction unlocks.
 func case_at(floor_point: Vector3, title: String) -> void:
 	total_loot += 1
+	_case_spots.append({"floor_point": floor_point, "title": title})
 	_add_pickup(floor_point, title, "case", total_loot - 1)
 
 
@@ -384,10 +402,12 @@ func enemy(kind: String, position: Vector3, params: Dictionary = {}) -> void:
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
+	_animate_features()
 	if not _active or not is_instance_valid(_player):
 		return
 	_update_pickups()
 	_update_extraction()
+	_update_features(delta)
 
 
 func _update_pickups() -> void:
@@ -497,8 +517,11 @@ func get_objectives() -> Array:
 	return result
 
 
-## True when position is over a hazard volume (hazards arrive with task F8).
-func is_hazard_at(_position: Vector3) -> bool:
+## True when position (level space; levels sit at the origin) is inside any hazard volume.
+func is_hazard_at(position: Vector3) -> bool:
+	for record: Dictionary in _hazards:
+		if (record["box"] as AABB).has_point(position):
+			return true
 	return false
 
 
@@ -534,6 +557,357 @@ func apply_quality(value: int) -> void:
 		_environment.glow_enabled = quality >= 2
 		_environment.ssao_enabled = quality >= 2 and RenderingServer.get_current_rendering_method() == "forward_plus"
 		_environment.fog_density = _fog_base * [1.25, 1.0, 1.0][quality]
+
+
+# --- Level features (task F8) -------------------------------------------------------------------
+# Features are cheap per-frame checks over small registries: a box test per updraft, hazard and
+# hint zone, and a body test for the player and cast weights. Their visuals are separate nodes
+# because they move, so each level keeps only a handful of them.
+
+## Builder: a magnetic plate that latches weights. facing is the side the plate faces; weights
+## arrive from that side. The plate is world geometry (layer 1) in group "anchor".
+func anchor(position: Vector3, facing: Vector3 = Vector3.DOWN) -> void:
+	var plate_size := Vector3(1.2, 0.12, 1.2)
+	var body := StaticBody3D.new()
+	body.name = "Anchor"
+	body.add_to_group("anchor")
+	body.collision_layer = LAYER_WORLD
+	body.collision_mask = 0
+	var up: Vector3 = facing if facing.length_squared() > 0.0001 else Vector3.DOWN
+	body.transform = Transform3D(_basis_with_up(up), position)
+	var shape := BoxShape3D.new()
+	shape.size = plate_size
+	var collision := CollisionShape3D.new()
+	collision.shape = shape
+	body.add_child(collision)
+	var mesh := BoxMesh.new()
+	mesh.size = plate_size
+	var plate := MeshInstance3D.new()
+	plate.mesh = mesh
+	plate.material_override = _materials["cyan"]
+	plate.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	body.add_child(plate)
+	add_child(body)
+
+
+## Builder: rising air. base is the bottom centre of the column. strength is the upward
+## acceleration (m/s^2) given to the player and to cast weights inside it; gravity is 12.
+func updraft(base: Vector3, size: Vector3, strength: float = 26.0) -> void:
+	var record: Dictionary = _new_volume("updraft", base, size)
+	record["strength"] = strength
+	_updrafts.append(record)
+	_add_volume_visuals(record, 0.1)
+
+
+## Builder: a damaging volume. kind is "electric", "heat" or "water"; center is the middle of the
+## box. dps is damage per second at damage_scale 1.0 (the difficulty setting). Practice keeps
+## hazards on purpose, so they still hurt there.
+func hazard(center: Vector3, size: Vector3, kind: String = "electric", dps: float = 30.0) -> void:
+	var kind_name: String = kind
+	if not HAZARD_KINDS.has(kind):
+		push_warning("Level %s: hazard kind '%s' is unknown; using electric." % [level_id, kind])
+		kind_name = "electric"
+	var record: Dictionary = _new_volume(kind_name, center - Vector3.UP * size.y * 0.5, size)
+	record["dps"] = dps
+	_hazards.append(record)
+	_add_volume_visuals(record, 0.3 if kind_name == "water" else 0.12)
+
+
+## Builder (call from _design): a water surface with its top at center.y. Deep water is also a
+## water hazard three metres deep, under the surface.
+func water(center: Vector3, size: Vector2, deep: bool = false) -> void:
+	_box_at(Transform3D(Basis.IDENTITY, center - Vector3.UP * 0.06), Vector3(size.x, 0.12, size.y), "water", false)
+	if deep:
+		hazard(center - Vector3.UP * 1.5, Vector3(size.x, 3.0, size.y), "water", WATER_DPS)
+
+
+## Builder: an invisible trigger box. The first time the player enters it, hint_requested fires
+## with the text ({tokens} are left for the HUD to expand). It never fires again in this build.
+func hint_zone(center: Vector3, size: Vector3, text: String, duration: float = 6.0) -> void:
+	_hint_zones.append({"box": AABB(center - size * 0.5, size), "text": text, "duration": duration, "fired": false})
+
+
+## Builder: a point light with a small glowing fitting. At most MAX_LIGHTS per level; extra lights
+## are skipped with a warning so the budget stays visible.
+func light(position: Vector3, color: Color, energy: float = 1.2, light_range: float = 14.0) -> void:
+	if _light_count >= MAX_LIGHTS:
+		push_warning("Level %s: over the %d light cap; light at %s skipped." % [level_id, MAX_LIGHTS, position])
+		return
+	_light_count += 1
+	var lamp := OmniLight3D.new()
+	lamp.position = position
+	lamp.light_color = color
+	lamp.light_energy = energy
+	lamp.omni_range = light_range
+	lamp.shadow_enabled = false
+	add_child(lamp)
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.16
+	sphere.height = 0.32
+	sphere.radial_segments = 8
+	sphere.rings = 4
+	var fitting := MeshInstance3D.new()
+	fitting.mesh = sphere
+	fitting.material_override = FX.glow_material(color, 2.0)
+	fitting.position = position
+	fitting.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(fitting)
+
+
+## Builder (call from _design): a ring of dark towers far off with amber window strips. Deterministic
+## for a given seed_value. Not solid, and merged with the other static geometry.
+func skyline(seed_value: int, center: Vector3, inner_radius: float, outer_radius: float, count: int = 24) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	for _tower in range(count):
+		var angle: float = rng.randf() * TAU
+		var distance: float = rng.randf_range(inner_radius, outer_radius)
+		var width: float = rng.randf_range(6.0, 14.0)
+		var depth: float = rng.randf_range(6.0, 12.0)
+		var height: float = rng.randf_range(12.0, 38.0)
+		var frame := Transform3D(Basis(Vector3.UP, rng.randf() * TAU), center + Vector3(cos(angle) * distance, height * 0.5, sin(angle) * distance))
+		_box_at(frame, Vector3(width, height, depth), "dark", false)
+		var window_frame: Transform3D = frame * Transform3D(Basis.IDENTITY, Vector3(0.0, height * 0.25, depth * 0.5 + 0.02))
+		_box_at(window_frame, Vector3(width * 0.5, 0.35, 0.04), "amber", false)
+
+
+## Builder (call from _design): solid walls around a rectangle on the ground, with a yellow cap so
+## the edge reads at speed.
+func perimeter(center: Vector3, size: Vector2, height: float = 6.0, material: String = "dark") -> void:
+	var half: Vector2 = size * 0.5
+	var thickness: float = 0.6
+	# Each run is {offset from centre, wall size}. The north and south walls cover the corners.
+	var runs: Array[Array] = [
+		[Vector3(0.0, 0.0, -half.y), Vector3(size.x + thickness, height, thickness)],
+		[Vector3(0.0, 0.0, half.y), Vector3(size.x + thickness, height, thickness)],
+		[Vector3(-half.x, 0.0, 0.0), Vector3(thickness, height, size.y)],
+		[Vector3(half.x, 0.0, 0.0), Vector3(thickness, height, size.y)],
+	]
+	for run: Array in runs:
+		var offset: Vector3 = run[0]
+		var wall: Vector3 = run[1]
+		box(center + offset + Vector3.UP * height * 0.5, wall, material, true)
+		box(center + offset + Vector3.UP * (height + 0.1), Vector3(wall.x, 0.2, wall.z), "yellow", false)
+
+
+## Cases back on the floor, for repeatable levels (the range) after an extraction.
+func restock_cases() -> void:
+	for pickup: Dictionary in _pickups.duplicate():
+		if pickup["kind"] == "case":
+			_pickups.erase(pickup)
+			(pickup["node"] as Node3D).queue_free()
+	collected_loot = 0
+	for index in range(_case_spots.size()):
+		var spot: Dictionary = _case_spots[index]
+		_add_pickup(spot["floor_point"] as Vector3, str(spot["title"]), "case", index)
+
+
+## Hazard damage for one step at position: the dps of every hazard that contains it, times
+## damage_scale and the step length. The level applies this to the player every physics frame.
+func hazard_damage_at(position: Vector3, delta: float) -> float:
+	var total: float = 0.0
+	for record: Dictionary in _hazards:
+		if (record["box"] as AABB).has_point(position):
+			total += float(record["dps"])
+	return total * damage_scale * maxf(delta, 0.0)
+
+
+func _update_features(delta: float) -> void:
+	_apply_updrafts()
+	_apply_hazards(delta)
+	_check_hint_zones()
+
+
+## Updrafts push the player and cast weights upward. A force lasts one physics step, so this
+## runs every frame from _physics_process.
+func _apply_updrafts() -> void:
+	if _updrafts.is_empty():
+		return
+	var bodies: Array[RigidBody3D] = []
+	if _player is RigidBody3D:
+		bodies.append(_player as RigidBody3D)
+	for node: Node in get_tree().get_nodes_in_group("cast_weight"):
+		if node is RigidBody3D:
+			bodies.append(node as RigidBody3D)
+	for body: RigidBody3D in bodies:
+		var local: Vector3 = to_local(body.global_position)
+		for record: Dictionary in _updrafts:
+			if not (record["box"] as AABB).has_point(local):
+				continue
+			# A sleeping body would ignore the push until something else woke it.
+			body.sleeping = false
+			body.apply_central_force(Vector3.UP * float(record["strength"]) * body.mass)
+
+
+func _apply_hazards(delta: float) -> void:
+	if _hazards.is_empty() or not _player.has_method("take_damage"):
+		return
+	var damage: float = hazard_damage_at(to_local(_player.global_position), delta)
+	if damage <= 0.0:
+		return
+	_player.call("take_damage", damage)
+	_zap_hazard()
+
+
+## Zaps are throttled so standing in a hazard sounds like a rhythm, not a constant buzz.
+func _zap_hazard() -> void:
+	if _clock - _zap_time < HAZARD_ZAP_INTERVAL:
+		return
+	_zap_time = _clock
+	var audio: Node = get_tree().get_first_node_in_group("game_audio")
+	if is_instance_valid(audio) and audio.has_method("play"):
+		audio.call("play", "hazard_zap")
+
+
+## Each hint zone asks for its hint once per build, the first time the player enters it.
+func _check_hint_zones() -> void:
+	var local: Vector3 = to_local(_player.global_position)
+	for zone: Dictionary in _hint_zones:
+		if bool(zone["fired"]) or not (zone["box"] as AABB).has_point(local):
+			continue
+		zone["fired"] = true
+		hint_requested.emit(str(zone["text"]), float(zone["duration"]))
+
+
+## Visual motion only, so it runs even while the level is inactive.
+func _animate_features() -> void:
+	for record: Dictionary in _updrafts:
+		_animate_motes(record)
+	for record: Dictionary in _hazards:
+		_animate_motes(record)
+
+
+func _new_volume(kind: String, origin: Vector3, size: Vector3) -> Dictionary:
+	return {
+		"kind": kind,
+		"origin": origin,
+		"size": size,
+		"box": AABB(origin - Vector3(size.x, 0.0, size.z) * 0.5, size),
+		"motes": null,
+	}
+
+
+## A translucent shell around the volume plus a MultiMesh of moving motes (one draw call).
+func _add_volume_visuals(record: Dictionary, shell_alpha: float) -> void:
+	var kind: String = record["kind"]
+	var origin: Vector3 = record["origin"]
+	var size: Vector3 = record["size"]
+	var color: Color = _feature_color(kind)
+	var shell_mesh := BoxMesh.new()
+	shell_mesh.size = size
+	var shell := MeshInstance3D.new()
+	shell.mesh = shell_mesh
+	shell.material_override = _tint_material(color, shell_alpha)
+	shell.position = origin + Vector3.UP * size.y * 0.5
+	shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(shell)
+	var mote_mesh := BoxMesh.new()
+	var count: int = 8
+	match kind:
+		"updraft":
+			mote_mesh.size = Vector3(0.06, 1.2, 0.06)
+		"heat":
+			mote_mesh.size = Vector3(0.12, 0.7, 0.12)
+		"electric":
+			mote_mesh.size = Vector3(0.035, 1.0, 0.035)
+			count = 10
+		_:
+			# Water: flat glints sliding over the surface.
+			mote_mesh.size = Vector3(0.6, 0.02, 0.1)
+			count = 12
+	var motes := MultiMesh.new()
+	motes.transform_format = MultiMesh.TRANSFORM_3D
+	motes.mesh = mote_mesh
+	motes.instance_count = count
+	# Motes stay near the volume, so a box the size of the volume (plus margin) is enough for culling.
+	motes.custom_aabb = (record["box"] as AABB).grow(1.5)
+	var node := MultiMeshInstance3D.new()
+	node.multimesh = motes
+	node.material_override = FX.glow_material(Color(color, 0.85), 2.0)
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(node)
+	record["motes"] = motes
+	_animate_motes(record)
+
+
+func _animate_motes(record: Dictionary) -> void:
+	var motes: MultiMesh = record["motes"] as MultiMesh
+	if motes == null:
+		return
+	var kind: String = record["kind"]
+	var origin: Vector3 = record["origin"]
+	var size: Vector3 = record["size"]
+	for index in range(motes.instance_count):
+		motes.set_instance_transform(index, _mote_transform(kind, index, motes.instance_count, origin, size))
+
+
+## Where mote number index sits right now. Updraft streaks rise, heat wobbles as it rises,
+## electric arcs flicker in new spots, and water glints slide along the surface.
+func _mote_transform(kind: String, index: int, count: int, origin: Vector3, size: Vector3) -> Transform3D:
+	var fraction: float = float(index) / float(count)
+	match kind:
+		"updraft", "heat":
+			var rise: float = 6.0 if kind == "updraft" else 2.4
+			var height: float = fposmod(_clock * rise / size.y + fraction, 1.0) * size.y
+			var angle: float = fraction * TAU
+			var wobble: float = sin(_clock * 2.0 + float(index)) * 0.12 if kind == "heat" else 0.0
+			var offset := Vector3(cos(angle) * size.x * (0.3 + wobble), height, sin(angle) * size.z * 0.3)
+			return Transform3D(Basis.IDENTITY, origin + offset)
+		"electric":
+			# Each arc lives for one flicker step (about 9 per second), then jumps somewhere else.
+			var slot: float = floorf(_clock * 9.0) + float(index) * 1.7
+			if _hash01(slot * 3.1 + float(index)) < 0.45:
+				return Transform3D(Basis.from_scale(Vector3.ZERO), origin)
+			var arc_height: float = size.y * (0.3 + 0.5 * _hash01(slot * 7.3 + 1.0))
+			var spot := Vector3(
+				(_hash01(slot * 5.7) * 2.0 - 1.0) * size.x * 0.45,
+				(size.y - arc_height) * _hash01(slot * 2.9 + 3.0) + arc_height * 0.5,
+				(_hash01(slot * 4.1 + 2.0) * 2.0 - 1.0) * size.z * 0.45)
+			return Transform3D(Basis.from_scale(Vector3(1.0, arc_height, 1.0)), origin + spot)
+		_:
+			var along: float = fposmod(_clock * 0.9 + fraction, 1.0) * size.x - size.x * 0.5
+			var across: float = (fraction * 2.0 - 1.0) * size.z * 0.35
+			return Transform3D(Basis.IDENTITY, origin + Vector3(along, size.y + 0.03, across))
+
+
+## Cheap deterministic pseudo-random value in 0..1, used to scatter the electric arcs.
+static func _hash01(value: float) -> float:
+	return absf(fmod(sin(value * 12.9898 + 78.233) * 43758.5453, 1.0))
+
+
+static func _feature_color(kind: String) -> Color:
+	match kind:
+		"updraft":
+			return Color("5ad6c8")
+		"heat":
+			return Color("ff7a1a")
+		"electric":
+			return Color("ffe066")
+		_:
+			return Color("2aa7c4")
+
+
+## Translucent unshaded tint for volume shells.
+static func _tint_material(color: Color, alpha: float) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = Color(color, alpha)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.emission_enabled = true
+	material.emission = color
+	material.emission_energy_multiplier = 0.35
+	return material
+
+
+## A basis whose Y axis is up (any unit vector). Used to orient anchor plates.
+static func _basis_with_up(up: Vector3) -> Basis:
+	var y: Vector3 = up.normalized()
+	var x: Vector3 = Vector3.RIGHT.cross(y)
+	if x.length_squared() < 0.0001:
+		x = Vector3.FORWARD.cross(y)
+	x = x.normalized()
+	return Basis(x, y, x.cross(y))
 
 
 # --- Build internals ----------------------------------------------------------------------------

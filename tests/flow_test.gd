@@ -56,8 +56,8 @@ func _test_boot_and_title() -> void:
 	await _frames(90)
 	_check(_main._attract.global_position.distance_to(before) > 0.02, "the attract camera drifts")
 	# A level that does not exist is refused and the title stays.
-	await _main.start_level("range")
-	_check(_main.state == "title", "an unavailable level (range) leaves the title alone")
+	await _main.start_level("tutorial")
+	_check(_main.state == "title", "an unavailable level (tutorial) leaves the title alone")
 	await _main.start_level("bogus")
 	_check(_main.state == "title", "an unknown level leaves the title alone")
 	# Opening a sub screen moves the state to menu, and back again.
