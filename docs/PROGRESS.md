@@ -87,6 +87,24 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   for the recommended free-to-try model.
 - Tests: QUALITY GATE: PASSED (22 scripts, 3 suites); build.ps1 -Target All OK.
 
+## 2026-11-03: F1 data layer
+- Model: Claude Sonnet 5.5 (switched from Opus 5.5 at the user's request).
+- Reviewed the four drafts (profile, upgrades, achievements, settings) against CONTRACT §4–5 and
+  DESIGN: no code changes were needed. They already handle a missing catalog (campaign order falls
+  back to `Achievements.CAMPAIGN`, pars to bronze-only) and damaged saves (`.tmp`/`.bak` restore,
+  damaged file kept as `.corrupt`).
+- Added tests/meta_test.gd: 363 checks, using only `user://test_f1.cfg`. Covers round trip, missing
+  and corrupt files, `.bak` restore, truncated writes, hand-edited values, the prototype save
+  migration, settings clamps and types, desktop vs mobile defaults, purchases (40/90/160/250,
+  maxed, short of funds), the unlock chain, record_run rewards (15/30/10-25-50 paid once, best
+  time, failed and practice runs), achievement rules, tier 0 / tier 4 stats, and the achievement
+  table against docs/DESIGN.md (ids, titles, text). A stub catalog script stands in for the
+  missing level_catalog.gd.
+- Tests: QUALITY GATE: PASSED (23 scripts, 4 suites).
+- Deviations: none. Bonus caches and cases pay on every extraction (DESIGN Economy), only medal
+  bonuses are once-only.
+- Follow-ups: F10 should call `Achievements.progress_unlocks(profile)` at boot to catch up.
+
 ---
 Template:
 ```

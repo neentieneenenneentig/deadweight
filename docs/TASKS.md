@@ -24,7 +24,7 @@ owner = needs the human (devices, accounts).
 | R5 | Store copy, release checklist, README | — | M | C | web | MUST | done |
 | R6 | Store art + screenshots | C6, G7, F11 | M | B | shell, vision | MUST | todo |
 | P1 | Android full-game unlock (Play Billing); only if the owner picks model A | F5, F10, O3b | M | A | shell, owner | MUST if A | todo |
-| F1 | Data layer: profile/upgrades/achievements/settings + tests | — | M | B | shell | MUST | todo |
+| F1 | Data layer: profile/upgrades/achievements/settings + tests | — | M | B | shell | MUST | done |
 | F2 | Input map + platform services | — | S | B | shell | MUST | todo |
 | F3 | UI screens A: title, loading, pause, result (+stubs, preview) | — | M | B | shell, vision | MUST | todo |
 | F4 | UI screens B: settings, credits | F3 | M | B | shell, vision | MUST | todo |
