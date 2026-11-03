@@ -8,6 +8,7 @@ extends SceneTree
 const MainScript = preload("res://scripts/main.gd")
 const ProfileScript = preload("res://scripts/profile.gd")
 const Catalog = preload("res://scripts/level_catalog.gd")
+const InputSetup = preload("res://scripts/input_setup.gd")
 const PATH := "user://test_f10.cfg"
 const PATH_B := "user://test_f10b.cfg"
 const CAUSES := ["hound", "sentry", "drone", "fall", "hazard"]
@@ -147,12 +148,25 @@ func _test_raid_to_result() -> void:
 	_main._action("cast", false)
 	await _frames(10)
 	_check(int(_main.run_stats["casts"]) == 1, "a cast is counted")
+	_check(_main.profile.has_achievement("FIRST_CAST"), "the first cast unlocks Gone Fishing live")
+	_check(_main._expand("charge {cast}") == "charge " + str(InputSetup.glyph("cast", "kbm")) and not str(_main._expand("{reload}")).contains("{"), "hint tokens expand to the device glyphs")
 	_main._action("cut", true)
 	# Clear the enemies so the teleport run is not interrupted, and count the kills.
 	for node: Node in get_nodes_in_group("enemies"):
 		node.call("take_damage", 9999.0, "smash")
 	await _frames(4)
 	_check(int(_main.run_stats["kills"]) == 5 and int(_main.run_stats["smash_kills"]) == 5, "enemy kills are counted")
+	# A fall below the kill plane cuts the line, costs 35 and returns to the last safe ground; the run goes on.
+	var checkpoint: Vector3 = _main._checkpoint
+	var hurt_before: float = float(_main.run_stats["damage_taken"])
+	var hp_before: float = _main.player.health
+	_main.player.reset_at(checkpoint + Vector3(0, -60, 0))
+	await _frames(6)
+	_check(_main.state == "playing", "a fall does not end the raid")
+	_check(_main.player.global_position.distance_to(checkpoint) < 3.0, "a fall returns the player to the last safe ground")
+	_check(is_equal_approx(_main.player.health, hp_before - MainScript.FALL_DAMAGE), "a fall costs 35 condition")
+	_check(is_equal_approx(float(_main.run_stats["damage_taken"]), hurt_before + MainScript.FALL_DAMAGE), "the fall counts as damage taken")
+	_check(not _main.player.freeze and _main.player.active, "the player keeps control after a fall")
 	var objectives: Array = _main.level.get_objectives()
 	var pickups: int = 0
 	for entry: Dictionary in objectives:
@@ -181,7 +195,10 @@ func _test_raid_to_result() -> void:
 	_check(result["bank"] == result["salvage"] and _main.profile.bank == result["salvage"], "the bank holds the reward")
 	_check(result["new_best"] and result["best_time"] == result["time"], "the first clear is a new best")
 	_check(result["next_level"] == "", "no next level exists yet")
-	_check((result["achievements"] as Array).has("Untouched") and (result["achievements"] as Array).has("Ghost"), "end-of-run achievements are unlocked and listed")
+	# The fall above cost condition, so Untouched is lost; Ghost (no sidearm shots) still awards.
+	_check((result["achievements"] as Array).has("Ghost") and not (result["achievements"] as Array).has("Untouched"), "end-of-run achievements follow the run (the fall cost Untouched)")
+	_check((result["achievements"] as Array).has("Bring Something Back"), "the first extraction unlocks Bring Something Back")
+	_check(not _main.profile.unlock_achievement("FIRST_EXTRACT"), "FIRST_EXTRACT unlocks only once")
 	_check(int(result["stats"]["kills"]) == 5 and int(result["stats"]["casts"]) == 1, "the result carries the run stats")
 	_check(_main.player.freeze, "physics freezes in the result view")
 	var record: Dictionary = _main.profile.level_record("l01")
@@ -223,7 +240,7 @@ func _test_failed_run_and_retry() -> void:
 	_main._action("weapon", true)
 	_main._action("cast", true)
 	await _frames(4)
-	_check(_main.weapon == "SIDEARM" and _main.ammo == MainScript.MAGAZINE - 1 and int(_main.run_stats["shots"]) == 1, "the sidearm fires and counts the shot")
+	_check(_main.weapon == "SIDEARM" and _main.ammo == _main.magazine_size() - 1 and _main.magazine_size() == 10 and int(_main.run_stats["shots"]) == 1, "the sidearm fires and counts the shot")
 	_main._action("weapon", true)
 	# Leave to the title from the result of this run via the menu signal.
 	_main._action("pause", true)
@@ -277,11 +294,17 @@ func _test_menus_and_settings() -> void:
 	await _frames(2)
 	_check(profile.bank == 0 and profile.upgrade_tier("spool") == 0 and profile.level_record("l01")["attempts"] == 0, "reset progress wipes the progress")
 	_check(profile.setting("fov") == 90.0, "reset progress keeps the settings")
+	# The next raid loads the magazine of the bought sidearm tier (stock 10, tier 1 = 12).
+	profile.bank = 40
+	_main.ui.upgrade_requested.emit("sidearm")
+	await _frames(2)
+	_check(profile.upgrade_tier("sidearm") == 1, "the sidearm upgrade is bought after the reset")
 	# A raid reads the new difficulty.
 	var raid: Signal = _main.level_started
 	_main.start_level("l01")
 	await raid
 	_check(is_equal_approx(float(_main.level.get("damage_scale")), 1.5), "hard difficulty sets the level damage scale")
+	_check(_main.magazine_size() == 12 and _main.ammo == 12, "the next raid loads the upgraded sidearm magazine (12)")
 	_main.ui.setting_changed.emit("difficulty", 1)
 	_main._action("pause", true)
 	await _frames(3)

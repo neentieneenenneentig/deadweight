@@ -185,6 +185,20 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
 ---
 Template:
 ```
+## 2026-11-03: F2 input map + platform, F11 run systems
+
+- F2 (built by a Haiku sub-agent, reviewed and re-run by me): `scripts/input_setup.gd` (register, glyph, expand_tokens), `scripts/platform.gd` (optional GodotSteam, unlock_achievement, vibrate, is_mobile, haptics flag), `tests/input_test.gd` (117 checks). The Steam path is unverified because GodotSteam is not in this environment.
+- F11 (`scripts/main.gd`, `tests/flow_test.gd`):
+  - Checkpoints every 0.5 s while grounded. Falling below kill_y cuts the line, costs 35 in raids (free in practice), and respawns at the checkpoint with health kept.
+  - Live achievements: FIRST_CAST, TERMINAL, HANG_TIME, DEADWEIGHT. DEADWEIGHT fires on a smash/weight kill, but no live code emits that source yet. FIRST_ANCHOR waits for anchors (F8).
+  - Toasts and platform unlocks for live and end-of-run awards.
+  - Sidearm magazine and damage come from Upgrades.stats. Stock magazine is now 10 (was a hard-coded 12). Plating max health applies, and the HUD condition bar scales to it.
+  - Hints use `{token}` expansion for the last-used device.
+  - Repeatable levels: extraction banner and a guarded `reset_cases` hook. The range level (F8) provides it.
+  - Audio calls go through a guarded `_sfx` helper.
+- flow_test: 107 checks, including the fall, checkpoint, FIRST_CAST, FIRST_EXTRACT once, the magazine tier and hint tokens. The gate passes (40 scripts, 6 suites).
+- Follow-ups: F8 must provide `reset_cases` and the `repeatable` info flag. DEADWEIGHT stays unverified in play until enemies take smash damage. G1 changes `reset_at`, which still sets health to 100 inside player.gd.
+
 ## YYYY-MM-DD: Txx <title>
 - Model:
 - Changed:

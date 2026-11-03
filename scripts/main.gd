@@ -19,7 +19,10 @@ const Achievements = preload("res://scripts/achievements.gd")
 const Settings = preload("res://scripts/settings.gd")
 const INPUT_SETUP_PATH := "res://scripts/input_setup.gd"
 
-const MAGAZINE: int = 12
+const CHECKPOINT_SECONDS: float = 0.5
+const FALL_DAMAGE: float = 35.0
+const PlatformScript = preload("res://scripts/platform.gd")
+const UpgradesScript = preload("res://scripts/upgrades.gd")
 const EXTRACTION_SECONDS: float = 6.0
 const LOADING_SECONDS: float = 0.45
 const RESTART_LOADING_SECONDS: float = 0.15
@@ -40,6 +43,7 @@ var level: Node3D
 var hud: CanvasLayer
 var ui: CanvasLayer
 var sound: Node
+var platform: Node
 var profile: RefCounted
 var level_id: String = ""
 var practice: bool = false
@@ -47,11 +51,13 @@ var elapsed: float = 0.0
 var extraction_time: float = 0.0
 var extraction_inside: bool = false
 var weapon: String = "ROD"
-var ammo: int = MAGAZINE
+var ammo: int = 0
 var reserve: int = 48
 ## Per-run counters handed to profile.record_run (CONTRACT 5.5).
 var run_stats: Dictionary = {}
 var last_result: Dictionary = {}
+## Workshop numbers for this raid (Upgrades.stats), read when the raid begins.
+var loadout: Dictionary = {}
 
 var _args: PackedStringArray = PackedStringArray()
 var _forced_practice: bool = false
@@ -72,6 +78,10 @@ var _save_timer: Timer
 var _save_pending: bool = false
 var _attract: Camera3D
 var _attract_time: float = 0.0
+var _checkpoint: Vector3 = Vector3.ZERO
+var _checkpoint_yaw: float = 0.0
+var _checkpoint_timer: float = 0.0
+var _device: String = "kbm"
 
 
 func _ready() -> void:
@@ -120,6 +130,9 @@ func _build_nodes() -> void:
 	sound.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(sound)
 	sound.add_to_group("game_audio")
+	platform = PlatformScript.new()
+	add_child(platform)
+	platform.setup()
 	hud = HudScript.new()
 	add_child(hud)
 	hud.action_requested.connect(_action)
@@ -284,9 +297,13 @@ func _begin_play() -> void:
 	_reset_run()
 	player.freeze = false
 	player.reset_at(level.get("spawn_position"))
+	player.health = float(loadout["max_health"])
 	player.yaw = float(level.get("spawn_yaw"))
 	player.pitch = -0.04
 	player.apply_look(Vector2.ZERO)
+	_checkpoint = level.get("spawn_position")
+	_checkpoint_yaw = float(level.get("spawn_yaw"))
+	_checkpoint_timer = CHECKPOINT_SECONDS
 	player.active = true
 	tether.active = true
 	player.camera.make_current()
@@ -296,7 +313,7 @@ func _begin_play() -> void:
 	ui.hide_all()
 	_set_hud_visible(true)
 	hud.show_game()
-	set_hint("AIM ABOVE THE HORIZON  /  charge CAST, release, then LOCK to ride the weight", 8.0)
+	set_hint("AIM ABOVE THE HORIZON  /  charge {cast}, release, then {lock} to ride the weight", 8.0)
 	if not _cam_override.is_empty():
 		player.reset_at(Vector3(_cam_override[0], _cam_override[1], _cam_override[2]))
 		player.yaw = deg_to_rad(float(_cam_override[3]))
@@ -311,8 +328,9 @@ func _reset_run() -> void:
 	elapsed = 0.0
 	extraction_time = 0.0
 	extraction_inside = false
+	loadout = UpgradesScript.stats(profile.upgrades)
 	weapon = "ROD"
-	ammo = MAGAZINE
+	ammo = magazine_size()
 	reserve = 48
 	_reload_time = 0.0
 	_fire_cooldown = 0.0
@@ -323,6 +341,11 @@ func _reset_run() -> void:
 	_hint = ""
 	_hint_time = 0.0
 	run_stats = {"casts": 0, "kills": 0, "smash_kills": 0, "shots": 0, "damage_taken": 0.0, "max_speed": 0.0, "max_airtime": 0.0}
+
+
+## Magazine size for this raid, from the sidearm workshop track (stock 10).
+func magazine_size() -> int:
+	return int(loadout.get("magazine", 10))
 
 
 ## Stops the player and tether and drops the current weight (used before loading and on the title).
@@ -371,7 +394,7 @@ func _finish(won: bool, cause: String = "") -> void:
 	level.set_active(false)
 	last_result = _build_result(won, cause)
 	sound.motion(0.0, 0.0, false, false)
-	sound.play("win" if won else "lose")
+	_sfx("win" if won else "lose")
 	_set_hud_visible(false)
 	hud.show_menu()
 	# Freeze physics in a result view without pausing the UI or the result sound.
@@ -402,6 +425,7 @@ func _build_result(won: bool, cause: String) -> Dictionary:
 		for achievement_id: String in Achievements.end_of_run(run, profile):
 			if profile.unlock_achievement(achievement_id):
 				titles.append(Achievements.title_of(achievement_id))
+				_platform_unlock(achievement_id)
 	_flush_save_now()
 	var next_id: String = ""
 	if won and not practice:
@@ -448,7 +472,7 @@ func _process(delta: float) -> void:
 		if extraction_inside:
 			default_hint = "HOLD POSITION  /  extraction in %.1fs" % maxf(0.0, EXTRACTION_SECONDS - extraction_time) if cases >= total else "EXTRACTION LOCKED  /  recover all %d cases" % total
 		hud.update_state({
-			"health": player.health, "speed": player.linear_velocity.length(),
+			"health": player.health * 100.0 / maxf(1.0, float(loadout.get("max_health", 100.0))), "speed": player.linear_velocity.length(),
 			"tension": tether.tension, "line_length": tether.line_length,
 			"reel_state": tether.state_name(), "charge": tether.charge,
 			"loot": cases, "total_loot": total,
@@ -472,33 +496,45 @@ func _physics_process(delta: float) -> void:
 	else:
 		_air_time += delta
 		run_stats["max_airtime"] = maxf(float(run_stats["max_airtime"]), _air_time)
+	if speed >= Achievements.TERMINAL_SPEED:
+		_award("TERMINAL")
+	if _air_time >= Achievements.HANG_TIME_SECONDS:
+		_award("HANG_TIME")
+	_track_checkpoint(delta)
 	var keyboard: Vector2 = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	player.move_input = (keyboard + hud.move_vector).limit_length(1.0)
 	_fire_cooldown = maxf(0.0, _fire_cooldown - delta)
 	if _reload_time > 0.0:
 		_reload_time -= delta
 		if _reload_time <= 0.0:
-			var loaded: int = mini(MAGAZINE - ammo, reserve)
+			var loaded: int = mini(magazine_size() - ammo, reserve)
 			ammo += loaded
 			reserve -= loaded
 	if extraction_inside and int(level.get("collected_loot")) >= int(level.get("total_loot")):
 		extraction_time += delta
 		if extraction_time >= EXTRACTION_SECONDS:
-			_finish(true)
-			return
+			if bool((level.get("info") as Dictionary).get("repeatable", false)):
+				_extract_repeatable()
+			else:
+				_finish(true)
+				return
 	else:
 		extraction_time = 0.0
 	if player.global_position.y < float(level.get("kill_y")) and _cam_override.is_empty():
-		if practice:
-			tether.clear()
-			player.reset_at(level.get("spawn_position"))
-			set_hint("PRACTICE RESET  /  cast upward before locking", 5.0)
-		else:
-			_fell_out = true
-			player.take_damage(player.health + 1.0)
+		_fall_respawn()
 
 
 # --- Input -------------------------------------------------------------------------------------
+
+## Remembers the last device used, so hints name the buttons the player is actually using.
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey or event is InputEventMouseButton:
+		_device = "kbm"
+	elif event is InputEventJoypadButton or event is InputEventJoypadMotion:
+		_device = "gamepad"
+	elif event is InputEventScreenTouch or event is InputEventScreenDrag:
+		_device = "touch"
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause") and not event.is_echo():
@@ -520,6 +556,87 @@ func _unhandled_input(event: InputEvent) -> void:
 			_action(action, true)
 		elif event.is_action_released(action):
 			_action(action, false)
+
+
+## Checkpoints: every CHECKPOINT_SECONDS the grounded player's spot becomes the respawn point.
+func _track_checkpoint(delta: float) -> void:
+	_checkpoint_timer -= delta
+	if _checkpoint_timer > 0.0:
+		return
+	_checkpoint_timer = CHECKPOINT_SECONDS
+	if player.grounded and player.global_position.y > float(level.get("kill_y")) + 2.0:
+		_checkpoint = player.global_position
+		_checkpoint_yaw = player.yaw
+
+
+## A fall below kill_y cuts the line and returns the player to the last safe ground.
+## Raids take FALL_DAMAGE (a fatal fall ends the run with cause "fall"); practice is free.
+func _fall_respawn() -> void:
+	tether.cut()
+	if practice:
+		_return_to_checkpoint()
+		set_hint("PRACTICE RESET  /  back on the last safe ground", 4.0)
+		return
+	_fell_out = true
+	player.take_damage(FALL_DAMAGE)
+	if state != "playing":
+		return
+	_fell_out = false
+	_return_to_checkpoint()
+	set_hint("FELL  /  line cut, back on the last safe ground", 4.0)
+
+
+## reset_at restores full health, so the health held before the reset is put back.
+func _return_to_checkpoint() -> void:
+	var health: float = player.health
+	player.reset_at(_checkpoint)
+	player.yaw = _checkpoint_yaw
+	player.apply_look(Vector2.ZERO)
+	player.health = maxf(health, 1.0)
+
+
+## Repeatable levels (the range) bank the extraction, show a banner and restock their cases.
+func _extract_repeatable() -> void:
+	extraction_time = 0.0
+	ui.show_toast("EXTRACTED", "cases reset for the next run")
+	_sfx("win")
+	if level.has_method("reset_cases"):
+		level.call("reset_cases")
+
+
+## Live achievement: unlocks once, toasts, and reaches Steam through platform.gd.
+func _award(achievement_id: String) -> void:
+	if profile.has_achievement(achievement_id):
+		return
+	if profile.unlock_achievement(achievement_id):
+		var entry: Dictionary = Achievements.find(achievement_id)
+		ui.show_toast(str(entry.get("title", achievement_id)), str(entry.get("desc", "")))
+		_platform_unlock(achievement_id)
+		_save_soon()
+
+
+## Tells the platform layer about an unlock. Does nothing when platform.gd is absent.
+func _platform_unlock(achievement_id: String) -> void:
+	if is_instance_valid(platform):
+		platform.unlock_achievement(achievement_id)
+
+
+## Plays a sound event through the audio node when it exists.
+func _sfx(event_name: String) -> void:
+	if is_instance_valid(sound) and sound.has_method("play"):
+		sound.play(event_name)
+
+
+## Hint text with {tokens} replaced for the last-used device (input_setup.gd, F2).
+## Text without tokens comes back unchanged, and so does everything when that file is absent.
+func _expand(text: String) -> String:
+	if not ResourceLoader.exists(INPUT_SETUP_PATH):
+		return text
+	var setup: Script = load(INPUT_SETUP_PATH) as Script
+	if setup == null or not setup.has_method("expand_tokens"):
+		return text
+	var device: String = "touch" if is_instance_valid(hud) and hud.touch_enabled else _device
+	return str(setup.call("expand_tokens", text, device))
 
 
 func _look(delta: Vector2) -> void:
@@ -560,9 +677,9 @@ func _action(action: String, pressed: bool) -> void:
 				tether.charge = 0.0
 				weapon = "SIDEARM" if weapon == "ROD" else "ROD"
 		"reload":
-			if pressed and ammo < MAGAZINE and reserve > 0 and _reload_time <= 0.0:
+			if pressed and ammo < magazine_size() and reserve > 0 and _reload_time <= 0.0:
 				_reload_time = 1.5
-				sound.play("reload")
+				_sfx("reload")
 		"jump":
 			if pressed:
 				player.request_jump()
@@ -572,20 +689,20 @@ func _fire() -> void:
 	if _fire_cooldown > 0.0 or _reload_time > 0.0:
 		return
 	if ammo <= 0:
-		sound.play("empty")
-		set_hint("EMPTY  /  reload with R or RELOAD", 2.0)
+		_sfx("empty")
+		set_hint("EMPTY  /  reload with {reload}", 2.0)
 		_fire_cooldown = 0.2
 		return
 	ammo -= 1
 	run_stats["shots"] = int(run_stats["shots"]) + 1
 	_fire_cooldown = 0.22
 	var camera: Camera3D = player.camera
-	var hit: bool = level.apply_shot(camera.global_position, -camera.global_basis.z, 34.0)
-	sound.play("shot")
+	var hit: bool = level.apply_shot(camera.global_position, -camera.global_basis.z, float(loadout.get("sidearm_damage", 34.0)))
+	_sfx("shot")
 	player.shot_effect()
 	if hit:
 		_hitmarker = 1.0
-		sound.play("hit")
+		_sfx("hit")
 
 
 func _release_controls() -> void:
@@ -617,7 +734,7 @@ func _notification(what: int) -> void:
 func _on_loot(kind: String, _value: int) -> void:
 	if state != "playing":
 		return
-	sound.play("loot")
+	_sfx("loot")
 	if kind == "case":
 		set_hint("CASE SECURED  /  %d OF %d  /  extraction banks your haul" % [int(level.get("collected_loot")), int(level.get("total_loot"))], 3.0)
 	else:
@@ -627,9 +744,9 @@ func _on_loot(kind: String, _value: int) -> void:
 func _on_damage(amount: float) -> void:
 	_danger = 1.0
 	run_stats["damage_taken"] = float(run_stats.get("damage_taken", 0.0)) + amount
-	sound.play("hurt")
-	if hud.touch_enabled and bool(profile.setting("haptics")):
-		Input.vibrate_handheld(100)
+	_sfx("hurt")
+	if is_instance_valid(platform):
+		platform.vibrate(100)
 
 
 func _on_player_died() -> void:
@@ -640,14 +757,16 @@ func _on_enemy_killed(_kind: String, by: String) -> void:
 	run_stats["kills"] = int(run_stats["kills"]) + 1
 	if by in ["smash", "weight"]:
 		run_stats["smash_kills"] = int(run_stats["smash_kills"]) + 1
+		_award("DEADWEIGHT")
 
 
 func _on_tether_event(event: String) -> void:
 	if event in ["cast", "lock", "release", "cut"]:
-		sound.play(event)
+		_sfx(event)
 		if event == "cast":
 			run_stats["casts"] = int(run_stats["casts"]) + 1
-			set_hint("WEIGHT AWAY  /  LOCK the spool to take the pull", 2.5)
+			_award("FIRST_CAST")
+			set_hint("WEIGHT AWAY  /  {lock} to take the pull", 2.5)
 	else:
 		set_hint(event, 3.0)
 
@@ -667,7 +786,7 @@ func _death_cause() -> String:
 
 
 func set_hint(message: String, duration: float = 3.0) -> void:
-	_hint = message
+	_hint = _expand(message)
 	_hint_time = duration
 
 
@@ -691,6 +810,7 @@ func _on_upgrade_requested(upgrade_id: String) -> void:
 	for achievement_id: String in Achievements.progress_unlocks(profile):
 		if profile.unlock_achievement(achievement_id):
 			ui.show_toast(Achievements.title_of(achievement_id), str(Achievements.find(achievement_id).get("desc", "")))
+			_platform_unlock(achievement_id)
 	_flush_save_now()
 	ui.refresh()
 
@@ -745,6 +865,8 @@ func _flush_save_now() -> void:
 func _apply_settings() -> void:
 	Settings.apply_engine(profile.settings, _allow_window_changes())
 	Settings.apply_audio(profile.settings)
+	if is_instance_valid(platform):
+		platform.set_haptics(bool(profile.setting("haptics")))
 
 
 func _apply_player_settings() -> void:

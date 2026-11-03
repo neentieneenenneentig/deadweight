@@ -25,7 +25,7 @@ owner = needs the human (devices, accounts).
 | R6 | Store art + screenshots | C6, G7, F11 | M | B | shell, vision | MUST | todo |
 | P1 | Android full-game unlock (Play Billing); only if the owner picks model A | F5, F10, O3b | M | A | shell, owner | MUST if A | todo |
 | F1 | Data layer: profile/upgrades/achievements/settings + tests | — | M | B | shell | MUST | done |
-| F2 | Input map + platform services | — | S | B | shell | MUST | todo |
+| F2 | Input map + platform services | — | S | B | shell | MUST | done |
 | F3 | UI screens A: title, loading, pause, result (+stubs, preview) | — | M | B | shell, vision | MUST | done |
 | F4 | UI screens B: settings, credits | F3 | M | B | shell, vision | MUST | todo |
 | F5 | UI screens C: level select, workshop, records | F3 | M | B | shell, vision | MUST | todo |
@@ -34,7 +34,7 @@ owner = needs the human (devices, accounts).
 | F8 | Level features (anchors, updrafts, hazards, hints) + PRACTICE RANGE | F7 | M | A | shell, vision | MUST | todo |
 | F9 | Navigation mesh + level validation suite | F7 | M | A | shell | MUST | todo |
 | F10 | Main flow switch-over (new menus + catalog levels) | F1, F3, F7 | L | A | shell, vision | MUST | done |
-| F11 | Main run systems: stats, achievements, checkpoints, sidearm, hints | F10 | M | A | shell | MUST | todo |
+| F11 | Main run systems: stats, achievements, checkpoints, sidearm, hints | F10 | M | A | shell | MUST | done |
 | G1 | Player v2: movement + camera feel | F10 | M | A | shell | MUST | todo |
 | G2 | Tether v2: upgrades, recover, anchors, smash, events | F10 | M | A | shell | MUST | todo |
 | G3 | Rope wrapping | G2 | M | A | shell | SHOULD | todo |
