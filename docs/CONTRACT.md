@@ -210,7 +210,7 @@ func reset_at(where: Vector3, yaw_radians: float = 0.0) -> void   # where = caps
 func take_damage(amount: float, source: String = "", from_position: Vector3 = Vector3.INF) -> void
 func heal(amount: float) -> void
 func configure(stats: Dictionary) -> void        # uses max_health; refills health
-func apply_settings(settings: Dictionary) -> void   # look_sensitivity, invert_y, fov, camera_shake
+func apply_settings(settings: Dictionary) -> void   # look_sensitivity, fov, camera_shake (invert_y stays in main _look: see G1)
 func set_feedback(charge: float, tension: float, weapon: String) -> void
 func shot_effect() -> void
 func add_shake(amount: float) -> void            # 0..1

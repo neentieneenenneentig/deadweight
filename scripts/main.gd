@@ -288,6 +288,10 @@ func _build_level(id: String, practice_mode: bool) -> void:
 		if state == "playing":
 			set_hint(message, 2.5))
 	level.enemy_killed.connect(_on_enemy_killed)
+	# Hint zones (F8) show their text once per build, only while playing.
+	level.hint_requested.connect(func(text: String, duration: float) -> void:
+		if state == "playing":
+			set_hint(text, duration))
 	level.build(player, practice_mode)
 	level.apply_quality(int(profile.setting("quality")))
 	level.set_active(false)
@@ -297,7 +301,8 @@ func _begin_play() -> void:
 	_reset_run()
 	player.freeze = false
 	player.reset_at(level.get("spawn_position"))
-	player.health = float(loadout["max_health"])
+	# configure() sets max_health from the loadout and refills health to it (G1).
+	player.configure(loadout)
 	player.yaw = float(level.get("spawn_yaw"))
 	player.pitch = -0.04
 	player.apply_look(Vector2.ZERO)
@@ -481,7 +486,14 @@ func _process(delta: float) -> void:
 			"weapon": weapon, "ammo": ammo, "reserve": reserve,
 			"reloading": _reload_time > 0.0,
 			"hint": _hint if _hint_time > 0.0 else default_hint,
-			"hitmarker": _hitmarker, "danger": _danger, "practice": practice
+			"hitmarker": _hitmarker, "danger": _danger, "practice": practice,
+			# Medal target, bonus progress and extraction state for the HUD (G6).
+			"par_silver": float((level.get("info") as Dictionary).get("par_silver", 0.0)),
+			"par_gold": float((level.get("info") as Dictionary).get("par_gold", 0.0)),
+			"bonus": (level.get("collected_bonus") as Array).size(),
+			"total_bonus": int(level.get("total_bonus")),
+			"extraction_ready": cases >= total,
+			"airborne": not player.grounded
 		})
 
 
@@ -741,7 +753,7 @@ func _on_loot(kind: String, _value: int) -> void:
 		set_hint("BONUS CACHE FOUND  /  pays when you extract", 3.0)
 
 
-func _on_damage(amount: float) -> void:
+func _on_damage(amount: float, _source: String, _from_position: Vector3) -> void:
 	_danger = 1.0
 	run_stats["damage_taken"] = float(run_stats.get("damage_taken", 0.0)) + amount
 	_sfx("hurt")
@@ -749,7 +761,7 @@ func _on_damage(amount: float) -> void:
 		platform.vibrate(100)
 
 
-func _on_player_died() -> void:
+func _on_player_died(_source: String) -> void:
 	_finish(false, _death_cause())
 
 
@@ -873,6 +885,9 @@ func _apply_player_settings() -> void:
 	player.look_sensitivity = BASE_LOOK_SENSITIVITY * float(profile.setting("look_sensitivity"))
 	if player.has_method("apply_settings"):
 		player.call("apply_settings", profile.settings)
+	# The HUD reads show_telemetry and other display settings (G6).
+	if is_instance_valid(hud):
+		hud.apply_settings(profile.settings)
 	elif is_instance_valid(player.camera):
 		player.camera.fov = float(profile.setting("fov"))
 
