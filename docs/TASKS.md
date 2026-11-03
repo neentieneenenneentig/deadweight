@@ -37,6 +37,7 @@ owner = needs the human (devices, accounts).
 | F9 | Navigation mesh + level validation suite | F7 | M | A | shell | MUST | done (2026-11-03) |
 | F10 | Main flow switch-over (new menus + catalog levels) | F1, F3, F7 | L | A | shell, vision | MUST | done |
 | F11 | Main run systems: stats, achievements, checkpoints, sidearm, hints | F10 | M | A | shell | MUST | done |
+| F12 | Hazard-aware navigation + bonus off-foot checks | F9, C6 | S | B | shell | SHOULD | todo |
 | G1 | Player v2: movement + camera feel | F10 | M | A | shell | MUST | done (2026-11-03) |
 | G2 | Tether v2: upgrades, recover, anchors, smash, events | F10 | M | A | shell | MUST | done (2026-11-03) |
 | G3 | Rope wrapping | G2 | M | A | shell | SHOULD | done 2026-11-03 |
@@ -491,6 +492,25 @@ and update the flow_test that covers it.
 - Calls into audio and music are guarded.
 **Acceptance:** flow_test covers falling out (the run continues), FIRST_EXTRACT unlocking once, and
 the magazine following the upgrade tier. The gate passes.
+
+### F12 — Hazard-aware navigation + bonus checks
+**Edit:** scripts/level_base.gd (navigation bake and hazard records only), tests/levels_test.gd.
+**Do:**
+- Hazard volumes (heat, water, zap) are left out of the walkable navmesh, or carved out of it, so:
+  - hounds route around hazards;
+  - levels_test's case route walks around them. Keep the API unchanged.
+- If a required case or the extraction stands only on hazard ground, the route check must fail
+  with a clear message.
+- levels_test asserts every bonus cache is **off-foot**: there is no navmesh path from spawn to
+  within 1.5 m of it. This is how "rod-only" is meant (DESIGN). Print a clear warning for caches
+  that are walkable.
+- Re-print the route lengths. The par suggestions (C10 formula) may grow a little; report the
+  new numbers per level.
+**Acceptance:**
+- levels_test passes for every level, or the report lists each level that now fails and why (the
+  lead fixes the level files);
+- world_test passes, so the hounds still path;
+- the gate passes.
 
 ---
 
