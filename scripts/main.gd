@@ -32,6 +32,12 @@ const BASE_LOOK_SENSITIVITY: float = 0.0024
 const DAMAGE_SCALE := [0.5, 1.0, 1.5]
 const TITLE_LEVEL := "l01"
 const DEFAULT_CAPTURE_FRAMES: int = 90
+## Right stick turn rate in rad/s at full deflection and gamepad_sensitivity 1.0 (G8).
+const STICK_LOOK_SPEED: float = 3.0
+## Exponent applied after the input map's deadzone rescale: small tilts give fine aim.
+const STICK_CURVE: float = 1.6
+## Analog input beyond this counts as the pad being used (smaller values are stick drift).
+const DEVICE_SWITCH_STRENGTH: float = 0.4
 
 ## Command-line user arguments (CONTRACT 4.7). Tests set this before adding the node to the tree;
 ## when empty the real arguments after "--" are used.
@@ -85,6 +91,8 @@ var _checkpoint: Vector3 = Vector3.ZERO
 var _checkpoint_yaw: float = 0.0
 var _checkpoint_timer: float = 0.0
 var _device: String = "kbm"
+## The hint as it was given, with {tokens}, so a device switch can expand it again.
+var _hint_raw: String = ""
 
 
 func _ready() -> void:
@@ -362,6 +370,7 @@ func _reset_run() -> void:
 	_air_time = 0.0
 	_fell_out = false
 	_hint = ""
+	_hint_raw = ""
 	_hint_time = 0.0
 	run_stats = {"casts": 0, "kills": 0, "smash_kills": 0, "shots": 0, "damage_taken": 0.0, "max_speed": 0.0, "max_airtime": 0.0}
 
@@ -489,6 +498,8 @@ func _process(delta: float) -> void:
 		_place_attract()
 		_follow_menu_state()
 	elif state == "playing":
+		_apply_pad_look(delta)
+		tether.reel_strength = _reel_strength()
 		_hint_time = maxf(0.0, _hint_time - delta)
 		_hitmarker = maxf(0.0, _hitmarker - delta * 5.0)
 		_danger = maxf(0.0, _danger - delta * 0.9)
@@ -571,11 +582,28 @@ func _physics_process(delta: float) -> void:
 ## Remembers the last device used, so hints name the buttons the player is actually using.
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey or event is InputEventMouseButton:
-		_device = "kbm"
-	elif event is InputEventJoypadButton or event is InputEventJoypadMotion:
-		_device = "gamepad"
+		_set_device("kbm")
+	elif event is InputEventMouseMotion:
+		# Moving the mouse brings the cursor back, so mouse motion counts as keyboard and mouse use.
+		if (event as InputEventMouseMotion).relative.length_squared() > 0.0:
+			_set_device("kbm")
+	elif event is InputEventJoypadButton:
+		_set_device("gamepad")
+	elif event is InputEventJoypadMotion:
+		# Stick drift is small; only a clear push switches to the pad.
+		if absf((event as InputEventJoypadMotion).axis_value) > DEVICE_SWITCH_STRENGTH:
+			_set_device("gamepad")
 	elif event is InputEventScreenTouch or event is InputEventScreenDrag:
-		_device = "touch"
+		_set_device("touch")
+
+
+## Switches the last-used device. Hints expand again at once, and the cursor follows the device.
+func _set_device(device: String) -> void:
+	if device == _device:
+		return
+	_device = device
+	_hint = _expand(_hint_raw)
+	_update_mouse()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -756,9 +784,51 @@ func _release_controls() -> void:
 		hud.move_vector = Vector2.ZERO
 
 
+## Captures the mouse while flying, hides the cursor while a pad drives the menus, and frees it
+## otherwise. Headless runs have no cursor, so the mouse mode is left alone there.
 func _update_mouse() -> void:
+	if DisplayServer.get_name() == "headless" or not is_instance_valid(hud):
+		return
 	var capture: bool = state == "playing" and not hud.touch_enabled and not _capture
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if capture else Input.MOUSE_MODE_VISIBLE
+	if capture:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	elif _device == "gamepad" and not hud.touch_enabled:
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+## Right stick look (CONTRACT 5.7). The deadzone comes from the input map (0.2), then this adds the
+## response curve, gamepad_sensitivity and the frame time, so the turn rate holds at any frame rate.
+## Keyboard look keys stay silent here: only a pad drives the stick.
+func _apply_pad_look(delta: float) -> void:
+	if _device != "gamepad":
+		return
+	var left: float = Input.get_action_strength("look_left")
+	var right: float = Input.get_action_strength("look_right")
+	var up: float = Input.get_action_strength("look_up")
+	var down: float = Input.get_action_strength("look_down")
+	# Positive x turns right and positive y tilts down, the same signs as a mouse move.
+	var stick := Vector2(right - left, down - up)
+	var length: float = minf(stick.length(), 1.0)
+	if length <= 0.0:
+		return
+	var curved: Vector2 = stick.normalized() * pow(length, STICK_CURVE)
+	var sensitivity: float = float(profile.setting("gamepad_sensitivity"))
+	var radians: Vector2 = curved * STICK_LOOK_SPEED * sensitivity * delta
+	# player.apply_look scales by the mouse look sensitivity, so divide it out and the stick
+	# follows gamepad_sensitivity alone. _look still applies invert_y.
+	var mouse_scale: float = player.look_sensitivity
+	if mouse_scale <= 0.0:
+		return
+	_look(radians / mouse_scale)
+
+
+## LT is analog: a pad pulls the line in by the trigger's depth. Keyboard and mouse reel stays full.
+func _reel_strength() -> float:
+	if _device != "gamepad":
+		return 1.0
+	return clampf(Input.get_action_strength("reel"), 0.0, 1.0)
 
 
 func _notification(what: int) -> void:
@@ -846,6 +916,7 @@ func _death_cause() -> String:
 
 
 func set_hint(message: String, duration: float = 3.0) -> void:
+	_hint_raw = message
 	_hint = _expand(message)
 	_hint_time = duration
 
