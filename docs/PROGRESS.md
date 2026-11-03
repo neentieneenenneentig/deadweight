@@ -325,6 +325,34 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   - Lead: main ignores dummy kills in run stats, DEADWEIGHT and death cause. CONTRACT §4.11 and §4.13 updated.
 - Gate: QUALITY GATE PASSED (51 scripts, 10 suites).
 
+## 2026-11-03: G3 rope wrapping, C1 tutorial INDUCTION, C2 l02 PUMP ROW
+
+- Model: Haiku 5.5 executors (three in parallel), lead Opus 5.5.
+- G3 (`scripts/tether.gd`, `tests/physics_test.gd`, CONTRACT §4.9):
+  - the line is a polyline with up to 8 wraps on layer-1 corners;
+  - a wrap is added where a segment is blocked. It sits 0.12 m off the surface and slides to the clearing corner on the shorter side;
+  - a wrap is dropped when its neighbours see each other with 0.08 m clearance (sphere sweep).
+  - Tension uses the total length. The player and the weight pull along their end segments.
+  - A ninth wrap, or a non-finite state, severs the line. The 0.24 s obstruction-cut rule is gone. `get_wrap_points()` added.
+  - The line view sags per segment.
+  - physics_test adds 8 wrap checks; 60 vs 120 Hz pull within 14 %.
+  - Open: the overflow test injects 8 wraps by hand. The corner search runs a few hundred raycasts per new wrap; profile it on Deck in Q1.
+- C1 (`scripts/levels/tutorial.gd`):
+  - a 130 m linear course with twelve hint-zone stations: walk, cast, lock, reel, cut, a rod-crossable pit with side-strip detours, anchor, swing, updraft, sidearm on a dummy, case, extraction;
+  - no hostiles; INFO.enemies is true because of the dummy, the same as the range.
+  - levels_test 30/0; par 20/10 s.
+  - Sidearm hint uses {weapon}, {cast} and {reload}. There is no {fire} token.
+- C2 (`scripts/levels/l02_pump_row.gd`):
+  - six porcelain pump houses ("NOT PUMPING") under three pipe racks with six cyan anchors;
+  - 3 cases (one on a ramped plinth) and 2 rod-only caches (rack top and a house roof);
+  - 3 hounds and a roof sentry.
+  - levels_test 34/0; route 165 m; par 25/15 s.
+  - Compatibility spawn view 142 draw calls. Forward+ 164, 4 over 160; §7 budgets Compatibility.
+  - Open: rod-only cache reachability is untested and needs a playtest.
+- Lead: world_test, flow_test and ui_test no longer assume only l01 exists. l09 (v1.1) is the stand-in unbuilt level, and l01's next level is l02.
+- Pars: new levels take levels_test's suggestions (20–25 s silver), while l01 still says 150/95 s. C10 reconciles these.
+- Gate: QUALITY GATE PASSED (53 scripts, 10 suites).
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>

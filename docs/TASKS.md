@@ -39,7 +39,7 @@ owner = needs the human (devices, accounts).
 | F11 | Main run systems: stats, achievements, checkpoints, sidearm, hints | F10 | M | A | shell | MUST | done |
 | G1 | Player v2: movement + camera feel | F10 | M | A | shell | MUST | done (2026-11-03) |
 | G2 | Tether v2: upgrades, recover, anchors, smash, events | F10 | M | A | shell | MUST | done (2026-11-03) |
-| G3 | Rope wrapping | G2 | M | A | shell | SHOULD | in progress |
+| G3 | Rope wrapping | G2 | M | A | shell | SHOULD | done 2026-11-03 |
 | G4 | Line + weight visuals | G2 | M | B | shell, vision | MUST | todo |
 | G5 | Viewmodel: rod + sidearm | G1 | M | B | shell, vision | SHOULD | done (2026-11-03) |
 | G6 | HUD v2: layout, reticle, telemetry | F10 | M | B | shell, vision | MUST | done (2026-11-03) |
@@ -51,8 +51,8 @@ owner = needs the human (devices, accounts).
 | A1 | Sound effects synthesis | — | L | A | shell | MUST | done (2026-11-03) |
 | A2 | Audio engine v2 | A1, F11 | M | B | shell | MUST | done (2026-11-03) |
 | A3 | Music (adaptive layers; MVP fallback allowed) | A2 | L | A | shell | MUST | done, MVP (2026-11-03) |
-| C1 | Tutorial: INDUCTION | F8, F9, F11, G2 | M | A | shell, vision | MUST | todo |
-| C2 | Level l02 PUMP ROW | F8, F9 | M | A | shell, vision | MUST | todo |
+| C1 | Tutorial: INDUCTION | F8, F9, F11, G2 | M | A | shell, vision | MUST | done 2026-11-03 |
+| C2 | Level l02 PUMP ROW | F8, F9 | M | A | shell, vision | MUST | done 2026-11-03 |
 | C3 | Level l03 OVERFLOW | F8, F9 | M | A | shell, vision | MUST | todo |
 | C4 | Level l04 SLAG LINE | F8, F9, E2 | M | A | shell, vision | MUST | todo |
 | C5 | Level l05 CRANE YARD | F8, F9, E2 | M | A | shell, vision | MUST | todo |
