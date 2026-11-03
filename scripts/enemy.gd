@@ -275,7 +275,8 @@ func _build_drone(armor: StandardMaterial3D, joints: StandardMaterial3D) -> void
 	_build_aim_line()
 
 
-## The red aim line used by the sentry's wind-up and the drone's charge. Hidden until needed.
+## Joins the sentry's fixed feet and struts into one mesh. They share a material and never animate,
+## so one surface is cheaper to draw than one mesh per piece.
 func _merge_fittings(parent: Node3D, material: Material) -> void:
 	# The sentry's fixed feet and struts share a material and never animate.
 	var surface := SurfaceTool.new()
@@ -291,6 +292,7 @@ func _merge_fittings(parent: Node3D, material: Material) -> void:
 	parent.add_child(stand)
 
 
+## Smooth body part: a sphere scaled to an oval, so the porcelain shapes read as curved.
 func _dream_oval(parent: Node3D, at: Vector3, size: Vector3, material: Material) -> MeshInstance3D:
 	var view := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
@@ -306,6 +308,7 @@ func _dream_oval(parent: Node3D, at: Vector3, size: Vector3, material: Material)
 	return view
 
 
+## The red aim line used by the sentry's wind-up and the drone's charge. Hidden until needed.
 func _build_aim_line() -> void:
 	var line_mesh := CylinderMesh.new()
 	line_mesh.top_radius = 0.018
