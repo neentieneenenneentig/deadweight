@@ -11,7 +11,9 @@ weight drags you into the sky. Reel in, cut loose, recast in mid-air. Raid aband
 industrial sectors for salvage, outfly robot hounds, sentries and drones, and extract.
 
 Platforms: Windows + Linux on Steam (Steam Deck friendly), Android on Google Play.
-Business model: premium, fully offline, no ads, no in-app purchases, no data collection.
+Business model: premium on Steam. On Google Play the owner chooses (PLAN O3b) between free to try
+with one full-game unlock purchase (recommended, task P1) and paid up front. Always fully offline,
+no ads, no data collection.
 
 ## Pillars
 

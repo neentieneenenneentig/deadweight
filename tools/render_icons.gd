@@ -105,11 +105,15 @@ static func defs(glow_center: Vector2 = Vector2(300, 200), glow_radius: float = 
 ## detail 0: tiny silhouette (16-32 px), 1: small (48-96 px), 2: full.
 ## mono: single-colour white layer with alpha shading (Android themed icon).
 ## line_end: local y where the line stops; line_fade uses the dw_line gradient.
-static func mark(detail: int, mono: bool = false, line_end: float = 900.0, line_fade: bool = false) -> String:
+## with_streaks: false drops the speed streaks (Android adaptive layers, where a launcher mask
+## would clip them).
+static func mark(detail: int, mono: bool = false, line_end: float = 900.0, line_fade: bool = false, with_streaks: bool = true) -> String:
 	var parts := PackedStringArray()
 	var streak_color: String = "#ffffff" if mono else PAPER
 	var streaks: Array = []
-	if detail == 1:
+	if not with_streaks:
+		streaks = []
+	elif detail == 1:
 		streaks = [[-146.0, 0.0, 112.0, 22.0, 0.6], [146.0, 36.0, 124.0, 22.0, 0.5]]
 	elif detail >= 2:
 		streaks = [[-142.0, -6.0, 118.0, 15.0, 0.55], [142.0, 30.0, 132.0, 15.0, 0.45], [-180.0, 70.0, 140.0, 11.0, 0.28]]
@@ -156,7 +160,7 @@ static func icon_svg(size: int, style: String = "rounded") -> String:
 	match style:
 		"foreground", "monochrome":
 			var transform: String = "translate(216 216) rotate(45) scale(%s) translate(%s %s)" % [_n(ADAPTIVE_SAFE_RADIUS / MARK_RADIUS), _n(-MARK_CENTER.x), _n(-MARK_CENTER.y)]
-			var body: String = mark(maxi(detail, 1), style == "monochrome")
+			var body: String = mark(maxi(detail, 1), style == "monochrome", 900.0, false, false)
 			return (head % [size, size, ADAPTIVE_SIZE, ADAPTIVE_SIZE]) + defs() + '<g transform="%s">%s</g></svg>' % [transform, body]
 		"background":
 			return (head % [size, size, ADAPTIVE_SIZE, ADAPTIVE_SIZE]) + defs(Vector2(244, 190), 380.0) + '<rect width="432" height="432" fill="url(#dw_bg)"/>' + _background_detail(432.0) + '</svg>'
@@ -345,7 +349,26 @@ func render_all() -> void:
 	_write_text(BRAND_DIR + "/icon_square.svg", icon_svg(512, "square"))
 	_write_text(BRAND_DIR + "/mark.svg", icon_svg(512, "mark"))
 	_save_png(render_icon(1024, "mark"), BRAND_DIR + "/mark_1024.png")
+	_save_png(_opaque(render_svg(feature_graphic_svg())), ART_DIR + "/play_feature_graphic_placeholder_1024x500.png")
 	print("render_icons: wrote icons, store icons and brand files")
+
+
+## Placeholder Google Play feature graphic (1024x500, opaque, no text). Task R6 replaces it with
+## a rendered scene and the logotype.
+static func feature_graphic_svg() -> String:
+	var parts := PackedStringArray()
+	parts.append('<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">')
+	parts.append(defs(Vector2(690, 170), 640.0, 300.0))
+	parts.append('<rect width="1024" height="500" fill="url(#dw_bg)"/>')
+	parts.append('<g opacity="0.12">')
+	for i in range(14):
+		var x: float = 40.0 + float(i) * 44.0
+		parts.append('<path d="M %s 500 L %s 500 L %s 452 L %s 452 Z" fill="%s"/>' % [_n(x), _n(x + 22.0), _n(x + 70.0), _n(x + 48.0), AMBER])
+	parts.append('</g>')
+	var transform: String = "translate(690 230) rotate(45) scale(1.05) translate(%s %s)" % [_n(-MARK_CENTER.x), _n(-MARK_CENTER.y)]
+	parts.append('<g transform="%s">%s</g>' % [transform, mark(2, false, 520.0, true)])
+	parts.append('</svg>')
+	return "".join(parts)
 
 
 ## The project icon (window/editor/boot) keeps the 256 px imported size.
@@ -535,6 +558,7 @@ func verify_all() -> void:
 	_check_png(PLAY_DIR + "/icon_512.png", Vector2i(512, 512), "opaque")
 	_check_file_size(PLAY_DIR + "/icon_512.png", 1024 * 1024)
 	_check_linux_zip(STEAM_DIR + "/linux_client_icons.zip")
+	_check_png(ART_DIR + "/play_feature_graphic_placeholder_1024x500.png", Vector2i(1024, 500), "opaque")
 	_check_svg("res://icon.svg", Vector2i(256, 256))
 	for file: String in ["icon_rounded.svg", "icon_square.svg", "mark.svg"]:
 		_check_svg(BRAND_DIR + "/" + file, Vector2i(512, 512))
@@ -585,7 +609,7 @@ func _check_png(path: String, size: Vector2i, rule: String) -> void:
 ## Everything but the trailing line must sit inside the 66 dp safe circle.
 func _check_safe_zone() -> void:
 	var transform: String = "translate(216 216) rotate(45) scale(%s) translate(%s %s)" % [_n(ADAPTIVE_SAFE_RADIUS / MARK_RADIUS), _n(-MARK_CENTER.x), _n(-MARK_CENTER.y)]
-	var svg: String = '<svg xmlns="http://www.w3.org/2000/svg" width="432" height="432" viewBox="0 0 432 432">' + defs() + '<g transform="%s">%s</g></svg>' % [transform, mark(1, true, 118.0)]
+	var svg: String = '<svg xmlns="http://www.w3.org/2000/svg" width="432" height="432" viewBox="0 0 432 432">' + defs() + '<g transform="%s">%s</g></svg>' % [transform, mark(1, true, 118.0, false, false)]
 	var image: Image = render_svg(svg)
 	var outside: int = 0
 	var covered: int = 0

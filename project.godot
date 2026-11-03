@@ -5,10 +5,13 @@ config_version=5
 [application]
 config/name="DEADWEIGHT"
 config/description="Cast impossibly heavy weights, catch the line, and fly."
-config/version="1.0.0"
+config/version="0.9.0"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
+config/windows_native_icon="res://icons/icon_256.ico"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="DEADWEIGHT"
 boot_splash/bg_color=Color(0.035, 0.055, 0.065, 1)
 boot_splash/show_image=false
 
@@ -19,13 +22,14 @@ window/size/window_width_override=1280
 window/size/window_height_override=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-window/handheld/orientation=0
+window/handheld/orientation=4
 
 [rendering]
 renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/default_filters/use_nearest_mipmap_filter=false
 textures/default_filters/anisotropic_filtering_level=2
+textures/vram_compression/import_etc2_astc=true
 anti_aliasing/quality/msaa_3d=1
 environment/defaults/default_clear_color=Color(0.035, 0.055, 0.065, 1)
 

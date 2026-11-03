@@ -31,6 +31,62 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   Steam $100 fee with a 30-day wait and 2-week Coming Soon. Sources are in PLAN §3.
 - Next: R1 (toolchain + API 36), and the owner starts O1, O2, O5 and O9 today.
 
+## 2026-11-03: git repository
+- Model: Claude Opus 5.5.
+- `git init -b main` and a baseline commit of the prototype, docs and drafts. .gitignore now
+  excludes .tools/, android/, builds/ and all signing material; .gitattributes added.
+
+## 2026-11-03: R1 toolchain + export presets
+- Model: Claude Opus 5.5.
+- Changed: tools/setup.ps1 (extracts only the needed templates, installs SDK packages only when
+  missing, installs the Android build template into android/build), tools/toolchain.json (template
+  file list; versions read from android_source.zip: compileSdk/targetSdk 36, minSdk 24,
+  build-tools 36.1.0, AGP 8.6.1, Gradle 8.11.1, NDK 29.0.14206865), tools/configure-android.ps1
+  (debug keystore in the editor profile), export_presets.cfg (Windows Desktop, Linux, Android
+  APK, Android AAB), tools/release.json (new), .gitignore, .cbmignore.
+- project.godot: version 0.9.0, sensor-landscape orientation, ETC2/ASTC import (Android export
+  needs it).
+- Tests: QUALITY GATE: PASSED. setup.ps1 second run: 0 s. Windows export launches (Vulkan,
+  Forward+). APK: package, version, minSdk 24, targetSdk 36, VIBRATE only, `zipalign -P 16` OK.
+  AAB: same manifest checks; arm64 libraries have 16 KB LOAD alignment.
+- Deviations: release.json starts at 0.9.0 / code 90 (scheme: major·100 + minor·10 + patch, so
+  1.0.0 = 100). The NDK isn't installed: AGP only uses it to strip symbols and the template's
+  libraries ship stripped. Gradle's cache lives in the user's ~/.gradle.
+- Follow-ups: the prebuilt APK carries an orphaned `mipmap/themed_icon` table entry from Godot's
+  template (aapt2 warns; the icon actually used is complete). Harmless.
+
+## 2026-11-03: R2 signing, build script, Steam scripts
+- Model: Claude Opus 5.5.
+- Changed: tools/make-upload-key.ps1 (new; RSA 4096 PKCS12, password via env var, refuses to
+  overwrite; run once, certificate SHA-256 47:82:69:92:…:5A:60), tools/build.ps1 (rewritten),
+  tools/install-android.ps1, tools/steam/ (vdf templates + upload.ps1).
+- build.ps1: gate → import → stamp presets from release.json (restored byte for byte) → export →
+  verify (apksigner/keytool certificate = upload key, aapt2 manifest, permission whitelist,
+  zipalign -P 16, jarsigner, merged bundle manifest) → zips, SHA256SUMS.txt, BUILD_INFO.txt.
+  Secrets are scrubbed from logs.
+- Tests: `build.ps1 -Target All` passed three times (147 s, 82 s, 115 s); export_presets.cfg
+  unchanged; the Windows zip runs from a fresh folder; the password appears in no log.
+- Gotchas fixed: a Gradle daemon kept `Start-Process -Wait` blocked forever
+  (GRADLE_OPTS=-Dorg.gradle.daemon=false); native tools writing to stderr throw under
+  ErrorActionPreference=Stop in Windows PowerShell (Invoke-Native helper).
+
+## 2026-11-03: R3 icons, R4 notices + privacy policy, R5 store copy
+- Model: Claude Opus 5.5.
+- R3: tools/render_icons.gd (draft kept) now passes all 52 checks: adaptive layers drop the speed
+  streaks so the mark sits inside the 66 dp safe zone, and it writes a 1024×500 feature-graphic
+  placeholder. Presets use icons/*; project.godot gets windows_native_icon. Contact sheet viewed;
+  the exe shows the new icon.
+- R4: tools/notices.gd regenerates THIRD_PARTY_NOTICES.txt (Godot MIT text, 102 components, 19
+  licence texts). PRIVACY_POLICY.md and store/privacy-policy.html (standalone). project.godot now
+  uses a custom user dir, so saves live in %APPDATA%\DEADWEIGHT and ~/.local/share/DEADWEIGHT.
+- R5: store/steam/{description,achievements}.md, store/google-play/{listing,data-safety,
+  content-rating}.md, store/presskit.md, RELEASE_CHECKLIST.md, README.md. Character counts
+  measured: Steam short 223/300, Play short 75 or 71/80, full 1,303 or 1,248/4,000.
+- Decision surfaced: Play never lets a free app become paid, and closed testers must buy paid apps
+  (Play Console Help 6334373 and 9845334). Added owner step O3b and task P1 (Play Billing unlock)
+  for the recommended free-to-try model.
+- Tests: QUALITY GATE: PASSED (22 scripts, 3 suites); build.ps1 -Target All OK.
+
 ---
 Template:
 ```

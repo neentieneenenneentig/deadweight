@@ -1,35 +1,43 @@
 # DEADWEIGHT
 
-A first-person extraction prototype for Android and Windows. Enter an abandoned
-floodworks, recover three salvage cases, and survive long enough to extract.
-Your escape tool is a fishing rod that throws impossibly heavy weights. Cast,
-lock the spool, reel yourself through the air, cut loose, and cast again.
+First-person movement action for PC (Steam: Windows, Linux, Steam Deck) and Android (Google Play).
+Your legs are slow and the ground is hostile. Your one real tool is a fishing rod that casts
+impossibly heavy weights: cast, lock the spool, and the weight drags you into the sky. Reel in, cut
+loose, recast in mid-air. Raid abandoned industrial sectors for salvage, outfly robot hounds,
+sentries and drones, and extract.
 
-## Play
+**Status:** a playable prototype (one level, the full raid loop, rod physics, two enemy kinds,
+touch controls) with a working release pipeline. Version 1.0 is being built task by task:
 
-- **Android:** copy `builds/DEADWEIGHT-android-debug.apk` to your phone and open it.
-  Allow installation from the app used to open the APK when Android asks. This is
-  a locally signed development build, not a Google Play release.
-- **Windows:** extract `builds/DEADWEIGHT-windows.zip` and run `DEADWEIGHT.exe`.
-  The executable includes the game data; keep the notices file with it.
-- **From source:** import `project.godot` into Godot **4.7.2 stable** and press F6
-  on `main.tscn`, or F5 to run the project.
+| Document | What it covers |
+| --- | --- |
+| [docs/PLAN.md](docs/PLAN.md) | Strategy, store deadlines, owner-only steps, milestones |
+| [docs/TASKS.md](docs/TASKS.md) | Task cards and their status |
+| [docs/EXECUTOR_BRIEF.md](docs/EXECUTOR_BRIEF.md) | Rules for any model or person doing a task |
+| [docs/DESIGN.md](docs/DESIGN.md) / [docs/CONTRACT.md](docs/CONTRACT.md) | The v1.0 game and the module APIs |
+| [docs/PROGRESS.md](docs/PROGRESS.md) | What each task changed |
+| [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) | Step by step to Steam and Google Play |
 
-Start with **Practice** to learn the rod without enemies. In a raid, collect all
-three cases, then stay inside the extraction zone for six seconds. Leaving the
-zone interrupts extraction. Extracted salvage is banked locally; death loses
-the current run's salvage. This is a single-player prototype with a local save,
-not an online economy or multiplayer service.
+## Play a build
 
-## Controls
+After `tools/build.ps1` (below), `builds/` holds:
+
+- `DEADWEIGHT-<version>-windows.zip`: unzip and run `DEADWEIGHT.exe`.
+- `DEADWEIGHT-<version>-linux.zip`: unzip, `chmod +x DEADWEIGHT.x86_64`, run it.
+- `DEADWEIGHT-<version>.apk`: install on a phone with `tools/install-android.ps1` (USB debugging).
+- `DEADWEIGHT-<version>.aab`: the bundle for Google Play. It can't be installed directly.
+
+From source: open `project.godot` in Godot **4.7.2 stable** (`tools/run.ps1 -Editor`) and press F5.
+
+### Prototype controls
 
 | Action | PC | Android |
 | --- | --- | --- |
 | Move | WASD | Left stick |
 | Aim | Mouse | Drag the right side |
-| Cast | Hold/release left mouse | Hold/release CAST; drag while holding to aim |
+| Cast | Hold and release left mouse | Hold and release CAST; drag while holding to aim |
 | Lock / free spool | Right mouse | LOCK toggle |
-| Reel | Hold E | Hold REEL; drag while holding to aim |
+| Reel | Hold E | Hold REEL |
 | Cut the line | Q | CUT |
 | Rod / sidearm | F | Weapon button |
 | Fire sidearm | Left mouse in sidearm mode | FIRE in sidearm mode |
@@ -37,78 +45,58 @@ not an online economy or multiplayer service.
 | Jump | Space | JUMP |
 | Pause | Escape | Pause button / Android back |
 
-The line stays attached when you switch to your sidearm. Cut or recover the
-current weight before casting another. Watch the spool state, tension, and line
-length: a slack line cannot pull you, and a free spool lets the weight travel.
-Aim upward, cast, then lock to catch the weight's pull. Reel to bring it closer;
-cut to preserve your motion and set up the next cast.
+Collect every case, then stand in the extraction zone for six seconds. Aim up, cast, then lock to
+catch the weight's pull; a slack line can't pull you. Cut to keep your speed and set up the next
+cast. Gamepad support and remapped controls arrive with tasks F2 and G8.
 
-The spool holds up to 48 metres of line. A line dragged through solid concrete
-severs after a short grace period, so clear the wall before pulling hard. Replacement
-weights are unlimited in this prototype; sidearm ammunition is limited.
+## Toolchain
 
-## Physics choice
-
-Player and weight have mass, gravity, inherited velocity, casting recoil,
-collision, and a tension-only line. Reeling has finite speed and force. Cutting
-does not erase velocity. The deliberate dream concession is a brief external
-push on a newly cast weight, allowing sustained aerial movement that ordinary
-throwing and reeling alone would not provide.
-
-## Local development tools
-
-The PowerShell helpers use a project-local `.tools` directory. They do not install
-Godot, Java, or the Android SDK globally. Initial setup downloads about 1.7 GB of
-archives, chiefly Godot's combined export templates. Only the Windows and Android
-templates are extracted. Checksums are pinned in `tools/toolchain.json`.
+Everything lives in the project-local, git-ignored `.tools/` folder; nothing is installed globally
+except Gradle's download cache in your user folder. Versions and checksums are pinned in
+`tools/toolchain.json`.
 
 ```powershell
-# Download Godot and Windows templates only.
-powershell -ExecutionPolicy Bypass -File tools/setup.ps1 -DesktopOnly
-
-# Full setup, including the local Android SDK and JDK 17.
+# Godot 4.7.2 + export templates, JDK 17, Android SDK (API 36) and the Android build template.
+# Re-running is quick and downloads nothing twice. Add -DesktopOnly to skip Android.
 powershell -ExecutionPolicy Bypass -File tools/setup.ps1
 
-# Run the game or open its editor.
+# The quality gate: parse-checks every script and runs every test suite.
+powershell -ExecutionPolicy Bypass -File tests/run_all.ps1
+
+# Run the game (-Touch shows the mobile controls, -Editor opens the editor).
 powershell -ExecutionPolicy Bypass -File tools/run.ps1
-powershell -ExecutionPolicy Bypass -File tools/run.ps1 -Editor
-
-# Show mobile controls on desktop for layout checks.
-powershell -ExecutionPolicy Bypass -File tools/run.ps1 -Touch
-
-# Import and export both targets, or use -Target Windows / -Target Android.
-powershell -ExecutionPolicy Bypass -File tools/build.ps1
-
-# Install the debug APK on a connected, authorized Android device.
-powershell -ExecutionPolicy Bypass -File tools/install-android.ps1
 ```
 
-Full setup displays and accepts the Android SDK package licenses needed for local
-development. Android export uses the prebuilt template, so it does not need a
-Gradle build, NDK, or CMake. The local debug signing key stays in ignored `.tools`;
-it must not be used for a public release. Keep that key to install subsequent
-debug builds over the current one without uninstalling and losing local saves.
+## Release builds
 
-Android targets ARMv7 and ARM64, landscape mode, and OpenGL ES 3.0 through Godot's
-Compatibility renderer. The preset requests Android 8.0/API 26 or newer. Physical
-phone testing is still needed for performance, touch comfort, and device-specific
-graphics behaviour. Desktop touch emulation is a layout check, not a substitute.
+```powershell
+# Once: create the Google Play upload key in .tools/keys/ and BACK IT UP privately.
+powershell -ExecutionPolicy Bypass -File tools/make-upload-key.ps1
 
-Godot's editor and export templates must match. For a different Godot installation,
-install that version's export templates and set its Android SDK/JDK paths in Editor
-Settings. Use the included export presets. iPhone support is deferred.
+# Gate, import, export, sign and verify. Targets: Windows, Linux, AndroidApk, AndroidAab, All.
+powershell -ExecutionPolicy Bypass -File tools/build.ps1 -Target All
+```
+
+- Name, version, version code and package id come from `tools/release.json`. `project.godot`
+  `config/version` must match its `version`. Raise `version_code` before every Play upload.
+- The build checks signatures against the upload key, Android target SDK 36, package and version,
+  the permission list (VIBRATE only) and 16 KB page alignment, then writes `builds/SHA256SUMS.txt`
+  and `builds/BUILD_INFO.txt`. Logs are in `builds/logs/`.
+- `export_presets.cfg` is stamped from `release.json` only for the duration of a build and is
+  always restored.
+- Steam uploads: `tools/steam/upload.ps1` (owner only; see the notes at the top of the script).
+- Store text, policy and art: `store/`, `PRIVACY_POLICY.md`. Icons: `tools/render_icons.gd`.
+  Third-party notices: `tools/notices.gd` regenerates `THIRD_PARTY_NOTICES.txt` from the engine.
 
 ## Project map
 
-- `scripts/main.gd`: raid state, weapons, extraction, persistence, and input routing.
-- `scripts/player.gd`: first-person rigid-body movement and camera.
-- `scripts/tether.gd`: casting, weights, spool states, and rope forces.
-- `scripts/world.gd`, `scripts/enemy.gd`: environment, salvage, extraction volume,
-  pursuers, and ranged threats.
-- `scripts/hud.gd`: menus, telemetry, results, and touch controls.
-- `scripts/audio.gd`: procedural audio.
-- `tests/`: headless gameplay/physics checks.
+- `scripts/main.gd`: game flow, raid state, weapons, extraction, persistence, input routing.
+- `scripts/player.gd`, `scripts/tether.gd`: rigid-body player and the rod (cast, spool, rope forces).
+- `scripts/world.gd`, `scripts/enemy.gd`: the Sluice Gate level, salvage, extraction, enemies.
+- `scripts/hud.gd`, `scripts/audio.gd`, `scripts/fx.gd`: interface, procedural audio, effects.
+- `scripts/profile.gd`, `upgrades.gd`, `achievements.gd`, `settings.gd`, `scripts/ui/`: v1.0
+  modules in progress (see TASKS.md).
+- `tests/`: headless suites run by `tests/run_all.ps1`.
 
-All game art and sound are generated in code. Engine credits and licensing are in
-`THIRD_PARTY_NOTICES.txt`, included in exports. The prototype's scope and original
-idea are recorded in `GAME_BRIEF.md`.
+All game art and sound are generated in code. Engine credits and licences are in
+`THIRD_PARTY_NOTICES.txt`, which ships with every build.

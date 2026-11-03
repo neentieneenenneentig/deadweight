@@ -17,12 +17,13 @@ owner = needs the human (devices, accounts).
 
 | ID | Task | Depends | Size | Tier | Needs | Scope | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| R1 | Toolchain + export presets (Win/Linux/APK/AAB, API 36) | — | M | B | shell, web | MUST | todo |
-| R2 | Release signing, build script, Steam upload scripts | R1 | M | B | shell | MUST | todo |
-| R3 | App icon + store icon set | — | S | B | shell, vision | MUST | todo |
-| R4 | Third-party notices + privacy policy | — | S | C/B | shell | MUST | todo |
-| R5 | Store copy, release checklist, README | — | M | C | web | MUST | todo |
+| R1 | Toolchain + export presets (Win/Linux/APK/AAB, API 36) | — | M | B | shell, web | MUST | done |
+| R2 | Release signing, build script, Steam upload scripts | R1 | M | B | shell | MUST | done |
+| R3 | App icon + store icon set | — | S | B | shell, vision | MUST | done |
+| R4 | Third-party notices + privacy policy | — | S | C/B | shell | MUST | done |
+| R5 | Store copy, release checklist, README | — | M | C | web | MUST | done |
 | R6 | Store art + screenshots | C6, G7, F11 | M | B | shell, vision | MUST | todo |
+| P1 | Android full-game unlock (Play Billing); only if the owner picks model A | F5, F10, O3b | M | A | shell, owner | MUST if A | todo |
 | F1 | Data layer: profile/upgrades/achievements/settings + tests | — | M | B | shell | MUST | todo |
 | F2 | Input map + platform services | — | S | B | shell | MUST | todo |
 | F3 | UI screens A: title, loading, pause, result (+stubs, preview) | — | M | B | shell, vision | MUST | todo |
@@ -202,6 +203,32 @@ RELEASE_CHECKLIST.md, README.md.
 - Every run happens off-screen (`--position 20000,20000`). Keep the shot list in the script.
 **Acceptance:** every file is exactly the right size, has been viewed, and has no debug text. The
 logo is legible on the small capsule.
+
+### P1 — Android full-game unlock with Google Play Billing (only if the owner picks model A)
+**Why:** Play never lets a free app become paid, and closed testers must buy a paid app. Model A
+(free to try, one purchase unlocks everything) keeps the 12-tester closed test free. See
+store/google-play/listing.md and PLAN O3b.
+**Read:** CONTRACT §4.1 (profile) and §4.6 (platform), F5's level select, tools/build.ps1, the
+plugin's own README.
+**Edit:** addons/ (the plugin), scripts/store.gd (new), scripts/profile.gd (one field),
+scripts/ui/levels_screen.gd, scripts/ui/settings_screen.gd, export_presets.cfg, tools/toolchain.json, tools/build.ps1,
+tests/store_test.gd (new), store/google-play/*.md, PRIVACY_POLICY.md, store/privacy-policy.html.
+**Do:**
+- Add the official Godot Google Play Billing plugin (github.com/godot-sdk-integrations), the release
+  that supports Godot 4.7, pinned with a checksum in toolchain.json. Both Android presets use the
+  Gradle build.
+- scripts/store.gd: `is_full_game() -> bool` (always true off Android), `purchase_full_game()`,
+  `restore()`, signal `entitlement_changed`. One non-consumable product, id `full_game`.
+  Acknowledge every purchase (Play refunds unacknowledged ones after 3 days), handle pending
+  purchases, and cache the entitlement in the profile so the game stays unlocked offline.
+- Free content: tutorial, l01, l02 and the practice range. Locked levels show the price and an
+  unlock button in level select; a "Restore purchase" button lives in settings.
+- build.ps1: allow `com.android.vending.BILLING` next to VIBRATE.
+- Update the Data safety, content rating ("digital purchases": yes) and listing files.
+**Acceptance:** store_test passes against a fake billing backend (buy, pending, restore, offline
+start, acknowledge). **OWNER** creates the `full_game` product (needs a Play merchant account) and
+adds a license tester; on a real phone the tester buys, reinstalls, restores and plays offline.
+The gate passes.
 
 ---
 

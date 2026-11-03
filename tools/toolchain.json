@@ -9,6 +9,19 @@
     "url": "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz",
     "sha256": "f298490b8d44d934be425a5a65a51bf15f422428b229a06a6e11d9ffea248011"
   },
+  "template_files": [
+    "version.txt",
+    "windows_debug_x86_64.exe",
+    "windows_release_x86_64.exe",
+    "windows_debug_x86_64_console.exe",
+    "windows_release_x86_64_console.exe",
+    "linux_debug.x86_64",
+    "linux_release.x86_64",
+    "android_debug.apk",
+    "android_release.apk",
+    "android_source.zip",
+    "icudt_godot.dat"
+  ],
   "jdk": {
     "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_windows_hotspot_17.0.20.1_1.zip",
     "sha256": "e53a79c3c3d86865bd7e787903884331068e71321714ffd44f145785affc7cb0"
@@ -17,5 +30,18 @@
     "url": "https://dl.google.com/android/repository/commandlinetools-win-13114758_latest.zip",
     "sha1": "54a582f3bf73e04253602f2d1c80bd5868aac115"
   },
-  "android_packages": ["platform-tools", "build-tools;35.0.1", "platforms;android-35"]
+  "android_template": {
+    "source": "templates.tpz > android_source.zip > config.gradle and gradle/wrapper/gradle-wrapper.properties (Godot 4.7.2-stable)",
+    "compile_sdk": 36,
+    "target_sdk": 36,
+    "min_sdk": 24,
+    "build_tools": "36.1.0",
+    "android_gradle_plugin": "8.6.1",
+    "gradle": "8.11.1",
+    "kotlin": "2.1.21",
+    "java": 17,
+    "ndk": "29.0.14206865",
+    "ndk_note": "Not installed. AGP only uses the NDK to strip debug symbols, and the template's release libraries ship stripped. AGP prints a harmless 'Unable to strip' warning."
+  },
+  "android_packages": ["platform-tools", "build-tools;36.1.0", "platforms;android-36"]
 }

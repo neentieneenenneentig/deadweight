@@ -12,9 +12,11 @@ in `docs/TASKS.md`, and the rules for any model executing them are in `docs/EXEC
   anchors, rope wrapping, gamepad, music). Module APIs are in `docs/CONTRACT.md`.
 - **Quality gate:** `tests/run_all.ps1` parse-checks every script and runs every suite. Every
   task ends with it passing.
-- **Toolchain:** Godot 4.7.2, JDK 17 and the Android SDK (API 35) are in `.tools/`. The export
-  templates are downloaded but **not extracted**. Release signing and API 36 are still missing
-  (task R1).
+- **Release pipeline (M0 done, 3 Nov 2026):** `tools/setup.ps1` installs Godot 4.7.2, its export
+  templates, JDK 17, the Android SDK (API 36) and the Android build template. `tools/build.ps1
+  -Target All` produces signed, verified Windows and Linux zips, an APK and an AAB (target SDK 36,
+  16 KB aligned) with checksums. The Play upload key is in `.tools/keys/` (back it up). Icons,
+  privacy policy, store text and `RELEASE_CHECKLIST.md` exist. The project is a git repository.
 - **Drafts from the interrupted run** parse but are untested. Each one is owned by a task:
   `scripts/profile.gd`, `upgrades.gd`, `achievements.gd` and `settings.gd` go to F1;
   `scripts/ui/{ui_root,screen,theme,widgets,draw}.gd` to F3–F6; `tools/render_icons.gd` to R3.
@@ -47,9 +49,9 @@ Facts checked on 3 November 2026. Re-check the official pages before acting on t
 | Store | Rule | Effect on the plan |
 | --- | --- | --- |
 | Google Play | Personal developer accounts created after 13 Nov 2023 must run a **closed test with at least 12 testers opted in for 14 consecutive days** before applying for production. Review takes about a week. ([Play Console Help](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en)) | Start the closed test **as early as possible**, even with the prototype. Builds can be updated during the test. The rule is for personal accounts; an organisation account (which needs a D-U-N-S number) avoids it. Confirm that in the Console. |
-| Google Play | New apps and updates must **target API 36 (Android 16)** since 31 Aug 2026. ([Play Console Help](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en)) | The current preset targets 35. Fixed in R1. |
+| Google Play | New apps and updates must **target API 36 (Android 16)** since 31 Aug 2026. ([Play Console Help](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en)) | Done in R1: both Android presets target 36, and `tools/build.ps1` verifies it. |
 | Google Play | AAB format, Play App Signing (the upload key is yours), Data safety form, privacy policy URL, content rating, store listing assets. | R1–R5 produce all of it. |
-| Steam | **$100 per app**, recouped after $1,000 revenue. **30-day wait** between paying and releasing. ([Steam Direct](https://partner.steamgames.com/steamdirect)) | Pay early: the 30 days run alongside development. |
+| Steam | **$100 per app**, recouped after $1,000 revenue. **21–30-day wait** between paying and releasing (the [onboarding guide](https://partner.steamgames.com/doc/gettingstarted/onboarding) says 21, the older [Steam Direct](https://partner.steamgames.com/steamdirect) page 30). | Pay early: the 30 days run alongside development. |
 | Steam | Coming Soon page live for **at least 2 weeks** before launch. Store-page review and build review take about 3–5 business days each. Identity and tax setup can take weeks. | Publish the Coming Soon page early with placeholder art (it collects wishlists), and update the art later in R6. |
 
 **So the owner's paperwork and the 14-day test define the earliest launch date, roughly 5–6 weeks
@@ -61,10 +63,11 @@ from the start.** The code should simply be ready by then.
 | --- | --- | --- |
 | O1 | Now | Steamworks: sign up, pay the $100 Steam Direct fee (this starts the 30-day clock), complete identity, tax and bank details. |
 | O2 | Now | Google Play Console: create the account ($25), verify your identity, and choose a personal or organisation account (see §3). |
-| O3 | Before the first Play upload | Pick the **permanent** package id (e.g. `com.yourname.deadweight`) and a publisher name. Put them in `tools/release.json` (after R1). |
-| O4 | After R4 | Host the privacy policy (for example GitHub Pages, from `store/privacy-policy.html`) and fill in the contact email. |
+| O3 | Before the first Play upload | Pick the **permanent** package id (e.g. `com.yourname.deadweight`) and a publisher name. Put them in `tools/release.json` (now a placeholder: `com.deadweightgame.deadweight`). |
+| O3b | Before creating the Play app | Choose the Android business model. **A, free to try** (recommended): free download, one purchase unlocks the full game, testers play free; needs task P1. **B, paid up front**: no extra code, but closed-test testers must buy it. Play never lets a free app become paid, so this can't be undone. Details: `store/google-play/listing.md`. |
+| O4 | Now | Fill in the contact email in `PRIVACY_POLICY.md` and `store/privacy-policy.html`, then host the HTML at a permanent URL (for example GitHub Pages). |
 | O5 | Now | Recruit **12 or more testers** with Google accounts (friends, Discord, Reddit r/AndroidClosedTesting). Keep them opted in for 14 days. |
-| O6 | After R1–R5 | Create the Play app, fill in the listing, Data safety and content rating, upload the AAB to **closed testing** and invite the testers. That starts the 14-day clock. |
+| O6 | Now (R1–R5 are done) | Create the Play app, fill in the listing, Data safety and content rating, upload the AAB to **closed testing** and invite the testers. That starts the 14-day clock. Follow `RELEASE_CHECKLIST.md`. |
 | O7 | After R5 (+R3) | Create the Steam app page and submit it for Coming Soon review. |
 | O8 | Each milestone | Play the build on a real Android phone and on a PC with a gamepad. Write notes in `docs/PLAYTEST.md`. |
 | O9 | Early | Check the name: search Steam, Google Play and trademark databases for "Deadweight" / "Dead Weight", and decide whether to keep it. |
@@ -77,13 +80,13 @@ progress.
 
 | Milestone | Tasks | Result |
 | --- | --- | --- |
-| M0 Release path | R1 → R2, then R3, R4, R5 | A signed AAB of the current prototype goes into closed testing (O6), and the Steam Coming Soon page starts (O7). **Do this first: it starts the store clocks.** |
+| M0 Release path | R1 → R2, then R3, R4, R5 (**done**) | A signed AAB of the current prototype goes into closed testing (O6), and the Steam Coming Soon page starts (O7). **The owner steps now start the store clocks.** |
 | M1 Foundation | F1, F7, F3 → F10 → F2, F11, F4, F5, F6, F8, F9 | New menus, saves, settings, level select, results and workshop; levels l01 and range. Upload it as the next closed-test build. |
 | M2 Feel | G2, G1, G6, G7, G4, G8 | Upgrades affect the rod, anchors, smash kills, the new HUD with markers, visible line, gamepad. |
 | M3 Threats | E1, E2, E3 | Navmesh hounds, drones, training dummies. |
 | M4 Audio | A1 → A2 → A3 | Full SFX and music. |
 | M5 Content | C1, C2, C3, C4, C5, C6, then C10 | Tutorial plus 6 levels across 2 zones. **v1.0 content complete.** |
-| M6 Ship | G3, G5 (polish if time), R6, Q1, Q2 | Store art, performance, release candidate, launch. |
+| M6 Ship | P1 (model A only), G3, G5 (polish if time), R6, Q1, Q2 | Store art, performance, release candidate, launch. |
 | v1.1 | C7, C8, C9 + ideas | The Spillway zone as a free update: good for a post-launch news beat. Also GodotSteam achievements, key rebinding, leaderboards. |
 
 ## 6. Running tasks cheaply and safely
