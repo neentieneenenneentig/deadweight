@@ -10,6 +10,8 @@ extends CharacterBody3D
 ##   SEARCH  goes to the last seen spot, looks around, then returns to PATROL
 ## The drone's states are simpler (see _tick_drone): patrol, close to a standoff distance, charge,
 ## fire one orb, cool down.
+## The dummy (E3) has no states: it never attacks, flashes when hit, and stands back up at full health
+## DUMMY_REFILL seconds after a kill.
 
 const FX = preload("res://scripts/fx.gd")
 
@@ -66,6 +68,16 @@ const DRONE_BLAST_RADIUS := 3.0
 const DRONE_BLAST_DAMAGE := 25.0     # before damage_scale; only a player inside the radius takes it
 const DRONE_ROTOR_SPIN := 40.0       # rad/s, visual only
 
+# Training dummy (E3): a ceramic mannequin that never attacks, flashes when hit and refills after a kill.
+const DUMMY_HEALTH := 60.0
+const DUMMY_REFILL := 3.0            # seconds down before it stands back up at full health
+const DUMMY_FLASH := Color("9ff0e6") # hit flash: pale cyan, so it reads as a target rather than a threat
+const PORCELAIN := Color("e8ddc7")
+
+# Death FX (E3): every kind throws a porcelain-shard burst, scaled by kind, once per death (see _die).
+const SHARD_COLOR := Color("f1e6d2")
+const DEATH_SCALE := {"hound": 0.8, "sentry": 1.1, "drone": 1.0, "dummy": 0.7}
+
 var target: Node3D
 var kind: String = "hound"
 var active: bool = false
@@ -110,6 +122,8 @@ var _drone_charge: float = 0.0       # seconds left in the charge; 0 when not ch
 var _orb_cooldown: float = 0.0
 var _orbs: Array[Dictionary] = []    # orbs in flight: {node, direction, travelled}
 var _rotors: Array[Node3D] = []
+# Dummy state.
+var _refill_left: float = 0.0        # seconds until a downed dummy stands back up
 
 
 func setup(player: Node3D, enemy_kind: String, location: Vector3, params: Dictionary = {}) -> void:
@@ -123,6 +137,8 @@ func setup(player: Node3D, enemy_kind: String, location: Vector3, params: Dictio
 			max_health = 70.0
 		"drone":
 			max_health = DRONE_HEALTH
+		"dummy":
+			max_health = DUMMY_HEALTH
 		_:
 			max_health = 105.0
 	health = float(params.get("health", max_health))
@@ -145,13 +161,17 @@ func set_active(value: bool) -> void:
 			_telegraph.visible = false
 
 
-## True while the hound is alerted, chasing or biting, and while the drone can see the player.
-## Feeds level threat_level().
+## True while the hound is alerted, chasing or biting; while the drone can see the player; and while the
+## sentry has the player in sight or is charging its shot. The sentry's wind-up (_aim_time) counts, and it
+## decays after sight is lost, so the sentry keeps tracking until its wind-up has cooled. Dummies never
+## track. Feeds level threat_level().
 func is_tracking() -> bool:
-	if _dead:
+	if _dead or kind == "dummy":
 		return false
 	if kind == "drone":
 		return _visible_target
+	if kind == "sentry":
+		return _visible_target or _aim_time > 0.0
 	return _state == State.ALERT or _state == State.CHASE or _state == State.ATTACK
 
 
@@ -181,6 +201,8 @@ func _build_body() -> void:
 			_build_hound(armor, joints)
 		"drone":
 			_build_drone(armor, joints)
+		"dummy":
+			_build_dummy(armor, joints)
 		_:
 			_build_sentry(armor, joints)
 
@@ -275,6 +297,28 @@ func _build_drone(armor: StandardMaterial3D, joints: StandardMaterial3D) -> void
 	_build_aim_line()
 
 
+## A ceramic tailor's mannequin on a round stand, with a cyan target ring on its chest. Six meshes, no
+## joints and no aim line: the dummy only takes hits and shows where to aim.
+func _build_dummy(armor: StandardMaterial3D, joints: StandardMaterial3D) -> void:
+	_dream_oval(_visual, Vector3(0, 0.05, 0), Vector3(0.9, 0.1, 0.9), armor)                # round base
+	_mesh_box(Vector3(0, 0.6, 0), Vector3(0.08, 1.1, 0.08), joints)                         # stand pole
+	_dream_oval(_visual, Vector3(0, 1.25, 0), Vector3(0.6, 0.9, 0.42), _body_material)      # torso
+	_dream_oval(_visual, Vector3(0, 1.66, 0), Vector3(0.95, 0.22, 0.46), armor)             # shoulder yoke
+	_dream_oval(_visual, Vector3(0, 1.95, 0), Vector3(0.34, 0.42, 0.34), _body_material)   # head
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.2
+	torus.outer_radius = 0.27
+	torus.rings = 16
+	torus.ring_segments = 6
+	var ring := MeshInstance3D.new()
+	ring.mesh = torus
+	ring.material_override = _material(Color("5ad6c8"), true)
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.rotation.x = PI * 0.5                                                             # a ring in the XY plane
+	ring.position = Vector3(0, 1.25, 0.24)                                                 # on the +Z chest, where the range player comes from
+	_visual.add_child(ring)
+
+
 ## Joins the sentry's fixed feet and struts into one mesh. They share a material and never animate,
 ## so one surface is cheaper to draw than one mesh per piece.
 func _merge_fittings(parent: Node3D, material: Material) -> void:
@@ -337,6 +381,9 @@ func _strut(parent: Node3D, from: Vector3, to: Vector3, thickness: float, materi
 
 
 func _physics_process(delta: float) -> void:
+	if kind == "dummy":
+		_tick_dummy(delta)
+		return
 	if _dead:
 		return
 	if kind == "drone":
@@ -831,12 +878,11 @@ func _clear_orbs() -> void:
 	_orbs.clear()
 
 
-## The drone's death blast: a fireball, a ring that marks the blast radius, and short-range damage to
-## the player only when they stand within DRONE_BLAST_RADIUS.
+## The drone's death blast: a ring that marks the blast radius, and short-range damage to the player only
+## when they stand within DRONE_BLAST_RADIUS. The fireball is the shared death burst (_death_fx).
 func _explode() -> void:
 	var level: Node = get_parent()
 	var centre: Vector3 = global_position
-	FX.explosion(level, centre, Color("ff7a3d"), 0.8)
 	FX.ring(level, centre, Color("ffc46b"), DRONE_BLAST_RADIUS, 0.4)
 	if is_instance_valid(target) and centre.distance_to(target.global_position) <= DRONE_BLAST_RADIUS:
 		target.call("take_damage", DRONE_BLAST_DAMAGE * damage_scale, kind, centre)
@@ -874,9 +920,11 @@ func take_damage(amount: float, source: String = "bullet") -> void:
 		_die(source)
 
 
+## Runs once per death: _dead blocks every later take_damage, so died, the FX and the fall fire once.
 func _die(source: String) -> void:
 	_dead = true
-	active = false
+	if kind != "dummy":
+		active = false
 	died.emit(kind, source)
 	_play("enemy_death")
 	collision_layer = 0
@@ -884,9 +932,13 @@ func _die(source: String) -> void:
 	remove_from_group("enemies")
 	if is_instance_valid(_telegraph):
 		_telegraph.visible = false
+	_clear_orbs()
+	_death_fx()
+	if kind == "dummy":
+		_fall_dummy()
+		return
 	_eye_material.emission_enabled = false
 	_eye_material.albedo_color = Color("101a1c")
-	_clear_orbs()
 	if kind == "drone":
 		_explode()
 		_visual.visible = false
@@ -899,6 +951,45 @@ func _die(source: String) -> void:
 	tween.parallel().tween_property(_visual, "position:y", -0.2, 0.35)
 	tween.tween_interval(12.0)
 	tween.tween_callback(queue_free)
+
+
+## Porcelain-shard burst for every kind, scaled by kind (DEATH_SCALE). Called once, from _die.
+func _death_fx() -> void:
+	var centre: Vector3 = global_position + Vector3.UP * 0.8
+	FX.explosion(get_parent(), centre, SHARD_COLOR, float(DEATH_SCALE.get(kind, 1.0)))
+
+
+## A dummy goes down and stays down. Its refill clock runs on physics ticks in _tick_dummy.
+func _fall_dummy() -> void:
+	_refill_left = DUMMY_REFILL
+	var tween := create_tween()
+	tween.tween_property(_visual, "rotation:z", 1.35, 0.35)
+	tween.parallel().tween_property(_visual, "position:y", -0.2, 0.35)
+
+
+## Dummy tick, run every physics frame whether or not the level is active. It fades the hit flash
+## and counts down the refill. It never looks for the player, so it never attacks.
+func _tick_dummy(delta: float) -> void:
+	if _dead:
+		_refill_left -= delta
+		if _refill_left <= 0.0:
+			_refill_dummy()
+		return
+	_hurt_flash = maxf(0.0, _hurt_flash - delta)
+	_body_material.albedo_color = DUMMY_FLASH if _hurt_flash > 0.0 else PORCELAIN
+
+
+## Stands the dummy back up at full health, with its collision and target group restored.
+func _refill_dummy() -> void:
+	_dead = false
+	health = max_health
+	_hurt_flash = 0.0
+	_body_material.albedo_color = PORCELAIN
+	_visual.rotation = Vector3.ZERO
+	_visual.position = Vector3.ZERO
+	collision_layer = 8
+	collision_mask = 1
+	add_to_group("enemies")
 
 
 ## Positional sound through the audio node (CONTRACT 4.16). Silent when there is no audio node.

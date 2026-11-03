@@ -28,6 +28,8 @@ var _deaths: int = 0
 var _death_kind: String = ""
 var _death_by: String = ""
 var _damage_log: Array = []          # [amount, source] for every hit the player takes
+var _level_kills: int = 0            # enemy_killed relays the range level emitted
+var _level_kill_kind: String = ""
 
 
 func _initialize() -> void:
@@ -64,6 +66,9 @@ func _run() -> void:
 	await _test_drone_orb_dodge()
 	await _test_drone_orb_hits()
 	await _test_drone_dies_once()
+	await _test_dummies()
+	await _test_threat()
+	await _test_sentry_tracking()
 	_scene.queue_free()
 	await _frames(3)
 	print("WORLD TEST: %d checks, %d failures" % [_checks, _failures])
@@ -504,6 +509,121 @@ func _test_drone_dies_once() -> void:
 	await _frames(3)
 
 
+## Training dummies in the real practice range (E3), with real physics. A dummy takes sidearm hits and
+## flashes, never hurts a player beside it, falls on death, refills 3 s later, and fires died once per kill.
+## The level relays enemy_killed for it. The raid world is freed first: it shares the range's origin.
+func _test_dummies() -> void:
+	_world.queue_free()
+	await _frames(3)
+	var range_level: Node3D = Catalog.create("range")
+	_scene.add_child(range_level)
+	range_level.connect("enemy_killed", _on_level_kill)
+	range_level.call("build", _player, true)
+	range_level.call("set_active", true)
+	await _frames(3)
+	var dummies: Array[Node] = _enemies_of(range_level, "dummy")
+	_check(dummies.size() == 3, "the practice range places its three training dummies")
+	if dummies.size() < 3:
+		range_level.queue_free()
+		await _frames(3)
+		return
+	var first: CharacterBody3D = dummies[0] as CharacterBody3D
+	var second: CharacterBody3D = dummies[2] as CharacterBody3D
+	_check(first.global_position.distance_to(RangeScript.DUMMY_SPOTS[0]) < 0.01, "the first dummy stands on its marked spot")
+	_check(is_zero_approx(float(range_level.call("threat_level"))), "dummies alone raise no threat")
+
+	# A dummy beside the player never attacks, over four seconds of real time.
+	_player.set("health", 100.0)
+	_damage_log.clear()
+	await _move_player(RangeScript.DUMMY_SPOTS[0] + Vector3(1.6, 0.92, 0.0))
+	await _frames(357)
+	_check(is_equal_approx(float(_player.get("health")), 100.0) and _damage_log.is_empty(), "a dummy never deals damage to a player standing beside it for four seconds")
+
+	# A sidearm hit flashes the body pale cyan, and the flash fades within a third of a second.
+	var body: StandardMaterial3D = first.get("_body_material") as StandardMaterial3D
+	var hit: bool = _shoot_dummy(range_level, first, 10.0)
+	await _frames(2)
+	_check(hit and body.albedo_color != Color("e8ddc7"), "a dummy flashes when a sidearm shot hits it")
+	await _frames(30)
+	_check(body.albedo_color == Color("e8ddc7"), "the dummy's hit flash fades back to porcelain")
+
+	# A lethal shot fires died once and the level relays it. The dummy stays down for the refill time.
+	_deaths = 0
+	_death_kind = ""
+	_death_by = ""
+	_level_kills = 0
+	_level_kill_kind = ""
+	first.connect("died", _on_enemy_died)
+	var lethal: bool = _shoot_dummy(range_level, first, 100.0)
+	_check(lethal and _deaths == 1 and _death_kind == "dummy" and _death_by == "bullet", "a lethal sidearm shot fires died once, with kind dummy and source bullet")
+	_check(_level_kills == 1 and _level_kill_kind == "dummy", "the practice range relays enemy_killed for a dummy kill")
+	_check(not first.is_in_group("enemies") and first.collision_layer == 0, "a downed dummy leaves the target group and stops taking hits")
+	await _frames(255)
+	_check(bool(first.get("_dead")) and not first.is_in_group("enemies") and _deaths == 1, "a dummy stays down before its 3 s refill")
+	await _frames(35)
+	_check(not bool(first.get("_dead")) and is_equal_approx(float(first.get("health")), float(first.get("max_health"))) and first.is_in_group("enemies"), "a dummy stands back up at full health about 3 s after its death")
+
+	# The refilled dummy can die again: a second kill is a second emission, and more damage while down adds none.
+	_check(_shoot_dummy(range_level, first, 100.0) and _deaths == 2 and _level_kills == 2, "a second kill after the refill fires died again")
+	first.call("take_damage", 500.0, "bullet")
+	_check(_deaths == 2 and _level_kills == 2, "more damage on a downed dummy fires nothing more")
+
+	# Each death throws exactly one porcelain burst, and a repeat hit on the corpse throws none.
+	var bursts_before: int = range_level.find_children("*", "CPUParticles3D", true, false).size()
+	second.call("take_damage", 500.0, "bullet")
+	var bursts_after: int = range_level.find_children("*", "CPUParticles3D", true, false).size()
+	second.call("take_damage", 500.0, "bullet")
+	var bursts_final: int = range_level.find_children("*", "CPUParticles3D", true, false).size()
+	_check(bursts_after == bursts_before + 1 and bursts_final == bursts_after, "a dummy's death throws exactly one burst of shards")
+	range_level.queue_free()
+	await _frames(3)
+
+
+## A hound that sees the player tracks, and the level's threat rises as the player closes in. Inactive
+## enemies and dummies add nothing. The arena is a bare level built with the real builder, far from the range.
+func _test_threat() -> void:
+	var arena: Node3D = LevelBase.new()
+	arena.position = ARENA
+	_scene.add_child(arena)
+	_add_solid(arena, Vector3(0, -0.5, 0), Vector3(40, 1, 40))
+	arena.call("build", _player, false)
+	arena.call("set_active", true)
+	arena.call("enemy", "hound", Vector3(0, 0.05, -30))
+	await _move_player(ARENA + Vector3(0, 0.92, 0))
+	var hound: CharacterBody3D = _enemies_of(arena, "hound")[0] as CharacterBody3D
+	_check(is_zero_approx(float(arena.call("threat_level"))), "an inactive hound is not tracking, so the level has no threat")
+	hound.call("set_active", true)
+	await _frames(12)
+	_check(bool(hound.call("is_tracking")), "a hound that sees the player reports is_tracking")
+	var far: float = float(arena.call("threat_level"))
+	await _move_player(ARENA + Vector3(0, 0.92, -18))
+	var near: float = float(arena.call("threat_level"))
+	_check(far > 0.0 and near > far + 0.1, "threat rises as a tracking hound closes in")
+	var before: float = float(arena.call("threat_level"))
+	arena.call("enemy", "dummy", Vector3(2.0, 0.0, -20.0))
+	var after: float = float(arena.call("threat_level"))
+	_check(not _enemies_of(arena, "dummy").is_empty() and is_equal_approx(before, after), "a dummy right beside the player adds no threat")
+	arena.queue_free()
+	await _frames(3)
+
+
+## A sentry reports is_tracking while it sees the player and through its wind-up, and stops once a wall
+## takes its sight and the wind-up has cooled.
+func _test_sentry_tracking() -> void:
+	var arena: Node3D = _make_arena()
+	_player.set("health", 100.0)
+	await _move_player(ARENA + Vector3(0, 0.92, 0))
+	var sentry: CharacterBody3D = _new_arena_enemy(arena, "sentry", Vector3(0, 0, -10))
+	sentry.call("set_active", true)
+	await _frames(24)
+	_check(bool(sentry.call("is_tracking")), "a sentry that sees the player reports is_tracking")
+	_add_solid(arena, Vector3(0, 1.5, -4), Vector3(8, 3, 0.6))
+	await _frames(54)
+	_check(not bool(sentry.call("is_tracking")), "a sentry behind cover stops tracking once its wind-up cools")
+	arena.queue_free()
+	await _frames(3)
+
+
 ## An empty level with a floor and its own navmesh, placed far from the shared test geometry.
 func _make_arena() -> Node3D:
 	var arena: Node3D = LevelBase.new()
@@ -565,6 +685,27 @@ func _on_enemy_died(kind: String, by: String) -> void:
 	_deaths += 1
 	_death_kind = kind
 	_death_by = by
+
+
+func _on_level_kill(kind: String, _by: String) -> void:
+	_level_kills += 1
+	_level_kill_kind = kind
+
+
+## Every enemy of one kind among a level's direct children (the level adds its enemies as children).
+func _enemies_of(level: Node3D, enemy_kind: String) -> Array[Node]:
+	var found: Array[Node] = []
+	for child: Node in level.get_children():
+		if child is CharacterBody3D and str(child.get("kind")) == enemy_kind:
+			found.append(child)
+	return found
+
+
+## A sidearm shot from the player's gun hand at a dummy's chest, through the level's real hit scan.
+func _shoot_dummy(level: Node3D, dummy: Node3D, damage: float) -> bool:
+	var origin: Vector3 = _player.global_position + Vector3.UP * 0.15
+	var chest: Vector3 = dummy.global_position + Vector3.UP * 1.2
+	return bool(level.call("apply_shot", origin, chest - origin, damage))
 
 
 func _test_body(location: Vector3, cast_weight: bool) -> RigidBody3D:

@@ -1,19 +1,19 @@
 extends "res://scripts/level_base.gd"
 ## PRACTICE RANGE (DESIGN: Practice Range): a flat sandbox for every tool before a raid. Grid and
 ## distance markers, platforms at 5/10/15/20/30 m, an anchor gantry, an updraft tower, a pillar
-## slalom, and one case by the extraction. Repeatable: an extraction banks the case and main calls
-## reset_cases() so the run starts again. Dummies arrive with task E3.
+## slalom, three training dummies (E3), and one case by the extraction. Repeatable: an extraction banks the
+## case and main calls reset_cases() so the run starts again.
 
 const INFO := {
 	"title": "PRACTICE RANGE",
 	"zone": "floodworks",
 	"number": -1,
-	"blurb": "Anchors, updrafts, platforms at marked heights and a pillar slalom. No clock, no enemies.",
+	"blurb": "Anchors, updrafts, platforms at marked heights, a pillar slalom and dummies. No clock.",
 	"par_silver": 0.0,
 	"par_gold": 0.0,
 	"cases": 1,
 	"bonus": 0,
-	"enemies": false,
+	"enemies": true,         # the training dummies are enemy nodes, so this must say so (levels_test)
 	"practice": true,
 	"repeatable": true,
 }
@@ -38,6 +38,9 @@ const SLALOM := [
 	Vector2(-5.0, -40.0), Vector2(5.0, -44.0), Vector2(-5.0, -48.0),
 	Vector2(5.0, -52.0), Vector2(-5.0, -56.0), Vector2(5.0, -60.0),
 ]
+## Training dummies on open floor beside the slalom, off the centre lane, clear of the gantry legs, the
+## updraft tower's hint zone and the case and extraction on the far side.
+const DUMMY_SPOTS := [Vector3(-16.0, 0.0, -36.0), Vector3(14.0, 0.0, -38.0), Vector3(-17.0, 0.0, -62.0)]
 
 
 func _design() -> void:
@@ -51,6 +54,7 @@ func _design() -> void:
 	_build_platforms()
 	_build_gantry()
 	_build_slalom()
+	_build_dummies()
 	_build_updraft_tower()
 	_build_start()
 	_build_extraction()
@@ -106,6 +110,12 @@ func _build_slalom() -> void:
 	for spot: Vector2 in SLALOM:
 		pillar(Vector3(spot.x, 0.0, spot.y), 3.5, 0.9, "rust")
 	label("PILLAR SLALOM", Vector3(0.0, 4.2, -36.0), 36, Color("e8d6a8"), 0.016, true)
+
+
+## Three training dummies (E3): they never attack, flash when hit and stand back up after a kill.
+func _build_dummies() -> void:
+	for spot: Vector3 in DUMMY_SPOTS:
+		enemy("dummy", spot)
 
 
 ## Updraft tower: a 14 m rising column with a catch platform on top. The platform's legs frame the

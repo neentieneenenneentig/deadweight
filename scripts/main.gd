@@ -867,7 +867,10 @@ func _on_player_died(_source: String) -> void:
 	_finish(false, _death_cause())
 
 
-func _on_enemy_killed(_kind: String, by: String) -> void:
+func _on_enemy_killed(kind: String, by: String) -> void:
+	# Training dummies refill and respawn; they never count as kills or earn achievements.
+	if kind == "dummy":
+		return
 	run_stats["kills"] = int(run_stats["kills"]) + 1
 	if by in ["smash", "weight"]:
 		run_stats["smash_kills"] = int(run_stats["smash_kills"]) + 1
@@ -908,6 +911,8 @@ func _death_cause() -> String:
 	var best: String = "fall"
 	var best_distance: float = 16.0
 	for node: Node in get_tree().get_nodes_in_group("enemies"):
+		if str(node.get("kind")) == "dummy":
+			continue
 		var distance: float = (node as Node3D).global_position.distance_to(player.global_position)
 		if distance < best_distance:
 			best_distance = distance

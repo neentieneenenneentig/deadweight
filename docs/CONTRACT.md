@@ -298,7 +298,7 @@ func set_active(value: bool) -> void
 func apply_quality(value: int) -> void              # shadows, glow, SSAO, fog density, particle counts
 func apply_shot(origin: Vector3, direction: Vector3, damage: float) -> bool
 func get_objectives() -> Array                      # 5.8
-func threat_level() -> float                        # 0..1 for music/HUD
+func threat_level() -> float                        # 0..1 for music/HUD: max over tracking non-dummy enemies, 0.2 at 45 m rising to 1.0 on the player; 0 when none track
 func is_hazard_at(position: Vector3) -> bool
 func is_safe_ground(position: Vector3) -> bool      # for checkpoints
 func bake_navigation(synchronous: bool = true) -> void
@@ -384,8 +384,10 @@ var damage_scale: float = 1.0
 func setup(player: Node3D, enemy_kind: String, location: Vector3, params: Dictionary = {}) -> void
 func set_active(value: bool) -> void
 func take_damage(amount: float, source: String = "bullet") -> void
-func is_tracking() -> bool
+func is_tracking() -> bool                # hound chasing, sentry sees the player or is winding up, drone engaged; dummy never
 ```
+Kind `dummy` never attacks, flashes on hit and refills to full health 3 s after `died`; main
+ignores dummy kills in run stats and death causes. Every kind spawns one porcelain-shard death burst.
 Calls `player.take_damage(amount * damage_scale, kind, global_position)`. Layer 8 mask 1,
 group `enemies` while alive. Positional sounds via the `game_audio` group (`play_at`).
 

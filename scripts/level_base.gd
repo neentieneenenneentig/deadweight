@@ -38,8 +38,11 @@ const EnemyScript = preload("res://scripts/enemy.gd")
 const FX = preload("res://scripts/fx.gd")
 const Dreamscape = preload("res://scripts/dreamscape.gd")
 const DreamProps = preload("res://scripts/dream_props.gd")
-## Enemy kind table (CONTRACT 4.11 enemy()). Dummies are added by task E3; any other kind is skipped.
-const ENEMY_KINDS := ["hound", "sentry", "drone"]
+## Enemy kind table (CONTRACT 4.11 enemy()). Any other kind is skipped with a warning.
+const ENEMY_KINDS := ["hound", "sentry", "drone", "dummy"]
+## threat_level(): a tracking enemy scores THREAT_FLOOR at THREAT_RANGE metres or farther, and 1.0 on the player.
+const THREAT_RANGE := 45.0
+const THREAT_FLOOR := 0.2
 const ProfileScript = preload("res://scripts/profile.gd")
 
 const PICKUP_RADIUS := 2.0
@@ -395,8 +398,8 @@ func extraction(floor_point: Vector3) -> void:
 	add_child(_extract_ring)
 
 
-## Hounds, sentries and drones today; dummies arrive with task E3. Raids only:
-## practice levels skip everything except dummies.
+## Hounds, sentries, drones and training dummies. Raids only: practice levels skip everything except
+## dummies. Every kind's died signal is relayed as enemy_killed (main listens to it).
 func enemy(kind: String, position: Vector3, params: Dictionary = {}) -> void:
 	if practice and kind != "dummy":
 		return
@@ -495,8 +498,9 @@ func apply_shot(origin: Vector3, direction: Vector3, damage: float) -> bool:
 	return hit_enemy
 
 
-## Quick-and-cheap danger estimate 0..1 for music and the HUD: how close the nearest living
-## enemy is, boosted when it is tracking the player.
+## Danger 0..1 for music and the HUD. Only enemies that are tracking the player count (is_tracking()), and
+## the closer one counts more: a tracking enemy scores THREAT_FLOOR at THREAT_RANGE metres and 1.0 on the
+## player. The highest score wins. Enemies that are not tracking, and training dummies, score nothing.
 func threat_level() -> float:
 	if not is_instance_valid(_player) or not _active:
 		return 0.0
@@ -504,11 +508,13 @@ func threat_level() -> float:
 	for enemy_node: Node in _enemies:
 		if not is_instance_valid(enemy_node) or not enemy_node.is_in_group("enemies"):
 			continue
+		if str(enemy_node.get("kind")) == "dummy":
+			continue
+		if not enemy_node.has_method("is_tracking") or not bool(enemy_node.call("is_tracking")):
+			continue
 		var distance: float = _player.global_position.distance_to((enemy_node as Node3D).global_position)
-		var level: float = clampf(1.0 - distance / 45.0, 0.0, 1.0)
-		if enemy_node.has_method("is_tracking") and bool(enemy_node.call("is_tracking")):
-			level = maxf(level, 0.7)
-		best = maxf(best, level)
+		var closeness: float = clampf(1.0 - distance / THREAT_RANGE, 0.0, 1.0)
+		best = maxf(best, lerpf(THREAT_FLOOR, 1.0, closeness))
 	return best
 
 
