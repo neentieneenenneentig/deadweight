@@ -14,7 +14,12 @@ const MAX_BAKE_MS := 2000.0          # acceptance: the synchronous navmesh bake 
 const ASYNC_TIMEOUT_MS := 20000      # the threaded bake gets this long before it counts as stuck
 const MAX_LABELS := 60
 const MAX_LIGHTS := 6
-const ROUTE_SPEED := 5.8             # m/s behind the par suggestion (route / 5.8 is the raw time)
+const ROUTE_SPEED := 5.8             # m/s behind the par suggestion (player GROUND_SPEED; route / 5.8 is the raw run)
+## Par suggestion (C10 lead pass): silver is a steady on-foot run with fighting (1.6x the raw run), gold
+## beats a flat-out run so it needs rod speed (0.9x); both add the extraction hold. Rounded to 5 s.
+const PAR_SILVER_FACTOR := 1.6
+const PAR_GOLD_FACTOR := 0.9
+const EXTRACTION_HOLD := 6.0         # s; main.gd EXTRACTION_SECONDS
 const SPAWN_CLEARANCE := 0.4         # sphere radius for "not inside a solid" at the spawn
 const CASE_CLEARANCE := 0.3          # sphere radius for "not inside a solid" at a case
 ## Required INFO keys (CONTRACT 5.6) and their types. "repeatable" is optional and checked if present.
@@ -244,8 +249,10 @@ func _print_report(info: Dictionary, route: float, case_count: int, draw_calls: 
 	if par_silver <= 0.0:
 		print("  par: no clock (practice level), no suggestion")
 	elif route >= 0.0:
+		var raw: float = route / ROUTE_SPEED
 		print("  suggested par: silver %.0f s, gold %.0f s (INFO: silver %.0f s, gold %.0f s)" % [
-			route / ROUTE_SPEED * 0.85, route / ROUTE_SPEED * 0.5, par_silver, float(info.get("par_gold", 0.0))])
+			snappedf(raw * PAR_SILVER_FACTOR + EXTRACTION_HOLD, 5.0), snappedf(raw * PAR_GOLD_FACTOR + EXTRACTION_HOLD, 5.0),
+			par_silver, float(info.get("par_gold", 0.0))])
 	print("  draw calls %d, triangles %d" % [draw_calls, triangles])
 	print("  navmesh bake %d ms (threaded %d ms), level build %d ms" % [bake_ms, async_ms, build_ms])
 

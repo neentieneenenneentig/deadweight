@@ -9,8 +9,8 @@ const INFO := {
 	"zone": "floodworks",
 	"number": 0,
 	"blurb": "Linear training course: walk, cast, lock, reel, cut, a gap, an anchor swing, an updraft, a dummy, one case.",
-	"par_silver": 20.0,      # placeholder until levels_test suggests the real numbers (C1 rule: rounded to 5 s)
-	"par_gold": 10.0,
+	"par_silver": 60.0,
+	"par_gold": 30.0,
 	"cases": 1,
 	"bonus": 0,
 	"enemies": true,         # the training dummy is an enemy node, so this must say so (levels_test)
