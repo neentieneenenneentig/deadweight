@@ -27,7 +27,7 @@ owner = needs the human (devices, accounts).
 | F1 | Data layer: profile/upgrades/achievements/settings + tests | — | M | B | shell | MUST | done |
 | F2 | Input map + platform services | — | S | B | shell | MUST | done |
 | F3 | UI screens A: title, loading, pause, result (+stubs, preview) | — | M | B | shell, vision | MUST | done |
-| F4 | UI screens B: settings, credits | F3 | M | B | shell, vision | MUST | todo |
+| F4 | UI screens B: settings, credits | F3 | M | B | shell, vision | MUST | done |
 | F5 | UI screens C: level select, workshop, records | F3 | M | B | shell, vision | MUST | todo |
 | F6 | UI test suite | F3, F4, F5 | M | B | shell | MUST | todo |
 | F7 | Level framework core + catalog + SLUICE GATE port | — | L | A | shell, vision | MUST | done |

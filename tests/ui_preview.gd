@@ -4,7 +4,8 @@ extends SceneTree
 ##   godot --path . --position 20000,20000 --resolution 1280x720 --script res://tests/ui_preview.gd
 ## Options after "--": --tag=<text> (file name suffix), --out=<folder>, --touch (touch UI),
 ## --only=<screen,...> (title_fresh title pause loading result_won result_lost levels workshop
-## records settings credits). Add --rendering-method gl_compatibility for the mobile renderer.
+## records settings settings_controls settings_video settings_audio settings_touch credits
+## credits_end). Add --rendering-method gl_compatibility for the mobile renderer.
 ## The profile is private to this script: nothing is read from or written to the real save.
 
 const Catalog = preload("res://scripts/level_catalog.gd")
@@ -56,17 +57,35 @@ func _run() -> void:
 	failures += await _shot("records", suffix, func() -> void: _ui.call("show_records"))
 	failures += await _shot("settings", suffix, func() -> void: _ui.call("show_settings"))
 	failures += await _shot("credits", suffix, func() -> void: _ui.call("show_credits"))
+	failures += await _shot("settings_controls", suffix, func() -> void: _open_settings_tab("controls"))
+	failures += await _shot("settings_video", suffix, func() -> void: _open_settings_tab("video"))
+	failures += await _shot("settings_audio", suffix, func() -> void: _open_settings_tab("audio"))
+	if bool(_ui.get("touch_enabled")):
+		failures += await _shot("settings_touch", suffix, func() -> void: _open_settings_tab("touch"))
+	failures += await _shot("credits_end", suffix, func() -> void: _ui.call("show_credits"), true)
 	print("UI PREVIEW %s: %d problem(s)" % [suffix, failures])
 	quit(1 if failures > 0 else 0)
 
 
+## Opens the settings screen on one tab.
+func _open_settings_tab(tab_id: String) -> void:
+	_ui.call("show_settings")
+	var settings: Object = _ui.call("get_screen", "settings")
+	settings.call("show_tab", tab_id)
+
+
 ## Shows one screen, waits for its animation, reports the focused control and saves a PNG.
-func _shot(screen_name: String, suffix: String, show: Callable) -> int:
+## scroll_end: scroll the credits to the bottom once laid out.
+func _shot(screen_name: String, suffix: String, show: Callable, scroll_end: bool = false) -> int:
 	if not _only.is_empty() and not _only.has(screen_name):
 		return 0
 	_ui.call("hide_all")
 	await _frames(2)
 	show.call()
+	if scroll_end:
+		await _frames(3)
+		var credits: Object = _ui.call("get_screen", "credits")
+		credits.call("scroll_to_bottom")
 	await _frames(SETTLE_FRAMES)
 	var problems: int = 0
 	var focus: Control = root.gui_get_focus_owner()
