@@ -54,7 +54,9 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent $profilePath) | Ou
 
 function Write-PerfProfile([int]$quality) {
 	# VSync off and no frame cap so the numbers are the renderer's, not the monitor's.
-	$text = "[profile]`nversion=1`n`n[settings]`nwindow_mode=`"windowed`"`nvsync=false`nmax_fps=0`nquality=$quality`nrender_scale=1.0`n"
+	# profile.gd rejects a file without its "; end of profile" trailer (cut-short write guard) and
+	# would silently fall back to defaults (High, vsync on), so the trailer is required.
+	$text = "[profile]`nversion=1`n`n[settings]`nwindow_mode=`"windowed`"`nvsync=false`nmax_fps=0`nquality=$quality`nrender_scale=1.0`n`n; end of profile`n"
 	[IO.File]::WriteAllText($profilePath, $text)
 }
 

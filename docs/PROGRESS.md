@@ -485,12 +485,24 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   - `--fps` draws a top-right readout (FPS, mean and p99 ms, draw calls) and prints `FPS_SAMPLE` once a second;
   - perf.ps1 runs 7 levels × 2 renderers × 3 presets off-screen at 1280×720 and writes `.tools/perf/latest.csv`.
   - Lead fix: perf.ps1 wrote its profile to `Godot/app_userdata/…`, but the project uses a custom user dir (`%APPDATA%\DEADWEIGHT`). Every run loaded defaults (High, vsync on), so the executor's table compared High with High. Fixed.
-  - Findings (RTX 3060 Ti):
-    - FPS is pinned at 60 even with vsync off in the profile and `--disable-vsync`. The driver or DWM likely forces it; test on a high-refresh display or with driver vsync off.
-    - CPU frame setup is at most 0.2 ms (l05).
-    - In-game draw calls are 200–258 in Forward+ and 197–230 in Compatibility (tutorial 108). That is above the §7 160 budget, which was measured level-only in level_preview. The in-game count adds the HUD canvas items and the viewmodel. Q1 on the phone decides whether this matters.
-  - The presets differ in code (Low: no shadows or MSAA; Medium: 2 splits at 70 m with 2× MSAA; High: 4 splits at 100 m with 4× MSAA, glow and SSAO). Render scale is a separate user slider (mobile default 0.85).
-  - Rerun `tools/perf.ps1` for a corrected per-preset table.
+  - Lead fix 2: profile.gd rejects any profile without its `; end of profile` trailer (cut-short write guard) and silently uses defaults. perf.ps1's profile lacked the trailer, so the executor's "FPS pinned at 60 by the driver" was really the default vsync. With the trailer, presets apply: quality 0 renders without shadows, as verified in a capture.
+  - Corrected table (RTX 3060 Ti, 1280×720, vsync off; avg FPS / draw calls):
+
+    | Level | F+ low | F+ med | F+ high | Compat low | Compat med | Compat high |
+    | --- | --- | --- | --- | --- | --- | --- |
+    | tutorial | 909 / 96 | 870 / 108 | 810 / 123 | 708 / 96 | 658 / 108 | 618 / 108 |
+    | l01 | 709 / 190 | 672 / 207 | 633 / 240 | 534 / 194 | 502 / 211 | 475 / 211 |
+    | l02 | 712 / 172 | 677 / 208 | 631 / 251 | 546 / 173 | 510 / 211 | 480 / 211 |
+    | l03 | 683 / 181 | 656 / 211 | 620 / 247 | 513 / 186 | 484 / 218 | 464 / 218 |
+    | l04 | 679 / 169 | 660 / 193 | 607 / 228 | 525 / 173 | 487 / 197 | 466 / 197 |
+    | l05 | 657 / 196 | 628 / 225 | 573 / 258 | 492 / 196 | 456 / 227 | 445 / 227 |
+    | l06 | 686 / 176 | 644 / 207 | 605 / 235 | 518 / 190 | 479 / 230 | 462 / 230 |
+
+  - Findings:
+    - l05 is the heaviest everywhere.
+    - Each preset step costs about 15–20 % of draw calls; Compatibility caps shadows at 2 splits, so its medium and high match.
+    - In-game counts include the HUD canvas and the viewmodel, so even Compatibility Low (173–196) is over the §7 160 figure. That figure was measured level-only. The phone (Q1, Medium at 0.85 render scale) decides whether a cut is needed. Candidates: fewer marker labels, dreamscape prop density at Low, no enemy or pickup shadows.
+  - The presets: Low has no shadows or MSAA; Medium has 2 splits at 70 m and 2× MSAA; High has 4 splits at 100 m, 4× MSAA, glow and SSAO. Render scale is a separate user slider (mobile default 0.85).
 - Gate: subsets pass (hud, audio, ui, flow, meta, levels); the full gate runs after R6b.
 
 Template:
