@@ -176,6 +176,9 @@ func _set_state(next: String) -> void:
 		return
 	state = next
 	_update_mouse()
+	# Any path out of "paused" (resume, title, a new level) lifts the SFX low-pass again.
+	if is_instance_valid(sound):
+		sound.set_paused(next == "paused")
 	state_changed.emit(next)
 
 
@@ -293,6 +296,8 @@ func _build_level(id: String, practice_mode: bool) -> void:
 		if state == "playing":
 			set_hint(text, duration))
 	level.build(player, practice_mode)
+	# Hounds path over the navmesh (E1). Baked synchronously so it is ready at once.
+	level.bake_navigation(true)
 	level.apply_quality(int(profile.setting("quality")))
 	level.set_active(false)
 
@@ -334,6 +339,8 @@ func _reset_run() -> void:
 	extraction_time = 0.0
 	extraction_inside = false
 	loadout = UpgradesScript.stats(profile.upgrades)
+	# Workshop stats for the line: spool, reel motor, sinker, assist and quickdraw (CONTRACT 4.9).
+	tether.configure(loadout)
 	weapon = "ROD"
 	ammo = magazine_size()
 	reserve = 48
@@ -772,15 +779,31 @@ func _on_enemy_killed(_kind: String, by: String) -> void:
 		_award("DEADWEIGHT")
 
 
+## Tether events arrive as ids only (CONTRACT 4.9). Sounds play for every id; hints are picked here.
 func _on_tether_event(event: String) -> void:
-	if event in ["cast", "lock", "release", "cut"]:
-		_sfx(event)
-		if event == "cast":
+	_sfx(event)
+	match event:
+		"cast":
 			run_stats["casts"] = int(run_stats["casts"]) + 1
 			_award("FIRST_CAST")
 			set_hint("WEIGHT AWAY  /  {lock} to take the pull", 2.5)
-	else:
-		set_hint(event, 3.0)
+		"anchor":
+			_award("FIRST_ANCHOR")
+			set_hint("ANCHORED  /  {reel} pulls you in, {cut} lets go", 3.0)
+		"recover":
+			set_hint("WEIGHT RECOVERED  /  {cast} to throw again", 2.5)
+		"spool_limit":
+			set_hint("SPOOL LIMIT  /  {lock} holds the line, {reel} takes it in", 2.5)
+		"severed":
+			set_hint("LINE SEVERED  /  keep your line clear of concrete", 3.0)
+		"overload":
+			set_hint("LINE OVERLOAD  /  cast again", 3.0)
+		"no_clearance":
+			set_hint("NO CAST CLEARANCE  /  step back from cover", 3.0)
+		"cut_first":
+			set_hint("CUT FIRST  /  {cut} to prepare a new weight", 3.0)
+		"auto_cut":
+			set_hint("LINE CUT  /  charging the next weight", 2.0)
 
 
 ## The nearest living enemy decides the cause; otherwise the player fell.
@@ -885,6 +908,9 @@ func _apply_player_settings() -> void:
 	player.look_sensitivity = BASE_LOOK_SENSITIVITY * float(profile.setting("look_sensitivity"))
 	if player.has_method("apply_settings"):
 		player.call("apply_settings", profile.settings)
+	# Auto-cut decides whether CAST drops the attached weight or asks for a CUT first.
+	if is_instance_valid(tether):
+		tether.auto_cut = bool(profile.setting("auto_cut"))
 	# The HUD reads show_telemetry and other display settings (G6).
 	if is_instance_valid(hud):
 		hud.apply_settings(profile.settings)

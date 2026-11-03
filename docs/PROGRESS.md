@@ -242,6 +242,17 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
 - A1 (`tools/generate_audio.gd`, `audio/sfx/`; model claude-haiku-5-5): deterministic offline synth writes 49 one-shot ids plus 4 loops (wind, reel, tension, drone_hum) as 44.1 kHz mono 16-bit WAV, with variants for footstep, weight_impact, shot, hit and hurt. 63 files with `.import` (loops flagged). Analysis: worst peak -1.11 dBFS, worst DC 1e-5, loop seams within bounds, category RMS spread at most 2.2 dB. `--check` loads all 63 files, and reruns are byte-identical. Deviations: one loudness target per category, with balance left to A2; no ear check. Follow-ups: A2 must load these files (scripts/audio.gd still synthesizes at runtime); a human listening pass is needed.
 - Gate: QUALITY GATE PASSED (44 scripts, 8 suites).
 
+## 2026-11-03: G2 tether v2, E1 hound AI v2, A2 audio engine v2
+
+- G2 (`scripts/tether.gd`, `tests/physics_test.gd`, tether region of `main.gd`; model claude-haiku-5-5): tuning block at the top; `configure(stats)`; `auto_cut` (on: CAST drops the attached weight; off: emits `cut_first`); analog `reel_strength` (0.5 reels at half speed); recover within 2.2 m of the rod tip for a reeled free weight; anchor latch freezes the weight and pivots the line; `spool_limit` on the rising edge; smash above 9 m/s with capped damage, a 0.35 s cooldown, FX and `weight_smash`; `weight_impact` throttled to 0.15 s; `event_happened` carries ids only, and main builds the hints. physics_test 58/0; flow_test 108/0.
+  - Balance: the stock rig now uses the DESIGN tier-0 values (40 m line, 14000 N at 9 m/s, 130 kg, assist 13000) instead of the old constants. This matches F1's tier-0 table.
+  - Open: gamepad analog reel is not wired (main sends full reel). Tether audio ids (`anchor`, `recover`, `spool_limit`, `severed`, `weight_impact`, `smash`, `reel_stall`) are not played yet. CONTRACT §4.9 needs updating for the new ids and configure keys. Smash damage is a tuning guess.
+- E1 (`scripts/enemy.gd`, `tests/world_test.gd`; model claude-haiku-5-5): the hound runs PATROL / ALERT / CHASE / ATTACK / SEARCH. It follows `level.get_nav_path` every 0.4 s, with probe steering as the fallback. It bites for 12 × damage_scale with knockback and gives up a chase on unreachable high ground, circling at a 4 m radius. `died(kind, by)` fires once. The model is 14 meshes with a gait and a glowing eye, not yet visually reviewed. world_test 85/0; levels_test l01 34/0.
+  - Deviations: sight memory 8 s; bite without windup; sentry damage scales with damage_scale.
+- A2 (`scripts/audio.gd`, `tests/audio_test.gd`, one sound line in `main.gd`; model claude-haiku-5-5): Music, SFX and UI buses under Master, with a low-pass on SFX enabled only while paused. 2D pool of 12 and 3D pool of 8. Pitch and volume jitter per play, and per-event concurrency limits. Variants and loops load from `audio/sfx/`, with the v1 synthesis as a fallback. audio_test 35/0. The base voice level is now 0 dB (was -8 dB), so the mix needs a listening pass. Not routed yet: enemy positional ids (`hound_*`, `sentry_*`, `drone_*`, `enemy_death`), and the tether and player ids listed under G2.
+- main.gd (lead): `level.bake_navigation(true)` runs right after each level build, so hounds can path. Without it, hounds gave up on any player above them.
+- Gate: QUALITY GATE PASSED (45 scripts, 9 suites).
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>
