@@ -23,6 +23,8 @@ owner = needs the human (devices, accounts).
 | R4 | Third-party notices + privacy policy | — | S | C/B | shell | MUST | done |
 | R5 | Store copy, release checklist, README | — | M | C | web | MUST | done |
 | R6 | Store art + screenshots | C6, G7, F11 | M | B | shell, vision | MUST | todo |
+| R7 | Store copy, notices + AI disclosure for the dreamscape | V1 | S | C | — | MUST | todo |
+| V1 | Art direction: The Department of Unfinished Gravity (owner, via Codex) | — | L | — | shell, vision | MUST | done (2026-11-03) |
 | P1 | Android full-game unlock (Play Billing); only if the owner picks model A | F5, F10, O3b | M | A | shell, owner | MUST if A | todo |
 | F1 | Data layer: profile/upgrades/achievements/settings + tests | — | M | B | shell | MUST | done |
 | F2 | Input map + platform services | — | S | B | shell | MUST | done |
@@ -39,16 +41,16 @@ owner = needs the human (devices, accounts).
 | G2 | Tether v2: upgrades, recover, anchors, smash, events | F10 | M | A | shell | MUST | done (2026-11-03) |
 | G3 | Rope wrapping | G2 | M | A | shell | SHOULD | todo |
 | G4 | Line + weight visuals | G2 | M | B | shell, vision | MUST | todo |
-| G5 | Viewmodel: rod + sidearm | G1 | M | B | shell, vision | SHOULD | todo |
+| G5 | Viewmodel: rod + sidearm | G1 | M | B | shell, vision | SHOULD | done (2026-11-03) |
 | G6 | HUD v2: layout, reticle, telemetry | F10 | M | B | shell, vision | MUST | done (2026-11-03) |
-| G7 | HUD v2: objective markers, damage arcs, touch options | G6 | M | B | shell, vision | MUST | todo |
+| G7 | HUD v2: objective markers, damage arcs, touch options | G6 | M | B | shell, vision | MUST | done (2026-11-03) |
 | G8 | Gamepad + Steam Deck pass | F11, F2, G6 | S | B | shell | MUST | todo |
 | E1 | Hound AI v2 (navmesh) | F9 | M | A | shell, vision | SHOULD | done (2026-11-03) |
-| E2 | Sentry polish + Drone enemy | E1, F8 | M | A | shell, vision | MUST | todo |
+| E2 | Sentry polish + Drone enemy | E1, F8 | M | A | shell, vision | MUST | done (2026-11-03) |
 | E3 | Training dummies, death FX, threat level | E2 | S | B | shell | SHOULD | todo |
 | A1 | Sound effects synthesis | — | L | A | shell | MUST | done (2026-11-03) |
 | A2 | Audio engine v2 | A1, F11 | M | B | shell | MUST | done (2026-11-03) |
-| A3 | Music (adaptive layers; MVP fallback allowed) | A2 | L | A | shell | MUST | todo |
+| A3 | Music (adaptive layers; MVP fallback allowed) | A2 | L | A | shell | MUST | done, MVP (2026-11-03) |
 | C1 | Tutorial: INDUCTION | F8, F9, F11, G2 | M | A | shell, vision | MUST | todo |
 | C2 | Level l02 PUMP ROW | F8, F9 | M | A | shell, vision | MUST | todo |
 | C3 | Level l03 OVERFLOW | F8, F9 | M | A | shell, vision | MUST | todo |
@@ -201,8 +203,37 @@ RELEASE_CHECKLIST.md, README.md.
   - 6+ at 1920×1080 (Forward+, HUD on, varied levels and moments);
   - 4+ at 2400×1080 with `--rendering-method gl_compatibility --touch`.
 - Every run happens off-screen (`--position 20000,20000`). Keep the shot list in the script.
+- Shots and key art show the dreamscape direction (`docs/DREAMSCAPE.md`). Start from
+  `tests/dreamscape_preview.gd`'s cameras.
 **Acceptance:** every file is exactly the right size, has been viewed, and has no debug text. The
 logo is legible on the small capsule.
+
+### R7 — Store copy, notices + AI disclosure for the dreamscape
+**Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
+department, and added three AI-generated textures. The store text, press kit, rating answers and
+notices still describe the old game.
+**Read:** docs/DREAMSCAPE.md, assets/dreamscape/PROMPTS.md, DESIGN (pitch and Presentation).
+**Edit:** store/steam/description.md, store/google-play/listing.md,
+store/google-play/content-rating.md, store/presskit.md, tools/notices.gd, THIRD_PARTY_NOTICES.txt
+(regenerate it with notices.gd), RELEASE_CHECKLIST.md (one OWNER line).
+**Do:**
+- Rewrite the pitch, features and tags around the new fiction:
+  - porcelain tea hounds, clockwork sentries and ceramic drones;
+  - a painted afternoon sky;
+  - "The Department of Unfinished Gravity".
+- Keep every character limit and recount it.
+- Content rating: the violence is fantasy violence against non-human porcelain and clockwork
+  automatons, with no blood. Replace "robots" with the new terms where it matters, and keep the
+  answers unchanged otherwise.
+- Notices header: code, models and audio are original. Three textures are original AI-generated
+  images, with their prompts in assets/dreamscape/PROMPTS.md.
+- Draft the Steam Content Survey AI disclosure text:
+  - pre-generated: the sky, porcelain texture and mural;
+  - live-generated: none.
+  Put the draft in store/steam/description.md and link it from RELEASE_CHECKLIST as an **OWNER**
+  step (PLAN O11).
+**Acceptance:** no stale "robot"/"industrial" wording in store files; limits stated; notices
+regenerated; the gate passes.
 
 ### P1 — Android full-game unlock with Google Play Billing (only if the owner picks model A)
 **Why:** Play never lets a free app become paid, and closed testers must buy a paid app. Model A
@@ -520,7 +551,7 @@ The gate passes.
   - 2–3 cm wide near the camera and never under about 1.5 px far away;
   - slack sag;
   - colour by state: cyan when slack, amber when taut, red near max.
-- A turned-steel sinker with a cyan band, plus a speed trail.
+- Keep V1's elongated ceramic cast weight. Add a cyan band and a speed trail.
 - The preview captures key moments in both renderers into .tools/captures/G4/.
 **Acceptance:** captures reviewed; the gate passes.
 
@@ -661,6 +692,10 @@ Rules for **every** level task (C1–C9):
 - The required cases and the extraction must be reachable on foot (validated by levels_test).
   Bonus caches may need the rod. Anchors sit within 40 m of where players will be.
 - Stay within the §7 budgets. Keep it readable: cyan route cues, red threats, landmarks.
+- Follow the V1 visual direction (`docs/DREAMSCAPE.md`, CONTRACT §8):
+  - dress the level with `scripts/dreamscape.gd` / `dream_props.gd` (absurd domestic objects,
+    arcades, unusable doors, deadpan notices);
+  - dressing adds no collision, lights or nav obstacles.
 - Review captures from spawn and from overviews in both renderers, and iterate.
 - **Acceptance:** `levels_test -- --only=<id>` passes, captures have been reviewed, and the gate
   passes.

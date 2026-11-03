@@ -253,6 +253,49 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
 - main.gd (lead): `level.bake_navigation(true)` runs right after each level build, so hounds can path. Without it, hounds gave up on any player above them.
 - Gate: QUALITY GATE PASSED (45 scripts, 9 suites).
 
+## 2026-11-03: G5 viewmodel, G7 HUD markers, E2 drone, A3 music (MVP); V1 plans
+
+- These four Haiku agents hit the 5-hour usage limit mid-task. The owner's V1 art pass (Codex) landed in between. Everything was checkpointed in 77ee192, then the agents were resumed with SendMessage and finished on top of V1.
+- G5 (`scripts/player.gd` viewmodel, `tests/gameplay_preview.gd`):
+  - rod: a tapered 12-segment blank with 7 brass guides, a grip, and a reel whose spool turns with line speed;
+  - motion: tension bends the rod, charge pulls it back, and a cast whips forward on a damped spring;
+  - a porcelain and plum pistol;
+  - a forward ray pulls the model back and up from walls.
+  - Captures: 7 shots in both renderers, in `.tools/captures/G5/`. physics_test 58/0.
+  - `set_feedback` gained `line_speed`. Main now passes the signed line rate.
+  - Open: the blank reads dark plum-grey, not pale porcelain. The ray is forward only, so a wall beside the rod isn't handled.
+- G7 (`scripts/hud.gd`, `tests/hud_test.gd`, four main.gd call sites):
+  - projected objective markers with distance, and clamped edge arrows off screen;
+  - damage arcs for 0.8 s via `damage_from(amount, source, from_position)`; CONTRACT §4.14 updated;
+  - speed and danger vignettes;
+  - touch_scale, touch_opacity and a left-handed mirror; the pause pad stays top-right;
+  - dynamic captions.
+  - hud_test passes. Captures in `.tools/captures/G7/`.
+  - Open: edge arrows that share a bearing overlap.
+- E2 (`scripts/enemy.gd`, `scripts/level_base.gd` ENEMY_KINDS, `tests/world_test.gd`):
+  - tripod sentry with a turning head; telegraph timing unchanged;
+  - drone: hovers 4–10 m, sight 40 m, closes to 12 m;
+  - 0.9 s charge, then a ray-stepped 22 m/s orb for 14 × damage_scale;
+  - 45 HP; a 3 m death blast for 25 × damage_scale.
+  - world_test 97/0. Codex's arena-local fixture correction is kept.
+  - Open: sentries report `is_tracking = false` (decide in E3). Drones are placed by C2–C6.
+- A3, MVP (`tools/generate_audio.gd -- --music`, `audio/music/`, `scripts/music.gd`, `tests/audio_test.gd`, music calls in main):
+  - four 16-bar 32 kHz stereo loops: menu 84, floodworks 104, foundry 80, spillway 92 BPM;
+  - three stingers: victory, defeat, medal;
+  - a warm tone per DREAMSCAPE;
+  - peaks at most -3.7 dBFS; seams fine; 23.15 MB in total.
+  - audio_test 64/0.
+  - The result screen now plays the stinger instead of the win/lose SFX; the SFX is the fallback when the music node is missing.
+  - CONTRACT §4.17 gained `set_zone` and `current_track`.
+  - Open: the three-stem version and intensity layers.
+- Plans for V1:
+  - EXECUTOR_BRIEF rule 3 and DESIGN now allow textures in `assets/dreamscape/` with prompts, and name the visual direction.
+  - New board rows: V1 (done) and R7 (store copy, notices and the Steam AI disclosure draft).
+  - PLAN O11: the Steam Content Survey AI disclosure.
+  - G4 keeps the ceramic weight. R6 uses the dreamscape cameras. Level tasks dress levels with `dreamscape.gd` / `dream_props.gd`.
+  - `docs/.gdignore` stops Godot importing the doc screenshots.
+- Gate: QUALITY GATE PASSED (51 scripts, 10 suites).
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>

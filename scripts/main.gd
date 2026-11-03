@@ -12,6 +12,7 @@ const PlayerScript = preload("res://scripts/player.gd")
 const TetherScript = preload("res://scripts/tether.gd")
 const HudScript = preload("res://scripts/hud.gd")
 const SoundScript = preload("res://scripts/audio.gd")
+const MusicScript = preload("res://scripts/music.gd")
 const UiRootScript = preload("res://scripts/ui/ui_root.gd")
 const ProfileScript = preload("res://scripts/profile.gd")
 const Catalog = preload("res://scripts/level_catalog.gd")
@@ -43,6 +44,7 @@ var level: Node3D
 var hud: CanvasLayer
 var ui: CanvasLayer
 var sound: Node
+var music: Node
 var platform: Node
 var profile: RefCounted
 var level_id: String = ""
@@ -66,6 +68,7 @@ var _reload_time: float = 0.0
 var _fire_cooldown: float = 0.0
 var _hint: String = ""
 var _hint_time: float = 0.0
+var _last_line_length: float = 0.0
 var _hitmarker: float = 0.0
 var _danger: float = 0.0
 var _air_time: float = 0.0
@@ -130,6 +133,8 @@ func _build_nodes() -> void:
 	sound.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(sound)
 	sound.add_to_group("game_audio")
+	music = MusicScript.new()
+	add_child(music)
 	platform = PlatformScript.new()
 	add_child(platform)
 	platform.setup()
@@ -199,6 +204,8 @@ func _open_title() -> void:
 	_set_state("title")
 	ui.hide_all()
 	ui.show_title()
+	if is_instance_valid(music):
+		music.play_track("menu")
 
 
 func _open_screen(screen_name: String) -> void:
@@ -320,9 +327,13 @@ func _begin_play() -> void:
 	level.set_active(true)
 	_apply_player_settings()
 	_set_state("playing")
+	if is_instance_valid(music):
+		music.set_zone(str(level.get("zone")))
 	ui.hide_all()
 	_set_hud_visible(true)
 	hud.show_game()
+	# Objective markers and damage arcs are measured through the player's camera (G7).
+	hud.set_camera(player.camera)
 	set_hint("AIM ABOVE THE HORIZON  /  charge {cast}, release, then {lock} to ride the weight", 8.0)
 	if not _cam_override.is_empty():
 		player.reset_at(Vector3(_cam_override[0], _cam_override[1], _cam_override[2]))
@@ -406,7 +417,14 @@ func _finish(won: bool, cause: String = "") -> void:
 	level.set_active(false)
 	last_result = _build_result(won, cause)
 	sound.motion(0.0, 0.0, false, false)
-	_sfx("win" if won else "lose")
+	if is_instance_valid(music):
+		# The result screen drops the track for a stinger: a new medal, a win, or a loss.
+		# The stinger replaces the win/lose SFX so the two cues don't double up.
+		var new_medal: bool = int(last_result.get("medal", 0)) > int(last_result.get("previous_medal", 0))
+		music.stop(1.0)
+		music.stinger("medal" if won and new_medal else ("victory" if won else "defeat"))
+	else:
+		_sfx("win" if won else "lose")
 	_set_hud_visible(false)
 	hud.show_menu()
 	# Freeze physics in a result view without pausing the UI or the result sound.
@@ -474,7 +492,10 @@ func _process(delta: float) -> void:
 		_hint_time = maxf(0.0, _hint_time - delta)
 		_hitmarker = maxf(0.0, _hitmarker - delta * 5.0)
 		_danger = maxf(0.0, _danger - delta * 0.9)
-		player.set_feedback(tether.charge, tether.tension, weapon)
+		# Signed line rate (m/s, positive while paying out) spins the reel's spool (G5).
+		var line_speed: float = (tether.line_length - _last_line_length) / maxf(delta, 0.0001)
+		_last_line_length = tether.line_length
+		player.set_feedback(tether.charge, tether.tension, weapon, line_speed)
 		sound.motion(player.linear_velocity.length(), tether.tension, tether.reeling, true)
 		var cases: int = int(level.get("collected_loot"))
 		var total: int = int(level.get("total_loot"))
@@ -502,6 +523,8 @@ func _process(delta: float) -> void:
 			"extraction_ready": cases >= total,
 			"airborne": not player.grounded
 		})
+		# Objective markers (G7): uncollected cases and bonuses, plus the extraction gate (CONTRACT 5.8).
+		hud.set_objectives(level.call("get_objectives"))
 
 
 func _physics_process(delta: float) -> void:
@@ -762,6 +785,8 @@ func _on_loot(kind: String, _value: int) -> void:
 
 func _on_damage(amount: float, _source: String, _from_position: Vector3) -> void:
 	_danger = 1.0
+	# The HUD draws a damage arc toward the source (G7).
+	hud.damage_from(amount, _source, _from_position)
 	run_stats["damage_taken"] = float(run_stats.get("damage_taken", 0.0)) + amount
 	_sfx("hurt")
 	if is_instance_valid(platform):

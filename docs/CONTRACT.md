@@ -211,7 +211,7 @@ func take_damage(amount: float, source: String = "", from_position: Vector3 = Ve
 func heal(amount: float) -> void
 func configure(stats: Dictionary) -> void        # uses max_health; refills health
 func apply_settings(settings: Dictionary) -> void   # look_sensitivity, fov, camera_shake (invert_y stays in main _look: see G1)
-func set_feedback(charge: float, tension: float, weapon: String) -> void
+func set_feedback(charge: float, tension: float, weapon: String, line_speed: float = 0.0) -> void   # line_speed spins the reel (G5)
 func shot_effect() -> void
 func add_shake(amount: float) -> void            # 0..1
 ```
@@ -400,7 +400,7 @@ func set_camera(camera: Camera3D) -> void
 func set_objectives(objectives: Array) -> void   # 5.8, called every frame while playing
 func update_state(data: Dictionary) -> void      # 5.9, every frame while playing
 func show_banner(title: String, subtitle: String = "", duration: float = 2.5, accent: String = "amber") -> void
-func damage_from(world_position: Vector3) -> void
+func damage_from(amount: float, source: String, from_position: Vector3) -> void   # 0.8 s directional arc (G7)
 func apply_settings(settings: Dictionary) -> void
 func set_active(value: bool) -> void             # hidden + touches released when false
 func release_touches() -> void
@@ -461,7 +461,11 @@ func play_track(track: String, fade: float = 1.5) -> void   # menu | floodworks 
 func set_intensity(value: float) -> void                    # 0 calm .. 1 chase (layers crossfade)
 func stinger(name: String) -> void                          # victory | defeat | medal
 func stop(fade: float = 1.0) -> void
+func set_zone(zone_id: String) -> void                      # crossfades to the zone's track (A3)
+func current_track() -> String                              # "" when stopped
 ```
+A3 shipped the MVP: one stem per track, so `set_intensity` is stored but has no audible effect
+until the three-stem version lands.
 
 ## 5. Data shapes
 
