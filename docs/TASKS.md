@@ -37,7 +37,7 @@ owner = needs the human (devices, accounts).
 | F9 | Navigation mesh + level validation suite | F7 | M | A | shell | MUST | done (2026-11-03) |
 | F10 | Main flow switch-over (new menus + catalog levels) | F1, F3, F7 | L | A | shell, vision | MUST | done |
 | F11 | Main run systems: stats, achievements, checkpoints, sidearm, hints | F10 | M | A | shell | MUST | done |
-| F12 | Hazard-aware navigation + bonus off-foot checks | F9, C6 | S | B | shell | SHOULD | todo |
+| F12 | Hazard-aware navigation + bonus off-foot checks | F9, C6 | S | B | shell | SHOULD | done 2026-11-03 |
 | G1 | Player v2: movement + camera feel | F10 | M | A | shell | MUST | done (2026-11-03) |
 | G2 | Tether v2: upgrades, recover, anchors, smash, events | F10 | M | A | shell | MUST | done (2026-11-03) |
 | G3 | Rope wrapping | G2 | M | A | shell | SHOULD | done 2026-11-03 |
@@ -62,7 +62,7 @@ owner = needs the human (devices, accounts).
 | C7 | Level l07 THE STEPS | F8, F9, E2 | M | A | shell, vision | LATER | todo |
 | C8 | Level l08 DAMWALL | F8, F9, E2 | M | A | shell, vision | LATER | todo |
 | C9 | Level l09 HEADWATER | F8, F9, E2 | M | A | shell, vision | LATER | todo |
-| C10 | Balance pass | C1–C6 | S | B | shell, owner | MUST | todo |
+| C10 | Balance pass | C1–C6 | S | B | shell, owner | MUST | pars + economy done 2026-11-03; owner playtest open |
 | Q1 | Device performance pass | C6 | M | B | shell, owner | MUST | todo |
 | Q2 | Release candidate + bug bash + final builds | all MUST | M | A | shell, owner | MUST | todo |
 

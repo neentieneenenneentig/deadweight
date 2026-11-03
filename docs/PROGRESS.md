@@ -417,6 +417,47 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   - At Compatibility spawn, enemies cost about 11–17 draw calls each and pickups about 9. Consider pickup and enemy shadow settings in Q1.
 - Gate: QUALITY GATE PASSED (58 scripts, 10 suites). All six v1.0 campaign levels plus the tutorial and the range now exist.
 
+## 2026-11-03: C10 pars + economy, F12 hazard-aware navigation
+
+- Model: lead Opus 5.5 (pars, test updates); Haiku 5.5 executors (C10 economy, F12).
+- C10 pars (lead): one formula in levels_test.
+  - Silver = 1.6 × (route / 5.8 m/s ground speed) + the 6 s extraction hold. Gold = 0.9 × + hold. Both are rounded to 5 s.
+  - The old suggestion (0.85× / 0.5×, no hold) made silver faster than a flat-out run.
+
+  | Level | Route m | Silver s | Gold s |
+  | --- | --- | --- | --- |
+  | tutorial | 130 | 60 (formula 40; extra for the stations) | 30 |
+  | l01 | 287 | 85 (was 150) | 50 (was 95) |
+  | l02 | 165 | 50 | 30 |
+  | l03 | 250 | 75 | 45 |
+  | l04 | 224 | 70 | 40 |
+  | l05 | 220 | 65 | 40 |
+  | l06 | 315 | 95 | 55 |
+
+- C10 economy (`scripts/upgrades.gd`):
+  - tier costs 40/90/160/250 → 30/55/85/120.
+  - A first campaign clear (tutorial to l06, bronze on all, silver on half) pays about 878 salvage. Maxing all six tracks costs 1740, about 1.98 clears (it was 3.7).
+  - Salvage values are unchanged (CASE 15, BONUS 30, medals 10/25/50).
+  - Enemy damage is unchanged. Sustained time-to-kill from 100 HP:
+
+    | Enemy | Relaxed | Normal | Hardened |
+    | --- | --- | --- | --- |
+    | hound | 17.6 s | 8.8 s | 5.5 s |
+    | sentry | 33 s | 16.5 s | 11 s |
+    | drone | 43 s | 21.7 s | 12.4 s |
+
+  - Lead: meta, flow and ui tests follow the new costs. The ui progress-profile bank is 245 → 115 and the flow workshop bank is 100 → 80, so the "unaffordable" cases still hold.
+  - Open: when l07–l09 land, a clear pays about 1320, so retune COSTS then.
+  - Open: deep water at Hardened kills from full health in about 2.7 s.
+  - Open: cases pay on every extraction, so the replay farm is about 2.4 replays to max everything (DESIGN intends this).
+- F12 (`scripts/level_base.gd` nav bake, `tests/levels_test.gd`):
+  - each hazard record adds a carved projected obstruction (`add_projected_obstruction`, carve) from 0.3 m below its box, so sync and threaded bakes and hounds avoid heat, electric and deep-water ground;
+  - route failures now name hazard ground;
+  - levels_test warns on any walkable bonus cache. All 12 campaign caches are off-foot, with no warnings.
+  - l06's route detours the heat pool (308 → 315 m), so its silver is 95. Bake times are unchanged (all under 50 ms).
+  - Limit: a hazard box hovering above the floor leaves the floor under it walkable. No level has one.
+- Gate: QUALITY GATE PASSED (59 scripts, 10 suites). R6's in-progress store_art.gd is in the parse count.
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>

@@ -314,7 +314,7 @@ func get_objectives() -> Array                      # 5.8
 func threat_level() -> float                        # 0..1 for music/HUD: max over tracking non-dummy enemies, 0.2 at 45 m rising to 1.0 on the player; 0 when none track
 func is_hazard_at(position: Vector3) -> bool
 func is_safe_ground(position: Vector3) -> bool      # for checkpoints
-func bake_navigation(synchronous: bool = true) -> void
+func bake_navigation(synchronous: bool = true) -> void  # layer-1 solids minus hazard volumes (heat, electric, deep water carved from 0.3 m below; F12)
 func get_nav_path(from: Vector3, to: Vector3) -> PackedVector3Array
 func _design() -> void                              # override
 ```
