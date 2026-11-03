@@ -70,10 +70,17 @@ func _run() -> void:
 	tether.reeling = true
 	await _frames(15)
 	_check(tether.line_length < lock_length, "active reeling shortens line")
+	# A reel within 2.2 m of the rod tip recovers the weight (tether v2), so this reel takes it back.
+	_check(not is_instance_valid(tether.weight) and tether.tension == 0.0, "reeling a weight in next to the rod recovers it")
+	tether.reeling = false
+	# The cut checks need a weight still on the line, so cast a fresh one.
+	tether._cast(0.7)
+	await _frames(4)
+	var cast_weight: RigidBody3D = tether.weight
 	var player_before: Vector3 = player.linear_velocity
-	var weight_before: Vector3 = weight.linear_velocity
+	var weight_before: Vector3 = cast_weight.linear_velocity
 	tether.cut()
-	_check(player.linear_velocity.is_equal_approx(player_before) and weight.linear_velocity.is_equal_approx(weight_before), "cut preserves both body velocities")
+	_check(player.linear_velocity.is_equal_approx(player_before) and cast_weight.linear_velocity.is_equal_approx(weight_before), "cut preserves both body velocities")
 	_check(not is_instance_valid(tether.weight) and tether.tension == 0.0, "cut removes the active connection")
 	tether.clear()
 	player.gravity_scale = 1.0
@@ -101,6 +108,7 @@ func _run() -> void:
 	arena.queue_free()
 	await process_frame
 	await _movement_checks()
+	await _tether_v2_checks()
 	print("PHYSICS TESTS ", "PASSED" if failures == 0 else "FAILED", " failures=", failures)
 	quit(0 if failures == 0 else 1)
 
@@ -252,6 +260,7 @@ func _ramp_checks() -> void:
 	_check(float(steep["drift"]) > 0.3, "control: an idle player still slides on a 50 degree ramp")
 
 
+
 ## Drops an idle player onto a tilted box and reports how far it drifted once it had settled.
 func _ramp_drift(degrees: float) -> Dictionary:
 	var world := _new_world()
@@ -326,5 +335,269 @@ func _health_checks() -> void:
 	dummy.died.connect(func(source: String) -> void: deaths.append(source))
 	dummy.take_damage(1000.0, "pit")
 	_check(deaths == ["pit"], "died carries the killing source")
+	world.queue_free()
+	await process_frame
+
+
+## A stub with a take_damage counter, used as the enemy for smash checks.
+const DUMMY_SOURCE := "extends StaticBody3D\nvar hits: int = 0\nvar last_amount: float = 0.0\nfunc take_damage(amount: float, _source: String = \"bullet\") -> void:\n\thits += 1\n\tlast_amount = amount\n"
+
+
+## Tether v2 checks: stats, auto-cut, analog reel, recover, anchors, spool limit, smash and impacts.
+## Each check builds its own world with real bodies. Gravity is off and cast assist is zero.
+func _tether_v2_checks() -> void:
+	await _tether_configure_check()
+	await _tether_auto_cut_check()
+	await _tether_reel_strength_check()
+	await _tether_recover_check()
+	await _tether_anchor_check()
+	await _tether_spool_limit_check()
+	await _tether_smash_check()
+	await _tether_impact_check()
+
+
+## A player and a tether in one world. Returns {"player", "tether"} as untyped values for the checks.
+func _tether_rig(world: Node3D, at: Vector3) -> Dictionary:
+	var body := _spawn(world, at, 0.0)
+	body.linear_damp = 0.0
+	body.pitch = 0.0
+	body.apply_look(Vector2.ZERO)
+	var line := Tether.new()
+	world.add_child(line)
+	line.bind(body)
+	line.active = true
+	line.assist_strength = 0.0
+	return {"player": body, "tether": line}
+
+
+## A static box with collision on the given layer, optionally in a group.
+func _add_box(world: Node3D, at: Vector3, size: Vector3, layer: int, group: String) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	shape.shape = box
+	body.add_child(shape)
+	body.collision_layer = layer
+	body.position = at
+	if not group.is_empty():
+		body.add_to_group(group)
+	world.add_child(body)
+	return body
+
+
+func _dummy_script() -> GDScript:
+	var script := GDScript.new()
+	script.source_code = DUMMY_SOURCE
+	script.reload()
+	return script
+
+
+## Puts the weight at a spot with a velocity along -z, for contact checks that need a fast hit.
+func _fling(line, at: Vector3, speed: float) -> void:
+	line.weight.global_position = at
+	line.weight.linear_velocity = Vector3(0, 0, -speed)
+	line.weight.angular_velocity = Vector3.ZERO
+
+
+func _tether_configure_check() -> void:
+	var world := _new_world()
+	var rig := _tether_rig(world, Vector3(0, 20, 0))
+	var line = rig["tether"]
+	line.configure({"max_line": 30.0, "reel_force": 15000.0, "reel_speed": 7.0, "weight_mass": 160.0, "assist_strength": 16000.0, "charge_time": 0.5})
+	_check(is_equal_approx(line.max_line, 30.0) and is_equal_approx(line.reel_force, 15000.0) and is_equal_approx(line.reel_speed, 7.0), "configure applies the spool and reel stats")
+	_check(is_equal_approx(line.weight_mass, 160.0) and is_equal_approx(line.assist_strength, 16000.0) and is_equal_approx(line.charge_time, 0.5), "configure applies the weight, assist and charge stats")
+	line.configure({"reel_force": 99999.0})
+	_check(is_equal_approx(line.reel_force, Tether.MAX_TENSION), "reel force is capped at the line's maximum tension")
+	world.queue_free()
+	await process_frame
+
+
+func _tether_auto_cut_check() -> void:
+	var world := _new_world()
+	var rig := _tether_rig(world, Vector3(0, 20, 0))
+	var line = rig["tether"]
+	var events: Array = []
+	line.event_happened.connect(func(event: String) -> void: events.append(event))
+	line._cast(0.5)
+	await _frames(20)
+	# The cast cooldown is 0.18 s, so 20 frames is enough for a second CAST.
+	line.auto_cut = false
+	line.begin_charge()
+	_check(events.has("cut_first") and is_instance_valid(line.weight) and not line.charging, "cut_first: CAST with a weight out only asks for a cut")
+	line.auto_cut = true
+	line.begin_charge()
+	_check(events.has("auto_cut") and events.has("cut") and not is_instance_valid(line.weight) and line.charging, "auto_cut: CAST drops the weight and starts the next charge")
+	line.charging = false
+	world.queue_free()
+	await process_frame
+
+
+## Reeling at half strength takes in line at about half the rate over the same time.
+func _tether_reel_strength_check() -> void:
+	var world := _new_world()
+	var rig := _tether_rig(world, Vector3(0, 20, 0))
+	var line = rig["tether"]
+	var player_body = rig["player"]
+	line.configure({"max_line": 60.0})
+	var drops: Array = []
+	for strength: float in [1.0, 0.5]:
+		line._cast(0.5)
+		await _frames(5)
+		# Park the weight 6 m out, beyond the recover radius, with no velocity of its own.
+		line.weight.global_position = player_body.global_position + Vector3(0, 0, -6.0)
+		line.weight.linear_velocity = Vector3.ZERO
+		# Keep the line slack so the reel is not loaded: only the reel speed decides the rate.
+		line.line_length = 18.0
+		line.reel_strength = strength
+		line.reeling = true
+		var before: float = line.line_length
+		await _frames(45)
+		line.reeling = false
+		drops.append(before - line.line_length)
+		line.cut()
+	_check(float(drops[0]) > 4.0, "full reel shortens a slack line at the reel speed")
+	_check(absf(float(drops[1]) / float(drops[0]) - 0.5) < 0.05, "reel_strength 0.5 reels at about half speed")
+	world.queue_free()
+	await process_frame
+
+
+## A free weight reeled in within 2.2 m of the rod tip is recovered, but not before.
+func _tether_recover_check() -> void:
+	var world := _new_world()
+	var rig := _tether_rig(world, Vector3(0, 20, 0))
+	var line = rig["tether"]
+	var player_body = rig["player"]
+	var events: Array = []
+	line.event_happened.connect(func(event: String) -> void: events.append(event))
+	line._cast(0.0)
+	await _frames(2)
+	# Park the weight 4 m out, about 2.35 m from the rod tip, which is outside the recover radius.
+	line.weight.gravity_scale = 0.0
+	line.weight.global_position = player_body.global_position + Vector3(0, 0, -4.0)
+	line.weight.linear_velocity = Vector3.ZERO
+	line.line_length = 5.0
+	line.reeling = true
+	await _frames(1)
+	_check(not events.has("recover") and is_instance_valid(line.weight), "a weight outside 2.2 m of the rod tip is not recovered")
+	var waited := 0
+	while is_instance_valid(line.weight) and waited < 300:
+		await physics_frame
+		waited += 1
+	_check(events.has("recover") and not is_instance_valid(line.weight), "reeling the weight within 2.2 m of the rod tip recovers it")
+	world.queue_free()
+	await process_frame
+
+
+## Touching an anchor latches the weight. A latched weight is reeled from, not recovered.
+func _tether_anchor_check() -> void:
+	var world := _new_world()
+	_add_box(world, Vector3(0, 20, -6.0), Vector3(3, 3, 0.5), 1, "anchor")
+	var rig := _tether_rig(world, Vector3(0, 20, 0))
+	var line = rig["tether"]
+	var player_body = rig["player"]
+	var events: Array = []
+	line.event_happened.connect(func(event: String) -> void: events.append(event))
+	line._cast(0.0)
+	await _frames(3)
+	line.weight.gravity_scale = 0.0
+	line.weight.global_position = Vector3(0, 20, -3.0)
+	line.weight.linear_velocity = Vector3(0, 0, -8.0)
+	line.line_length = 30.0
+	var waited := 0
+	while not line.anchored and waited < 90:
+		await physics_frame
+		waited += 1
+	_check(line.anchored and events.has("anchor") and line.weight.freeze, "a weight touching an anchor latches and freezes")
+	var start_z: float = player_body.global_position.z
+	line.line_length = 8.0
+	line.reeling = true
+	await _frames(120)
+	line.reeling = false
+	_check(line.anchored and player_body.global_position.z < start_z - 0.3, "reeling from an anchor pulls the player toward the plate")
+	_check(not events.has("recover") and is_instance_valid(line.weight), "an anchored weight is not recovered by reeling")
+	world.queue_free()
+	await process_frame
+
+
+## spool_limit fires once, at the moment free spool reaches the line maximum.
+func _tether_spool_limit_check() -> void:
+	var world := _new_world()
+	var rig := _tether_rig(world, Vector3(0, 20, 0))
+	var line = rig["tether"]
+	line.configure({"max_line": 4.0})
+	var events: Array = []
+	line.event_happened.connect(func(event: String) -> void: events.append(event))
+	line._cast(1.0)
+	var waited := 0
+	while not events.has("spool_limit") and waited < 120:
+		await physics_frame
+		waited += 1
+	# Read the line straight after the event, before any later overload can cut it.
+	_check(events.has("spool_limit") and is_equal_approx(line.line_length, 4.0), "spool_limit fires when the line reaches its maximum")
+	await _frames(20)
+	_check(events.count("spool_limit") == 1, "spool_limit does not repeat while the line stays at its maximum")
+	world.queue_free()
+	await process_frame
+
+
+## A fast weight hit on an enemy deals damage, emits weight_smash, and a second hit inside 0.35 s deals none.
+func _tether_smash_check() -> void:
+	var world := _new_world()
+	var rig := _tether_rig(world, Vector3(0, 20, 0))
+	var line = rig["tether"]
+	var target := _add_box(world, Vector3(0, 20, -6.0), Vector3(3, 3, 0.5), 8, "enemies")
+	target.set_script(_dummy_script())
+	var smashes: Array = []
+	line.weight_smash.connect(func(_hit: Node, speed: float, damage: float) -> void: smashes.append([speed, damage]))
+	line._cast(0.0)
+	await _frames(3)
+	line.weight.gravity_scale = 0.0
+	line.line_length = 40.0
+	_fling(line, Vector3(0, 20, -3.0), 14.0)
+	var waited := 0
+	while int(target.get("hits")) == 0 and waited < 60:
+		await physics_frame
+		waited += 1
+	_check(int(target.get("hits")) == 1 and smashes.size() == 1, "a fast weight hit smashes the enemy once")
+	var damage: float = float(target.get("last_amount"))
+	_check(damage > 0.0 and damage <= Tether.SMASH_MAX_DAMAGE, "smash damage is positive and capped")
+	# Second hit inside the 0.35 s cooldown: the weight reaches the enemy again but deals nothing.
+	_fling(line, Vector3(0, 20, -4.8), 14.0)
+	await _frames(6)
+	_check(int(target.get("hits")) == 1, "a second smash within 0.35 s deals no damage")
+	await _frames(40)
+	_fling(line, Vector3(0, 20, -4.8), 14.0)
+	waited = 0
+	while int(target.get("hits")) < 2 and waited < 30:
+		await physics_frame
+		waited += 1
+	_check(int(target.get("hits")) == 2, "smash works again once the cooldown has passed")
+	world.queue_free()
+	await process_frame
+
+
+## weight_impact fires on a hard world hit and is throttled while the weight keeps touching.
+func _tether_impact_check() -> void:
+	var world := _new_world()
+	var rig := _tether_rig(world, Vector3(0, 20, 0))
+	var line = rig["tether"]
+	_add_box(world, Vector3(0, 20, -6.0), Vector3(3, 3, 0.5), 1, "")
+	var impacts: Array = []
+	line.weight_impact.connect(func(_at: Vector3, speed: float) -> void: impacts.append(speed))
+	line._cast(0.0)
+	await _frames(3)
+	line.weight.gravity_scale = 0.0
+	line.line_length = 40.0
+	_fling(line, Vector3(0, 20, -3.0), 8.0)
+	var waited := 0
+	while impacts.is_empty() and waited < 60:
+		await physics_frame
+		waited += 1
+	_check(impacts.size() == 1 and float(impacts[0]) > 4.0, "a hard world hit emits weight_impact")
+	# A second hit within the 0.15 s interval is throttled out.
+	_fling(line, Vector3(0, 20, -4.9), 8.0)
+	await _frames(10)
+	_check(impacts.size() == 1, "weight_impact is throttled to one per 0.15 s")
 	world.queue_free()
 	await process_frame
