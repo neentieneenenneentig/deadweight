@@ -26,7 +26,7 @@ owner = needs the human (devices, accounts).
 | P1 | Android full-game unlock (Play Billing); only if the owner picks model A | F5, F10, O3b | M | A | shell, owner | MUST if A | todo |
 | F1 | Data layer: profile/upgrades/achievements/settings + tests | — | M | B | shell | MUST | done |
 | F2 | Input map + platform services | — | S | B | shell | MUST | todo |
-| F3 | UI screens A: title, loading, pause, result (+stubs, preview) | — | M | B | shell, vision | MUST | todo |
+| F3 | UI screens A: title, loading, pause, result (+stubs, preview) | — | M | B | shell, vision | MUST | done |
 | F4 | UI screens B: settings, credits | F3 | M | B | shell, vision | MUST | todo |
 | F5 | UI screens C: level select, workshop, records | F3 | M | B | shell, vision | MUST | todo |
 | F6 | UI test suite | F3, F4, F5 | M | B | shell | MUST | todo |

@@ -131,6 +131,26 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
 - Follow-ups: main.gd still builds scripts/world.gd; F10 switches it to the catalog and deletes
   world.gd.
 
+## 2026-11-03: F3 UI screens A (title, loading, pause, result)
+- Model: Claude Sonnet 5.5.
+- Added scripts/ui/{title,loading,pause,result}_screen.gd and stubs for levels, workshop, records,
+  settings and credits (header + BACK; F4/F5 replace them whole), plus tests/ui_preview.gd.
+- Title: logotype reveal, bank chip, CONTINUE (next unfinished unlocked raid) or CAMPAIGN,
+  PRACTICE RANGE (disabled "SOON" while the catalog says the range has no script), WORKSHOP,
+  RECORDS, SETTINGS, CREDITS, QUIT (desktop only), the "start with INDUCTION" callout (only when the
+  tutorial exists and is not done), version. Loading: title, subtitle, animated hazard bar, tip;
+  swallows Esc. Pause: RESUME/RESTART/SETTINGS/QUIT TO TITLE (confirm) and a controls reference for
+  the current device. Result: medal pop, time against par track, breakdown, bank, achievements,
+  stats; lost runs show the cause and a "try this" tip; body scrolls so the footer buttons always fit
+  under touch scaling.
+- Verified by captures in .tools/captures/F3/ at 1280x720, 1280x800, 2400x1080 (the 20:9 canvas is
+  1600x720), Forward+ and Compatibility, mouse and touch. Every screen opens with its primary
+  control focused (loading excepted, by design).
+- Tests: QUALITY GATE: PASSED (37 scripts, 4 suites). UI behaviour tests come with F6.
+- Deviations: none in the framework files. ui_preview shows l01 as the 3D backdrop.
+- Follow-ups: F10 must wire `restart_requested`, `menu_requested`, `next_level_requested` and
+  `level_requested("range")`. The tutorial callout and CONTINUE improve once C1 exists.
+
 ---
 Template:
 ```

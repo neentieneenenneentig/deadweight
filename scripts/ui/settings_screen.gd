@@ -1,0 +1,15 @@
+extends "res://scripts/ui/screen.gd"
+## STUB from task F3: a header and BACK so the menu flow works end to end.
+## Task F4 replaces this whole file with the real settings screen.
+
+var _back: Button
+
+
+func build() -> void:
+	var f: Dictionary = frame("SETTINGS", "OPTIONS")
+	_back = footer_controls(f["footer"])
+	wrap_label(f["body"], "This screen arrives with task F4.", "BodyMuted")
+
+
+func primary_focus() -> Control:
+	return _back
