@@ -513,6 +513,22 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
 - Lead review: an improvement on the standing poses, but not yet store-quality. The camera looks up at plates 7–8 m away, so the frames are mostly sky with a short line. That is card R6c.
 - Gate: QUALITY GATE PASSED (59 scripts, 10 suites).
 
+## 2026-11-03: R6c screenshot framing pass
+
+- Model: Haiku 5.5 executor; lead Opus 5.5 review and fix.
+- `tools/store_art.gd` LIVE_SHOTS:
+  - casts start 17–23 m from their plates;
+  - after latch the camera looks along the horizontal swing, pitched 15° up (`look: "velocity"`), so the line runs from the rod into the frame with the level below;
+  - hud_01 is a live hound chase (TRACKED, 18.9 M/S);
+  - hud_07 swings over the l06 heat pool and teapot from the 9 m rim;
+  - touch_02 is a taut swing (19.5 M/S, 14 kN).
+- Swing shots use practice mode, so bites can't knock the swing off. Lead fix: store_art hides the HUD's "PRACTICE / NO HOSTILES" label (through its modulate), so the frames don't show it.
+- Still weak:
+  - touch_04 (l06 kiln, 7.7 M/S);
+  - hud_02 and touch_01, which are sentry-beam casts in flight, not swings;
+  - hud_06 and touch_03, which are reels with a large wall in frame.
+  - The owner picks the final 5–8 for each store.
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>

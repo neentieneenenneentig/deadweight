@@ -24,7 +24,7 @@ owner = needs the human (devices, accounts).
 | R5 | Store copy, release checklist, README | — | M | C | web | MUST | done |
 | R6 | Store art + screenshots | C6, G7, F11 | M | B | shell, vision | MUST | done 2026-11-03 |
 | R6b | Live action screenshots | R6 | S | B | shell, vision | MUST | done 2026-11-03 |
-| R6c | Screenshot framing pass | R6b | S | B | shell, vision | SHOULD | todo |
+| R6c | Screenshot framing pass | R6b | S | B | shell, vision | SHOULD | done 2026-11-03 (touch_04 slow, sentry shots are casts) |
 | R7 | Store copy, notices + AI disclosure for the dreamscape | V1 | S | C | — | MUST | done 2026-11-03 |
 | V1 | Art direction: The Department of Unfinished Gravity (owner, via Codex) | — | L | — | shell, vision | MUST | done (2026-11-03) |
 | P1 | Android full-game unlock (Play Billing); only if the owner picks model A | F5, F10, O3b | M | A | shell, owner | MUST if A | todo |
