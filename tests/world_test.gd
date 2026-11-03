@@ -5,6 +5,11 @@ const Catalog = preload("res://scripts/level_catalog.gd")
 const PlayerScript = preload("res://scripts/player.gd")
 const EnemyScript = preload("res://scripts/enemy.gd")
 const RangeScript = preload("res://scripts/levels/range.gd")
+const LevelBase = preload("res://scripts/level_base.gd")
+## Hound navigation tests build their own small level here, far from the Sluice Gate geometry so the
+## shared physics space holds nothing else.
+const ARENA := Vector3(500.0, 0.0, 0.0)
+const ATTACK_REACH := 2.2            # planar metres: close enough that the hound is biting range
 
 var _scene: Node3D
 var _player: RigidBody3D
@@ -19,6 +24,9 @@ var _salvage: int = 0
 var _extraction_events: Array[bool] = []
 var _hint_events: int = 0
 var _range_loot: int = 0
+var _deaths: int = 0
+var _death_kind: String = ""
+var _death_by: String = ""
 
 
 func _initialize() -> void:
@@ -48,6 +56,9 @@ func _run() -> void:
 	await _test_sentry_telegraph()
 	await _test_raid_population()
 	await _test_features()
+	await _test_hound_wall_route()
+	await _test_hound_gives_up()
+	await _test_hound_dies_once()
 	_scene.queue_free()
 	await _frames(3)
 	print("WORLD TEST: %d checks, %d failures" % [_checks, _failures])
@@ -328,6 +339,121 @@ func _test_features() -> void:
 	_check(collected_once == 1 and _range_loot == 2 and int(_range.get("collected_loot")) == 1, "reset_cases puts the case back so it can be collected again")
 	_range.queue_free()
 	await _frames(3)
+
+
+## The hound sees the player, who then steps behind a wall. The hound must route around the wall on the
+## navmesh (the chase memory keeps it hunting) and reach biting range from the far side.
+func _test_hound_wall_route() -> void:
+	var arena: Node3D = _make_arena()
+	_add_solid(arena, Vector3(0, 1.5, 3), Vector3(8, 3, 0.6))
+	arena.call("bake_navigation", true)
+	await _frames(2)
+	_check(bool(arena.get("navigation_ready")), "arena navmesh bakes with a wall in it")
+	_player.set("health", 100.0)
+	await _move_player(ARENA + Vector3(0, 0.92, -4))
+	var hound: CharacterBody3D = _new_arena_hound(arena, Vector3(0, 0.05, -10))
+	hound.call("set_active", true)
+	await _frames(2)
+	await _move_player(ARENA + Vector3(0, 0.92, 8))   # behind the wall, out of sight
+	var ticks: float = float(Engine.physics_ticks_per_second)
+	var reached_at: float = -1.0
+	for i in range(int(10.0 * ticks)):
+		await physics_frame
+		if _planar_gap(hound, _player) < ATTACK_REACH:
+			reached_at = float(i + 1) / ticks
+			break
+	print("HOUND ROUTE: attack range %s" % ("not reached" if reached_at < 0.0 else "after %.2f s" % reached_at))
+	_check(reached_at > 0.0, "hound routes around the wall to a player it chased from the far side, within 10 s")
+	_check(hound.global_position.z > 3.3, "hound ends up on the far side of the wall")
+	arena.queue_free()
+	await _frames(3)
+
+
+## A player on a platform the hound cannot climb: after a few failed route checks the hound gives up the
+## chase and circles where it stands, instead of chasing up.
+func _test_hound_gives_up() -> void:
+	var arena: Node3D = _make_arena()
+	_add_solid(arena, Vector3(0, 1.5, 8), Vector3(6, 3, 6))   # platform, top at 3 m, no ramp
+	arena.call("bake_navigation", true)
+	await _frames(2)
+	_player.set("health", 100.0)
+	await _move_player(ARENA + Vector3(0, 3.92, 8))   # standing on the platform
+	var hound: CharacterBody3D = _new_arena_hound(arena, Vector3(0, 0.05, -4))
+	var start: Vector3 = hound.global_position
+	hound.call("set_active", true)
+	var ticks: float = float(Engine.physics_ticks_per_second)
+	var top: float = 0.0
+	var farthest: float = 0.0
+	var closest: float = INF
+	for i in range(int(3.0 * ticks)):
+		await physics_frame
+		top = maxf(top, hound.global_position.y)
+		farthest = maxf(farthest, hound.global_position.distance_to(start))
+		closest = minf(closest, _planar_gap(hound, _player))
+	_check(not bool(hound.call("is_tracking")), "hound gives up on a player it cannot reach and stops tracking")
+	_check(top < 0.6, "hound never climbs toward the platform")
+	_check(farthest > 1.5 and farthest < 7.0, "hound circles below at a patrol radius, neither idle nor wandering off")
+	_check(closest > 4.0, "hound never gets near the unreachable player")
+	_check(is_equal_approx(float(_player.get("health")), 100.0), "no bite lands on the unreachable player")
+	arena.queue_free()
+	await _frames(3)
+
+
+## Three lethal hits, one death: died fires once, with the hound's kind and the lethal hit's source.
+func _test_hound_dies_once() -> void:
+	var arena: Node3D = _make_arena()
+	var hound: CharacterBody3D = _new_arena_hound(arena, Vector3(0, 0.05, 0))
+	hound.connect("died", _on_hound_died)
+	_deaths = 0
+	_check(hound.find_children("*", "MeshInstance3D", true, false).size() <= 14, "hound model stays within 14 mesh instances")
+	hound.call("take_damage", 1.0, "bullet")
+	_check(_deaths == 0, "a survivable hit does not fire died")
+	hound.call("take_damage", 500.0, "bullet")
+	hound.call("take_damage", 500.0, "bullet")
+	await _frames(20)
+	hound.call("take_damage", 500.0, "bullet")
+	_check(_deaths == 1 and _death_kind == "hound" and _death_by == "bullet", "a hound killed three times fires died exactly once, with its kind and source")
+	arena.queue_free()
+	await _frames(3)
+
+
+## An empty level with a floor and its own navmesh, placed far from the shared test geometry.
+func _make_arena() -> Node3D:
+	var arena: Node3D = LevelBase.new()
+	arena.position = ARENA
+	_scene.add_child(arena)
+	_add_solid(arena, Vector3(0, -0.5, 0), Vector3(40, 1, 40))
+	return arena
+
+
+## A plain solid box on layer 1. The navmesh bake reads the level's children, so walls added this way are baked.
+func _add_solid(parent: Node3D, center: Vector3, size: Vector3) -> void:
+	var body := StaticBody3D.new()
+	body.position = center
+	body.collision_layer = 1
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	collision.shape = shape
+	body.add_child(collision)
+	parent.add_child(body)
+
+
+func _new_arena_hound(arena: Node3D, location: Vector3) -> CharacterBody3D:
+	var hound: CharacterBody3D = EnemyScript.new()
+	arena.add_child(hound)
+	hound.call("setup", _player, "hound", location)
+	return hound
+
+
+func _planar_gap(a: Node3D, b: Node3D) -> float:
+	return Vector2(a.global_position.x - b.global_position.x, a.global_position.z - b.global_position.z).length()
+
+
+func _on_hound_died(kind: String, by: String) -> void:
+	_deaths += 1
+	_death_kind = kind
+	_death_by = by
 
 
 func _test_body(location: Vector3, cast_weight: bool) -> RigidBody3D:
