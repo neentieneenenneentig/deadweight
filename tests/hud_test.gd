@@ -124,7 +124,7 @@ func _run() -> void:
 	_camera.queue_free()
 	await process_frame
 	if _failures == 0:
-		print("HUD TESTS PASSED: two-thumb aim, finger reuse, focus/hide release, state readouts, captions, vignettes, medal target, telemetry, banner, objective markers on and off screen, damage arcs, touch scale, opacity and left-handed mirror, six layouts (also left-handed), safe area")
+		print("HUD TESTS PASSED: two-thumb aim, finger reuse, focus/hide release, state readouts, captions, vignettes, medal target, telemetry, banner, objective markers on and off screen, hint-band fade and backing, edge arrow spacing, distance labels, damage arcs, touch scale, opacity and left-handed mirror, six layouts (also left-handed), safe area")
 	else:
 		push_error("HUD TESTS FAILED: %d checks" % _failures)
 	quit(0 if _failures == 0 else 1)
@@ -217,7 +217,7 @@ func _test_medal_target_and_telemetry() -> void:
 	_hud.update_state({"time": 74.0, "par_silver": 90.0, "par_gold": 60.0, "tension": 14000.0, "line_length": 9.4, "reel_state": "LOCKED / TAUT", "charge": 0.0, "weapon": "ROD"})
 	_expect(_hud._target_label.text == "NEXT SILVER   01:30", "past gold par the next target is silver")
 	_expect(_hud._line_label.text.contains("kN"), "telemetry on shows line tension numbers")
-	_expect(_hud._reticle_state.text.contains("kN"), "telemetry on shows tension in the reticle state")
+	_expect(_hud._rod_label.text == "LOCKED / TAUT" and not _hud._reticle_state.visible, "the rod panel is the one readout of the reel state; the reticle shows no state word while nothing tracks")
 	_hud.update_state({"time": 50.0, "par_silver": 90.0, "par_gold": 60.0})
 	_expect(_hud._target_label.text == "NEXT GOLD   01:00", "before gold par the next target is gold")
 	_hud.update_state({"time": 100.0, "par_silver": 90.0, "par_gold": 60.0})
@@ -226,10 +226,15 @@ func _test_medal_target_and_telemetry() -> void:
 	_hud.show_telemetry = false
 	_hud.update_state({"time": 74.0, "par_silver": 90.0, "par_gold": 60.0, "tension": 14000.0, "line_length": 9.4, "reel_state": "LOCKED / TAUT", "charge": 0.5, "weapon": "ROD", "speed": 17.5})
 	_expect(not _hud._line_label.text.contains("kN") and not _hud._line_label.text.contains("M LINE"), "telemetry off hides line numbers")
-	_expect(not _hud._reticle_state.text.contains("kN"), "telemetry off hides tension in the reticle state")
 	_expect(_hud._rod_label.text == "CHARGING", "telemetry off shows charging without a percentage")
 	_expect(not _hud._speed_label.text.contains("M/S"), "telemetry off hides the speed number")
 	_expect(_hud._target_label.text == "NEXT SILVER   01:30", "the medal target is shown regardless of telemetry")
+	_hud.update_state({"alert": true, "reel_state": "LOCKED / TAUT"})
+	_expect(_hud._reticle_state.visible and _hud._reticle_state.text == "TRACKED", "an alert shows TRACKED at the reticle")
+	_expect(_hud._reticle_state.get_theme_color("font_color") == _hud.RED, "the TRACKED word is red")
+	_expect(_hud._rod_label.text == "LOCKED / TAUT" and _hud._rod_label.get_theme_color("font_color") == _hud.PAPER, "the alert leaves the rod panel as the single state readout")
+	_hud.update_state({"alert": false})
+	_expect(not _hud._reticle_state.visible, "the TRACKED word goes when the alert clears")
 	_hud.apply_settings({"show_telemetry": true})
 	_expect(_hud.show_telemetry, "apply_settings reads show_telemetry from the profile settings")
 
@@ -306,6 +311,49 @@ func _test_markers_and_arcs() -> void:
 	_expect(bool(markers[1]["next"]) and not bool(markers[0]["next"]) and not bool(markers[2]["next"]), "markers: the nearest active objective is the next one")
 	_expect(not bool(markers[2]["active"]) and markers[2]["color"] == _hud.EXTRACT_COLOR, "markers: the extraction gate dims until it is ready and is green-white")
 	_expect(markers[1]["color"] == _hud.AMBER and markers[0]["color"] == _hud.CYAN, "markers: bonus is amber and salvage is cyan")
+
+	# Banner band (G7b): a marker behind the hint line fades, one clear of the line stays full strength.
+	_hud.update_state({"hint": "DRONE ACQUIRING — FIND COVER"})
+	await _frames(2)
+	var band_point: Vector2 = Vector2(centre.x, _hud._hint.position.y + 12.0)
+	var behind_hint: Vector3 = _camera.project_ray_origin(band_point) + _camera.project_ray_normal(band_point) * 20.0
+	_hud.set_objectives([
+		{"position": behind_hint, "kind": "case", "label": "CASE", "active": true},
+		{"position": Vector3(0.0, 0.0, -20.0), "kind": "case", "label": "CASE", "active": true},
+	])
+	var faded: Array = _hud._overlay.markers
+	_expect(float(faded[0]["band_fade"]) == _hud.BAND_FADE, "banner band: a marker behind the hint line fades")
+	_expect(float(faded[1]["band_fade"]) == 1.0, "banner band: a marker clear of the hint line stays at full strength")
+	_expect(_hud._overlay.backing.has_area() and _hud._overlay.backing.has_point(band_point), "banner band: the hint line has a backing behind it")
+	_hud.update_state({"hint": ""})
+	await _frames(1)
+	_expect(not _hud._overlay.backing.has_area(), "banner band: no hint means no backing")
+
+	# Edge arrows (G7b): three objectives off the right edge would stack; they come out ARROW_GAP apart.
+	_hud.set_objectives([
+		{"position": Vector3(60.0, 0.0, -10.0), "kind": "case", "label": "CASE", "active": true},
+		{"position": Vector3(60.0, 0.5, -10.0), "kind": "bonus", "label": "CACHE", "active": true},
+		{"position": Vector3(60.0, -0.5, -10.0), "kind": "case", "label": "CASE", "active": true},
+	])
+	var arrows: Array = _hud._overlay.markers
+	var arrow_ys: Array[float] = []
+	var arrows_on_edge: bool = true
+	for arrow: Dictionary in arrows:
+		var arrow_point: Vector2 = arrow["point"]
+		arrow_ys.append(arrow_point.y)
+		arrows_on_edge = arrows_on_edge and absf(arrow_point.x - bounds.end.x) < 0.5
+	arrow_ys.sort()
+	var smallest_gap: float = INF
+	for i in range(1, arrow_ys.size()):
+		smallest_gap = minf(smallest_gap, arrow_ys[i] - arrow_ys[i - 1])
+	_expect(arrows_on_edge and smallest_gap >= _hud.ARROW_GAP - 0.5, "edge arrows: arrows on one side are spread at least %d px apart (gap %.1f)" % [int(_hud.ARROW_GAP), smallest_gap])
+	_expect(arrow_ys[0] >= bounds.position.y - 0.5 and arrow_ys[arrow_ys.size() - 1] <= bounds.end.y + 0.5, "edge arrows: the spread stays inside the marker bounds")
+
+	# Distance labels (G7b): near labels are larger than far ones, and never below 10 px.
+	var near_px: int = _hud._overlay.label_size(10.0)
+	var far_px: int = _hud._overlay.label_size(300.0)
+	_expect(near_px > far_px and far_px == 10 and near_px <= 14, "labels: far objectives get smaller labels, clamped to 10 to 14 px")
+	_hud.update_state({"hint": ""})
 	_hud.set_objectives([])
 
 	# Damage arcs: the bearing is relative to the camera facing, and each arc lasts about 0.8 s.

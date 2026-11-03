@@ -40,6 +40,12 @@ const ARC_WIDTH := 4.0
 const MAX_ARCS := 6
 ## Objective markers and their edge arrows stay this far from the screen edge (before insets).
 const MARKER_EDGE := 44.0
+## Edge arrows on the same side keep at least this gap (px), so chevrons and distances never stack.
+const ARROW_GAP := 40.0
+## Markers inside the hint or banner band draw at this fraction of their alpha, so the words read.
+const BAND_FADE := 0.2
+## Soft dark backing behind the hint line, so it reads over bright porcelain and sky.
+const HINT_BACKING := Color(0.03, 0.05, 0.06, 0.4)
 ## Speed band for the speed vignette: nothing below START, full strength at FULL (m/s).
 const SPEED_VIGNETTE_START := 14.0
 const SPEED_VIGNETTE_FULL := 24.0
@@ -159,8 +165,16 @@ class WorldOverlay extends Control:
 
 	var markers: Array = []
 	var arcs: Array = []
+	## Backing rectangle behind the hint line (empty = none).
+	var backing := Rect2()
+
+	## Marker labels shrink with distance: 14 px within 10 m, down to 10 px at about 100 m.
+	static func label_size(distance: float) -> int:
+		return clampi(roundi(14.0 - maxf(distance - 10.0, 0.0) * 0.05), 10, 14)
 
 	func _draw() -> void:
+		if backing.has_area():
+			draw_rect(backing, HINT_BACKING, true)
 		for arc: Dictionary in arcs:
 			_draw_arc(arc)
 		for marker: Dictionary in markers:
@@ -184,8 +198,9 @@ class WorldOverlay extends Control:
 	func _draw_marker(marker: Dictionary) -> void:
 		var color: Color = marker["color"]
 		var alpha: float = 1.0 if bool(marker["next"]) else (0.7 if bool(marker["active"]) else 0.3)
-		color.a *= alpha
+		color.a *= alpha * float(marker.get("band_fade", 1.0))
 		var label: String = "%d M" % roundi(float(marker["distance"]))
+		var label_px: int = label_size(float(marker["distance"]))
 		var point: Vector2 = marker["point"]
 		if bool(marker["on_screen"]):
 			var radius: float = 13.0 if bool(marker["next"]) else 9.0
@@ -196,7 +211,7 @@ class WorldOverlay extends Control:
 			var outline: PackedVector2Array = diamond.duplicate()
 			outline.append(diamond[0])
 			draw_polyline(outline, color, 2.0, true)
-			_draw_label(label, Vector2(point.x, point.y + radius + 16.0), color)
+			_draw_label(label, Vector2(point.x, point.y + radius + 16.0), color, label_px)
 			return
 		# Off screen: a chevron on the edge, pointing toward the objective, with its distance inside.
 		var direction: Vector2 = marker["direction"]
@@ -206,15 +221,15 @@ class WorldOverlay extends Control:
 			point - direction * 6.0 + side * 9.0,
 			point - direction * 6.0 - side * 9.0])
 		draw_colored_polygon(arrow, color)
-		_draw_label(label, point - direction * 30.0, color)
+		_draw_label(label, point - direction * 30.0, color, label_px)
 
 	## Small centred caption with a shadow so it reads over bright ground.
-	func _draw_label(text: String, centre: Vector2, color: Color) -> void:
+	func _draw_label(text: String, centre: Vector2, color: Color, font_px: int) -> void:
 		var font: Font = ThemeDB.fallback_font
-		var width: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+		var width: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_px).x
 		var origin := Vector2(centre.x - width * 0.5, centre.y + 4.0)
-		draw_string(font, origin + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0, 0, 0, 0.7))
-		draw_string(font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, color)
+		draw_string(font, origin + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_px, Color(0, 0, 0, 0.7))
+		draw_string(font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_px, color)
 
 
 class TouchPad extends Control:
@@ -407,10 +422,13 @@ func _build_reticle() -> void:
 	_reticle = Reticle.new()
 	_reticle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_game.add_child(_reticle)
-	_reticle_state = _label(_reticle, "READY TO CAST", 13, PAPER)
+	# The reticle carries one word only, and only while a threat tracks the player. The rod panel
+	# owns the reel state, so "READY TO CAST" is never printed twice.
+	_reticle_state = _label(_reticle, "TRACKED", 13, RED)
 	_reticle_state.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_reticle_state.position = Vector2(-30.0, 150.0)
 	_reticle_state.size = Vector2(220, 22)
+	_reticle_state.visible = false
 
 
 func _build_equipment() -> void:
@@ -664,7 +682,7 @@ func update_state(data: Dictionary) -> void:
 	_update_timer(float(data.get("time", 0.0)), float(data.get("par_silver", 0.0)), float(data.get("par_gold", 0.0)))
 	_update_objectives(loot, total_loot, int(data.get("bonus", 0)), int(data.get("total_bonus", 0)), inside, extract_ready, clampf(float(data.get("extraction", 0.0)), 0.0, 1.0))
 	_update_weapon(data, sidearm, charge, reel, tension, tension_norm)
-	_update_reticle(data, charge, reel, tension, tension_norm, sidearm)
+	_update_reticle(data, charge, tension_norm, sidearm)
 	_update_vignettes(clampf(float(data.get("danger", 0.0)), 0.0, 1.0), speed)
 	_hint.text = str(data.get("hint", _hint_override))
 	_practice_label.visible = bool(data.get("practice", false))
@@ -746,14 +764,17 @@ func _update_weapon(data: Dictionary, sidearm: bool, charge: float, reel: String
 	_charge_bar.visible = charge > 0.0
 
 
-func _update_reticle(data: Dictionary, charge: float, reel: String, tension: float, tension_norm: float, sidearm: bool) -> void:
+## The reticle's shape and colour carry the state. Its only word, TRACKED, shows while a threat
+## is on the player (CONTRACT 5.9 alert); the red colour is set on the same word.
+func _update_reticle(data: Dictionary, charge: float, tension_norm: float, sidearm: bool) -> void:
 	_reticle.hit = clampf(float(data.get("hitmarker", 0.0)), 0.0, 1.0)
 	_reticle.sidearm = sidearm
 	_reticle.charge = charge
 	_reticle.tension = tension_norm
 	_reticle.queue_redraw()
-	_reticle_state.text = _state_text(data, charge, reel, tension)
-	_reticle_state.add_theme_color_override("font_color", RED if bool(data.get("alert", false)) else PAPER)
+	var alert: bool = bool(data.get("alert", false))
+	_reticle_state.visible = alert
+	_reticle_state.add_theme_color_override("font_color", RED if alert else PAPER)
 
 
 ## Danger tints the whole edge red (low health or a recent hit). Speed tints it cyan above
@@ -763,20 +784,6 @@ func _update_vignettes(danger: float, speed: float) -> void:
 	_speed_vignette.strength = clampf((speed - SPEED_VIGNETTE_START) / (SPEED_VIGNETTE_FULL - SPEED_VIGNETTE_START), 0.0, 1.0)
 	_vignette.queue_redraw()
 	_speed_vignette.queue_redraw()
-
-
-## Short state word under the reticle. Numbers are appended only when telemetry is on.
-func _state_text(data: Dictionary, charge: float, reel: String, tension: float) -> String:
-	if bool(data.get("reloading", false)):
-		return "RELOADING"
-	if charge > 0.0:
-		return "CHARGING"
-	if str(data.get("weapon", "ROD")) != "ROD":
-		return "SIDEARM"
-	var text: String = reel.to_upper()
-	if show_telemetry and tension > 0.0:
-		text += "   %.1f kN" % (tension / 1000.0)
-	return text
 
 
 ## Touch captions follow the state: FIRE with the sidearm, FREE while the line is reeling or locked,
@@ -839,7 +846,9 @@ func _edge_result(toward: Vector2, bounds: Rect2) -> Dictionary:
 	var half: Vector2 = bounds.size * 0.5
 	var along_x: float = half.x / absf(direction.x) if absf(direction.x) > 0.0001 else INF
 	var along_y: float = half.y / absf(direction.y) if absf(direction.y) > 0.0001 else INF
-	return {"on_screen": false, "point": centre + direction * minf(along_x, along_y), "direction": direction}
+	# The side the ray leaves through decides which edge the arrow spreads along.
+	var edge: String = ("right" if direction.x > 0.0 else "left") if along_x <= along_y else ("bottom" if direction.y > 0.0 else "top")
+	return {"on_screen": false, "point": centre + direction * minf(along_x, along_y), "direction": direction, "edge": edge}
 
 
 ## Rebuilds the marker list from the objectives and the camera, then asks the overlay to redraw.
@@ -852,8 +861,79 @@ func _refresh_markers() -> void:
 		var next_index: int = _next_objective()
 		for i in range(_objectives.size()):
 			entries.append(_marker_entry(_objectives[i], i == next_index))
+	_fade_in_band(entries)
+	_spread_arrows(entries)
 	_overlay.markers = entries
+	_overlay.backing = _hint_backing()
 	_overlay.queue_redraw()
+
+
+## Rectangle behind the hint line, sized to its text (empty when there is no hint).
+func _hint_backing() -> Rect2:
+	if not is_instance_valid(_hint) or _hint.text.is_empty():
+		return Rect2()
+	var font: Font = _hint.get_theme_font("font")
+	var text_width: float = font.get_string_size(_hint.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+	var lines: int = 1 if text_width <= _hint.size.x else 2
+	var width: float = minf(text_width, _hint.size.x) + 28.0
+	var height: float = lines * 22.0 + 12.0
+	var centre_x: float = _hint.position.x + _hint.size.x * 0.5
+	return Rect2(centre_x - width * 0.5, _hint.position.y - 6.0, width, height)
+
+
+## The hint line and the banner, grown a little: markers in here fade so the words stay readable.
+func _text_band() -> Rect2:
+	var band: Rect2 = _hint_backing()
+	if not band.has_area():
+		return Rect2()
+	if _banner.visible:
+		band = band.merge(Rect2(_banner.position, _banner.size))
+	return band.grow(14.0)
+
+
+## Markers whose point (or the label under it) sits in the text band draw faded (band_fade).
+func _fade_in_band(entries: Array) -> void:
+	var band: Rect2 = _text_band()
+	for entry: Dictionary in entries:
+		var fade: float = 1.0
+		if bool(entry["on_screen"]):
+			var point: Vector2 = entry["point"]
+			if band.has_point(point) or band.has_point(point + Vector2(0.0, 24.0)):
+				fade = BAND_FADE
+		entry["band_fade"] = fade
+
+
+## Edge arrows that land on the same side are pushed apart along that side, so none overlap.
+func _spread_arrows(entries: Array) -> void:
+	var sides: Dictionary = {}
+	for entry: Dictionary in entries:
+		if bool(entry["on_screen"]):
+			continue
+		var side: String = str(entry["edge"])
+		if not sides.has(side):
+			sides[side] = []
+		var group: Array = sides[side]
+		group.append(entry)
+	var bounds: Rect2 = marker_bounds()
+	for side: String in sides:
+		# Left and right arrows run along y; top and bottom run along x.
+		var axis: int = 1 if side == "left" or side == "right" else 0
+		var group: Array = sides[side]
+		group.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["point"][axis] < b["point"][axis])
+		var coords: Array[float] = []
+		for entry: Dictionary in group:
+			coords.append(float(entry["point"][axis]))
+		# Push each arrow past the one above it, then pull the run back if it runs off the far end.
+		for i in range(1, coords.size()):
+			coords[i] = maxf(coords[i], coords[i - 1] + ARROW_GAP)
+		if not coords.is_empty() and coords[coords.size() - 1] > bounds.end[axis]:
+			coords[coords.size() - 1] = bounds.end[axis]
+			for i in range(coords.size() - 2, -1, -1):
+				coords[i] = minf(coords[i], coords[i + 1] - ARROW_GAP)
+		for i in range(coords.size()):
+			var point: Vector2 = group[i]["point"]
+			point[axis] = maxf(coords[i], bounds.position[axis])
+			group[i]["point"] = point
 
 
 func _marker_entry(objective: Dictionary, is_next: bool) -> Dictionary:
