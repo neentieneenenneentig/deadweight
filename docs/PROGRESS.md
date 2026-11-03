@@ -353,6 +353,33 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
 - Pars: new levels take levels_test's suggestions (20–25 s silver), while l01 still says 150/95 s. C10 reconciles these.
 - Gate: QUALITY GATE PASSED (53 scripts, 10 suites).
 
+## 2026-11-03: C3 l03 OVERFLOW, C4 l04 SLAG LINE, G4 line + weight visuals
+
+- Model: Haiku 5.5 executors (three in parallel), lead Opus 5.5.
+- C3 (`scripts/levels/l03_overflow.gd`):
+  - a sunken basin of deep water with a dry causeway, two ramped islands, two anchor gantries, two overflow vents and an entrance gate with a spawn anchor;
+  - 4 cases and 2 bonus caches. The Rigging Nest is rod-only. The Cistern Lid is reached by riding a vent, not a rod plate.
+  - 3 hounds and 2 bank sentries.
+  - levels_test 36/0; route 250 m; par 35/20 s.
+  - Spawn draw calls: Compatibility 153, Forward+ 163. 17 Label3D; no extra lights.
+- C4 (`scripts/levels/l04_slag_line.gd`):
+  - a foundry conveyor hall with three heat strips (18 dps), bypassed by cross gaps and side aisles;
+  - a catwalk deck on ramps, and two overhead beams carrying the rod-only caches KILN LID and FLUE CAP;
+  - the first drones: one alone at z -30, then a sentry and a second drone, then a third near extraction.
+  - levels_test 36/0; route 224 m; par 35/20 s.
+  - Spawn draw calls: Compatibility 122, Forward+ 142.
+  - Open: the foundry palette renders pastel plum. Its sky keys in level_base are unused by the panorama sky.
+- G4 (`scripts/tether.gd` rendering only, `tests/line_preview.gd`):
+  - a camera-facing ribbon through the wrap points with per-segment sag, at least 1.5 px wide on screen;
+  - cyan when slack, amber from 100 N to 600 N, red as danger runs from 0.7 to 0.85. Danger is max(tension / MAX_TENSION, length / (2 × max_line)).
+  - A weight speed trail above 8 m/s (10 samples, 0.22 s).
+  - Reuses one ImmediateMesh per visual; unshaded with no shadows.
+- Lead: G4 overwrote G5's `tests/gameplay_preview.gd` (the viewmodel captures). The original is restored, and G4's script now lives at `tests/line_preview.gd`.
+- Open:
+  - Forward+ filmic tonemapping turns the in-world red salmon. It is true red in Compatibility.
+  - Forward+ spawn views of l02 and l03 are over 160 draw calls; §7 budgets Compatibility.
+- Gate: QUALITY GATE PASSED (56 scripts, 10 suites).
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>

@@ -40,7 +40,7 @@ owner = needs the human (devices, accounts).
 | G1 | Player v2: movement + camera feel | F10 | M | A | shell | MUST | done (2026-11-03) |
 | G2 | Tether v2: upgrades, recover, anchors, smash, events | F10 | M | A | shell | MUST | done (2026-11-03) |
 | G3 | Rope wrapping | G2 | M | A | shell | SHOULD | done 2026-11-03 |
-| G4 | Line + weight visuals | G2 | M | B | shell, vision | MUST | todo |
+| G4 | Line + weight visuals | G2 | M | B | shell, vision | MUST | done 2026-11-03 |
 | G5 | Viewmodel: rod + sidearm | G1 | M | B | shell, vision | SHOULD | done (2026-11-03) |
 | G6 | HUD v2: layout, reticle, telemetry | F10 | M | B | shell, vision | MUST | done (2026-11-03) |
 | G7 | HUD v2: objective markers, damage arcs, touch options | G6 | M | B | shell, vision | MUST | done (2026-11-03) |
@@ -53,8 +53,8 @@ owner = needs the human (devices, accounts).
 | A3 | Music (adaptive layers; MVP fallback allowed) | A2 | L | A | shell | MUST | done, MVP (2026-11-03) |
 | C1 | Tutorial: INDUCTION | F8, F9, F11, G2 | M | A | shell, vision | MUST | done 2026-11-03 |
 | C2 | Level l02 PUMP ROW | F8, F9 | M | A | shell, vision | MUST | done 2026-11-03 |
-| C3 | Level l03 OVERFLOW | F8, F9 | M | A | shell, vision | MUST | todo |
-| C4 | Level l04 SLAG LINE | F8, F9, E2 | M | A | shell, vision | MUST | todo |
+| C3 | Level l03 OVERFLOW | F8, F9 | M | A | shell, vision | MUST | done 2026-11-03 |
+| C4 | Level l04 SLAG LINE | F8, F9, E2 | M | A | shell, vision | MUST | done 2026-11-03 |
 | C5 | Level l05 CRANE YARD | F8, F9, E2 | M | A | shell, vision | MUST | todo |
 | C6 | Level l06 CRUCIBLE | F8, F9, E2 | M | A | shell, vision | MUST | todo |
 | C7 | Level l07 THE STEPS | F8, F9, E2 | M | A | shell, vision | LATER | todo |
@@ -544,7 +544,7 @@ about half speed, and the spool_limit event. The gate passes.
 The gate passes.
 
 ### G4 — Line + weight visuals
-**Edit:** scripts/tether.gd (rendering and visual functions only), tests/gameplay_preview.gd
+**Edit:** scripts/tether.gd (rendering and visual functions only), tests/line_preview.gd
 (new).
 **Do:**
 - A camera-facing ribbon from the rod tip through the wrap points to the weight:
