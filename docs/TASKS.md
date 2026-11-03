@@ -23,7 +23,7 @@ owner = needs the human (devices, accounts).
 | R4 | Third-party notices + privacy policy | — | S | C/B | shell | MUST | done |
 | R5 | Store copy, release checklist, README | — | M | C | web | MUST | done |
 | R6 | Store art + screenshots | C6, G7, F11 | M | B | shell, vision | MUST | todo |
-| R7 | Store copy, notices + AI disclosure for the dreamscape | V1 | S | C | — | MUST | todo |
+| R7 | Store copy, notices + AI disclosure for the dreamscape | V1 | S | C | — | MUST | done 2026-11-03 |
 | V1 | Art direction: The Department of Unfinished Gravity (owner, via Codex) | — | L | — | shell, vision | MUST | done (2026-11-03) |
 | P1 | Android full-game unlock (Play Billing); only if the owner picks model A | F5, F10, O3b | M | A | shell, owner | MUST if A | todo |
 | F1 | Data layer: profile/upgrades/achievements/settings + tests | — | M | B | shell | MUST | done |
@@ -39,15 +39,15 @@ owner = needs the human (devices, accounts).
 | F11 | Main run systems: stats, achievements, checkpoints, sidearm, hints | F10 | M | A | shell | MUST | done |
 | G1 | Player v2: movement + camera feel | F10 | M | A | shell | MUST | done (2026-11-03) |
 | G2 | Tether v2: upgrades, recover, anchors, smash, events | F10 | M | A | shell | MUST | done (2026-11-03) |
-| G3 | Rope wrapping | G2 | M | A | shell | SHOULD | todo |
+| G3 | Rope wrapping | G2 | M | A | shell | SHOULD | in progress |
 | G4 | Line + weight visuals | G2 | M | B | shell, vision | MUST | todo |
 | G5 | Viewmodel: rod + sidearm | G1 | M | B | shell, vision | SHOULD | done (2026-11-03) |
 | G6 | HUD v2: layout, reticle, telemetry | F10 | M | B | shell, vision | MUST | done (2026-11-03) |
 | G7 | HUD v2: objective markers, damage arcs, touch options | G6 | M | B | shell, vision | MUST | done (2026-11-03) |
-| G8 | Gamepad + Steam Deck pass | F11, F2, G6 | S | B | shell | MUST | todo |
+| G8 | Gamepad + Steam Deck pass | F11, F2, G6 | S | B | shell | MUST | done 2026-11-03 |
 | E1 | Hound AI v2 (navmesh) | F9 | M | A | shell, vision | SHOULD | done (2026-11-03) |
 | E2 | Sentry polish + Drone enemy | E1, F8 | M | A | shell, vision | MUST | done (2026-11-03) |
-| E3 | Training dummies, death FX, threat level | E2 | S | B | shell | SHOULD | todo |
+| E3 | Training dummies, death FX, threat level | E2 | S | B | shell | SHOULD | done 2026-11-03 |
 | A1 | Sound effects synthesis | — | L | A | shell | MUST | done (2026-11-03) |
 | A2 | Audio engine v2 | A1, F11 | M | B | shell | MUST | done (2026-11-03) |
 | A3 | Music (adaptive layers; MVP fallback allowed) | A2 | L | A | shell | MUST | done, MVP (2026-11-03) |

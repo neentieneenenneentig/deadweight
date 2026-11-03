@@ -296,6 +296,35 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   - `docs/.gdignore` stops Godot importing the doc screenshots.
 - Gate: QUALITY GATE PASSED (51 scripts, 10 suites).
 
+## 2026-11-03: R7 store copy + AI disclosure, G8 gamepad pass, E3 dummies + threat
+
+- Model: Haiku 5.5 executors (three in parallel), lead Opus 5.5.
+- R7 (`store/*`, `tools/notices.gd`, `THIRD_PARTY_NOTICES.txt`, `RELEASE_CHECKLIST.md`):
+  - Steam, Play and press-kit copy now use The Department of Unfinished Gravity setting. The robot and industrial wording is gone.
+  - Counted lengths: Steam short 256/300. Play title 10/30. Play short 74 (A) and 70 (B) of 80. Play full 1,436 (A) and 1,381 (B) of 4,000.
+  - Content rating: fantasy violence against porcelain and clockwork automatons, no blood.
+  - Tags drop Robots and Sci-fi, and add Surreal and Atmospheric (15 in total).
+  - The notices header names the three AI textures. Notices regenerated: 102 components, 19 licence texts.
+  - Steam Content Survey AI-disclosure draft added. RELEASE_CHECKLIST Steam step 9 (OWNER, PLAN O11).
+  - Open: the owner confirms the tags and the disclosure wording. Q2 checks the store claims against the RC.
+- G8 (`scripts/main.gd`, `tests/input_test.gd`):
+  - right-stick look on the pad only: input-map deadzone 0.2, curve 1.6, 3 rad/s × gamepad_sensitivity × delta, invert_y;
+  - LT sets the analog `tether.reel_strength`; keyboard and mouse reel stays 1.0;
+  - device switches re-expand hints at once, and stick drift under 0.4 is ignored;
+  - the cursor is hidden on menus while the pad is in use; mouse-mode changes are skipped headless.
+  - input_test 145 checks: look direction and sensitivity, invert, reel, glyphs, Start pause/resume, D-pad focus on every screen.
+  - Lead fix: the run reset also clears `_hint_raw`.
+  - Open: a real Steam Deck pad and a visual check at 1280×800.
+- E3 (`scripts/enemy.gd`, `scripts/level_base.gd`, `scripts/levels/range.gd`, `tests/world_test.gd`):
+  - dummy kind: a porcelain mannequin with a cyan chest ring. It never attacks, flashes on hit, and refills 3 s after death.
+  - three dummies in the range; range INFO.enemies is now true, because levels_test counts the nodes;
+  - a porcelain-shard death burst for every kind; the drone keeps its blast ring;
+  - threat_level is the max over tracking non-dummy enemies: 0.2 at 45 m, 1.0 on the player;
+  - the sentry is tracking while it sees the player or winds up.
+  - world_test 117/0. levels_test range 31/0, l01 34/0. Captures in `.tools/captures/E3/`.
+  - Lead: main ignores dummy kills in run stats, DEADWEIGHT and death cause. CONTRACT §4.11 and §4.13 updated.
+- Gate: QUALITY GATE PASSED (51 scripts, 10 suites).
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>
