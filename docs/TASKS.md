@@ -35,18 +35,18 @@ owner = needs the human (devices, accounts).
 | F9 | Navigation mesh + level validation suite | F7 | M | A | shell | MUST | done (2026-11-03) |
 | F10 | Main flow switch-over (new menus + catalog levels) | F1, F3, F7 | L | A | shell, vision | MUST | done |
 | F11 | Main run systems: stats, achievements, checkpoints, sidearm, hints | F10 | M | A | shell | MUST | done |
-| G1 | Player v2: movement + camera feel | F10 | M | A | shell | MUST | todo |
+| G1 | Player v2: movement + camera feel | F10 | M | A | shell | MUST | done (2026-11-03) |
 | G2 | Tether v2: upgrades, recover, anchors, smash, events | F10 | M | A | shell | MUST | todo |
 | G3 | Rope wrapping | G2 | M | A | shell | SHOULD | todo |
 | G4 | Line + weight visuals | G2 | M | B | shell, vision | MUST | todo |
 | G5 | Viewmodel: rod + sidearm | G1 | M | B | shell, vision | SHOULD | todo |
-| G6 | HUD v2: layout, reticle, telemetry | F10 | M | B | shell, vision | MUST | todo |
+| G6 | HUD v2: layout, reticle, telemetry | F10 | M | B | shell, vision | MUST | done (2026-11-03) |
 | G7 | HUD v2: objective markers, damage arcs, touch options | G6 | M | B | shell, vision | MUST | todo |
 | G8 | Gamepad + Steam Deck pass | F11, F2, G6 | S | B | shell | MUST | todo |
 | E1 | Hound AI v2 (navmesh) | F9 | M | A | shell, vision | SHOULD | todo |
 | E2 | Sentry polish + Drone enemy | E1, F8 | M | A | shell, vision | MUST | todo |
 | E3 | Training dummies, death FX, threat level | E2 | S | B | shell | SHOULD | todo |
-| A1 | Sound effects synthesis | — | L | A | shell | MUST | todo |
+| A1 | Sound effects synthesis | — | L | A | shell | MUST | done (2026-11-03) |
 | A2 | Audio engine v2 | A1, F11 | M | B | shell | MUST | todo |
 | A3 | Music (adaptive layers; MVP fallback allowed) | A2 | L | A | shell | MUST | todo |
 | C1 | Tutorial: INDUCTION | F8, F9, F11, G2 | M | A | shell, vision | MUST | todo |

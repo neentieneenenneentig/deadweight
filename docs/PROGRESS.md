@@ -234,6 +234,14 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
 - Deviations: loading has no focusable control, so its check asserts that nothing takes focus. Layouts use the shipped expand stretch, so 800x450 lays out at 1280x720.
 - Follow-ups: with stretch disabled, several views overflow at raw 960x720 and 800x450 (records, result, result_lost, title, workshop, pause). This is latent, but any stretch change will expose it.
 
+## 2026-11-03: G1 player v2, G6 HUD v2, A1 sound synthesis, F8 hint wiring
+
+- G1 (`scripts/player.gd`, `tests/physics_test.gd`; model claude-haiku-5-5): new signals `damaged(amount, source, from_position)`, `died(source)`, `landed`, `jumped`, `footstep`; `configure`, `apply_settings`, `heal`, `add_shake` (trauma squared), `reset_at(where, yaw)`, `airborne_time`; 0.12 s coyote time and jump buffer; air control at most 3 m/s² and no gain above 6 m/s; idle slope hold up to 35.5°; FOV up to 12° wider at 40 m/s; landing dip. Tests: physics_test 37/37, flow_test 108/0. Deviation: `invert_y` stays in main's `_look` (CONTRACT §4.8 note updated).
+- G6 (`scripts/hud.gd`, `tests/hud_test.gd`; model claude-haiku-5-5): in-game HUD only (menus, pause and results removed). Vitals with a low-health pulse, timer with next medal target, objectives with bonus and extraction progress, reticle with tension ring and charge arc, weapon panel, hints, `show_banner`, safe-area insets. hud_test passes headless and windowed; captures in `.tools/captures/G6/`. Follow-up: `alert` (enemy alert) is not sent yet, so the reticle's alert colour stays off until enemies report it (G7).
+- main.gd (lead): `_begin_play` calls `player.configure(loadout)` so upgraded max health applies. The HUD now receives par times, bonus progress, extraction readiness and airborne state, and `hud.apply_settings` runs with the player settings. Level hint zones (F8) show through `hint_requested`.
+- A1 (`tools/generate_audio.gd`, `audio/sfx/`; model claude-haiku-5-5): deterministic offline synth writes 49 one-shot ids plus 4 loops (wind, reel, tension, drone_hum) as 44.1 kHz mono 16-bit WAV, with variants for footstep, weight_impact, shot, hit and hurt. 63 files with `.import` (loops flagged). Analysis: worst peak -1.11 dBFS, worst DC 1e-5, loop seams within bounds, category RMS spread at most 2.2 dB. `--check` loads all 63 files, and reruns are byte-identical. Deviations: one loudness target per category, with balance left to A2; no ear check. Follow-ups: A2 must load these files (scripts/audio.gd still synthesizes at runtime); a human listening pass is needed.
+- Gate: QUALITY GATE PASSED (44 scripts, 8 suites).
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>
