@@ -3,6 +3,14 @@ extends SceneTree
 ## checks read state (bus layout, stream resolution, live player counts, effect flags).
 
 const AudioScript = preload("res://scripts/audio.gd")
+const MusicScript = preload("res://scripts/music.gd")
+
+## A3 music (CONTRACT 4.17). Tempos and stinger lengths match tools/generate_audio.gd.
+const MUSIC_DIR := "res://audio/music/"
+const MUSIC_RATE := 32000
+const BARS := 16
+const TRACK_TEMPOS := {"menu": 84.0, "floodworks": 104.0, "foundry": 80.0, "spillway": 92.0}
+const STINGER_SECONDS := {"victory": 3.0, "defeat": 3.0, "medal": 2.5}
 
 ## Every event id from CONTRACT 5.11, including the internal loops and drone_hum.
 const EVENT_IDS := [
@@ -41,6 +49,8 @@ func _run() -> void:
 	_test_concurrency()
 	_test_positional()
 	_test_motion()
+	_test_music_files()
+	_test_music_node()
 	print("audio checks: %d, failures: %d" % [_checks, _failures])
 	# Free the node so the run exits without leaking its voices and streams.
 	root.remove_child(_audio)
@@ -191,6 +201,47 @@ func _loop_player(path: String) -> AudioStreamPlayer:
 			if (voice as AudioStreamPlayer).stream.resource_path == path:
 				return voice as AudioStreamPlayer
 	return null
+
+
+## Every track is a 16-bar seamless loop; every stinger is a one-shot. Lengths are checked
+## to the frame: a track is BARS bars of four beats at its tempo.
+func _test_music_files() -> void:
+	for track_id: String in TRACK_TEMPOS:
+		var frames: int = roundi(float(BARS * 4) * 60.0 * float(MUSIC_RATE) / float(TRACK_TEMPOS[track_id]))
+		var wav := load(MUSIC_DIR + track_id + ".wav") as AudioStreamWAV
+		_check(wav != null, "track %s loads as AudioStreamWAV" % track_id)
+		if wav == null:
+			continue
+		_check(wav.loop_mode == AudioStreamWAV.LOOP_FORWARD, "track %s is a forward loop" % track_id)
+		_check(wav.stereo and wav.mix_rate == MUSIC_RATE, "track %s is 32 kHz stereo" % track_id)
+		_check(absf(wav.get_length() * MUSIC_RATE - frames) < 0.5, "track %s is 16 bars at %.0f BPM (%.3f s)" % [track_id, TRACK_TEMPOS[track_id], float(frames) / MUSIC_RATE])
+	for stinger_id: String in STINGER_SECONDS:
+		var wav := load(MUSIC_DIR + stinger_id + ".wav") as AudioStreamWAV
+		_check(wav != null, "stinger %s loads as AudioStreamWAV" % stinger_id)
+		if wav == null:
+			continue
+		_check(wav.loop_mode == AudioStreamWAV.LOOP_DISABLED, "stinger %s does not loop" % stinger_id)
+		_check(absf(wav.get_length() - float(STINGER_SECONDS[stinger_id])) < 1.0 / MUSIC_RATE, "stinger %s is %.1f s" % [stinger_id, float(STINGER_SECONDS[stinger_id])])
+
+
+## music.gd plays, switches zones and stops without errors. Fades are zero so the state
+## checks run at once. The Audio node runs first so the Music bus exists.
+func _test_music_node() -> void:
+	var music = MusicScript.new()
+	root.add_child(music)
+	music.play_track("menu", 0.0)
+	_check(music.current_track() == "menu", "play_track sets the current track to menu")
+	music.set_zone("foundry")
+	_check(music.current_track() == "foundry", "set_zone changes the track id to foundry")
+	music.set_zone("no_such_zone")
+	_check(music.current_track() == "foundry", "an unknown zone leaves the track unchanged")
+	music.stinger("victory")
+	music.stinger("no_such_stinger")
+	music.set_intensity(0.5)
+	music.stop(0.0)
+	_check(music.current_track() == "", "stop clears the current track")
+	root.remove_child(music)
+	music.free()
 
 
 func _check(condition: bool, description: String) -> void:

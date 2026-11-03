@@ -1182,8 +1182,8 @@ func _build_track(id: String, bpm: float) -> Dictionary:
 			_score_spillway()
 		_:
 			push_error("generate_audio: no score for track %s" % id)
-	# The foundry is driven a little so it reads heavy; the others stay clean.
-	var drive: float = 1.5 if id == "foundry" else 0.0
+	# No saturation: the department's music stays warm and soft rather than harsh.
+	var drive: float = 0.0
 	var samples: PackedInt32Array = _finish_stereo(_l, _r, false, MUSIC_RMS_DB, drive)
 	var path: String = "%s/%s.wav" % [MUSIC_DIR, id]
 	_write_bytes(path, _wav_file(samples, 2, MUSIC_RATE, frames))
@@ -1281,8 +1281,8 @@ func _score_floodworks() -> void:
 		_bell(_bt(b), _bl(0.5), _hz(float(chord[b % 3]) + 24.0), 0.05, -0.5 if b % 2 == 0 else 0.5)
 
 
-## Foundry: C minor at 80, heavy and low. A sub drone, saw bass, a hard kick and snare,
-## metallic clanks on the offbeats, and a warm pad. Driven a little in the mix.
+## Foundry: C minor at 80, low and warm rather than industrial. A sub drone, saw bass, a soft
+## kick and brushed snare, music-box glints on the offbeats, and a warm pad.
 func _score_foundry() -> void:
 	var chords: Array = [[48, 51, 55], [53, 56, 60], [56, 60, 63], [55, 58, 62]]  # Cm Fm Ab Gm
 	for c in range(4):
@@ -1297,11 +1297,12 @@ func _score_foundry() -> void:
 		var pitch: float = float(chord[0]) - 12.0 + float(bass_pattern[b % 4])
 		_tone(_bt(b), _bl(0.9), _hz(pitch), 0.18, 0.0, 0.004, 0.25, 0.05, 8)
 		if b % 2 == 0:
-			_kick(_bt(b), _bl(1.0), 90.0, 36.0, 0.06, 0.25, 0.8)
+			_kick(_bt(b), _bl(1.0), 90.0, 36.0, 0.06, 0.25, 0.6)
 		else:
-			_noise(_bt(b), _bl(0.5), 0.25, 0.0, 0.001, 0.12, NOISE_LP, 0.25)
-			_tone(_bt(b), _bl(0.3), 165.0, 0.15, 0.0, 0.001, 0.07, 0.02, 1)
-		_noise(_bt(b + 0.5), _bl(0.25), 0.09, -0.5 if b % 8 < 4 else 0.5, 0.001, 0.035, NOISE_BP, 0.2)
+			_noise(_bt(b), _bl(0.5), 0.12, 0.0, 0.001, 0.12, NOISE_LP, 0.15)
+			_tone(_bt(b), _bl(0.3), 165.0, 0.10, 0.0, 0.001, 0.07, 0.02, 1)
+		# A warm music-box glint on the offbeat keeps the low floor from feeling industrial.
+		_bell(_bt(b + 0.5), _bl(0.4), _hz(float(chord[(b + 1) % 3]) + 36.0), 0.03, -0.5 if b % 8 < 4 else 0.5)
 
 
 ## Spillway: D major at 92. Airy and wide: detuned pads panned hard left and right, a
