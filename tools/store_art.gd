@@ -1,26 +1,38 @@
 extends SceneTree
-## Store art compositor (R6). Renders the Steam and Google Play key art at the exact store sizes.
-## Each job builds a catalog level in its own SubViewport of the target size, frames it with a
-## camera, and draws the brand lockup (the game's logotype font and the brand mark) over it.
-## "still" jobs freeze the player; "cast" jobs fire the real rod at an anchor and capture once the
-## weight has latched (the line is taut). Nothing touches the player's save.
+## Store art compositor (R6) and live gameplay screenshots (R6b).
 ##
-## Run from the project root, off-screen:
+## Key art: each JOBS entry builds a catalog level in its own SubViewport of the target size, frames
+## it with a camera, and draws the brand lockup over it. "still" jobs freeze the player.
+## Run from the project root, off-screen (only the store art paths; the wrapper never runs these):
 ##   <godot> --path . --position 20000,20000 --script res://tools/store_art.gd -- --only=header
-## (--only= takes a substring of the output file name; leave it out to render every job)
-## Writes only the JOBS files under store/art/steam/ and store/art/google-play/.
+##
+## Live shots: each LIVE_SHOTS entry runs the real game (main.tscn, so the HUD, rod, line and enemies
+## are the shipped code) in its own process, casts the rod at an anchor, lets the weight latch, swings
+## or reels, and saves the root viewport from the player's own camera. The wrapper
+## tools/capture-store-art.ps1 runs one process per shot, at the shot's size and renderer:
+##   <godot> --path . --position 20000,20000 --resolution 1920x1080 --fixed-fps 60 --script res://tools/store_art.gd -- --shot=hud_03_pump_row_swing --profile=user://test_store_art.cfg --unlock-all
+## Use --probe=1 in place of --shot=<name> with --level=<id> to list the anchors and enemies of a level.
+##
+## Nothing touches the player's save. Writes only under store/art/screenshots/ (live) or the JOBS files
+## under store/art/steam/ and store/art/google-play/ (key art).
 
 const Catalog = preload("res://scripts/level_catalog.gd")
 const Player = preload("res://scripts/player.gd")
 const Tether = preload("res://scripts/tether.gd")
 const UiTheme = preload("res://scripts/ui/theme.gd")
+const Achievements = preload("res://scripts/achievements.gd")
+const MainScene: PackedScene = preload("res://main.tscn")
 
 const MARK_PATH: String = "res://store/art/brand/mark_1024.png"
 const ART_DIR: String = "res://store/art/"
+const SCREENSHOT_DIR: String = "res://store/art/screenshots/"
 const TAGLINE: String = "DEPARTMENT OF UNFINISHED GRAVITY"
 const WORDMARK: String = "DEADWEIGHT"
 const SETTLE_FRAMES: int = 30
-const CAST_TIMEOUT: float = 5.0
+const CAST_TIMEOUT_FRAMES: int = 300
+const LIVE_TIMEOUT_FRAMES: int = 1200
+## Live runs use --fixed-fps 60, so one physics step is one frame and the frame counts below are exact.
+const LIVE_FPS: float = 60.0
 
 ## One entry per output. Fields:
 ##   file: path under store/art/ (new files only); size: output pixels; level: catalog id (or "")
@@ -47,6 +59,31 @@ const JOBS: Array[Dictionary] = [
 	{"file": "google-play/play_feature_graphic_1024x500.png", "size": Vector2i(1024, 500), "level": "l03", "mode": "still",
 		"practice": false, "cam": Vector3(0.0, 6.0, 16.0), "look": Vector3(0.0, 5.0, -40.0), "fov": 60.0, "layout": "feature"},
 ]
+
+## Live gameplay shots (R6b). Fields:
+##   level: catalog id; from: "spawn" or the capsule centre to cast from; aim: a point near the anchor
+##   the rod is fired at (the nearest anchor plate is used); swing: impulse on the player once the
+##   weight has latched (N s, zero for none); reel: true to reel in while latched; reel_frames: frames
+##   of reel-in before the swing, which shortens the line to a pendulum length; frames: physics frames
+##   before the capture; power 0..1 charge; lift: metres added to the aim to clear gravity's drop;
+##   track: keep the plate in view once latched; min_speed: capture early at this speed with taut line;
+##   latch: false casts at a target and captures the line in flight.
+const LIVE_SHOTS: Dictionary = {
+	"hud_01_pump_row_hound_chase": {"level": "l02", "from": Vector3(-4, 1, -6), "aim": Vector3(7, 0.5, -18), "latch": false, "power": 0.3, "frames": 40},
+	"hud_02_sluice_gate_sentry_beam": {"level": "l01", "from": Vector3(-8, 1, -30), "aim": Vector3(-22, 3.6, -46), "latch": false, "power": 0.3, "frames": 40},
+	"hud_03_pump_row_swing": {"level": "l02", "from": Vector3(0, 1, -26), "aim": Vector3(-5, 8.64, -37), "power": 0.2, "lift": 2.2, "reel_frames": 40, "swing": Vector3(910.0, 250.0, -410.0), "track": true, "min_speed": 15.0, "frames": 120},
+	"hud_04_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(12, 8.54, -38), "power": 0.2, "lift": 2.2, "reel_frames": 70, "swing": Vector3(637.0, 250.0, 637.0), "track": true, "min_speed": 15.0, "frames": 120},
+	"hud_05_slag_line_lintel_swing": {"level": "l04", "from": "spawn", "aim": Vector3(4, 9.44, 8), "power": 0.2, "lift": 2.2, "reel_frames": 15, "swing": Vector3(1000.0, 200.0, 660.0), "track": true, "min_speed": 15.0, "frames": 120},
+	"hud_06_crane_yard_arm_reel": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(-5, 14.99, -22), "power": 0.2, "lift": 1.5, "reel": true, "track": true, "frames": 90},
+	"hud_07_crucible_kiln_swing": {"level": "l06", "from": "spawn", "aim": Vector3(-4, 9.44, 1.5), "power": 0.2, "lift": 2.2, "reel_frames": 15, "swing": Vector3(-1000.0, 200.0, -300.0), "track": true, "min_speed": 15.0, "frames": 120},
+	"hud_08_induction_ledge_swing": {"level": "tutorial", "from": Vector3(0, 1, -56), "aim": Vector3(3.5, 7.74, -66), "power": 0.2, "lift": 2.2, "reel_frames": 40, "swing": Vector3(855.0, 250.0, 300.0), "track": true, "min_speed": 15.0, "frames": 120},
+	"hud_09_practice_range_gantry": {"level": "range", "from": Vector3(0, 1, -56), "aim": Vector3(4, 8.64, -70), "power": 0.2, "lift": 2.2, "reel_frames": 70, "swing": Vector3(874.0, 250.0, 246.0), "track": true, "min_speed": 15.0, "frames": 120},
+	"touch_01_sluice_gate_sentry_beam": {"level": "l01", "from": Vector3(-8, 1, -30), "aim": Vector3(-22, 3.6, -46), "latch": false, "power": 0.3, "frames": 40},
+	"touch_02_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(-12, 8.54, -38), "power": 0.2, "lift": 2.2, "reel_frames": 70, "swing": Vector3(637.0, 250.0, -637.0), "track": true, "min_speed": 15.0, "frames": 120},
+	"touch_03_crane_yard_arm": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(5, 14.99, -22), "power": 0.2, "lift": 1.5, "reel": true, "track": true, "frames": 90},
+	"touch_04_crucible_kiln_reel": {"level": "l06", "from": "spawn", "aim": Vector3(4, 9.44, 1.5), "power": 0.2, "lift": 2.2, "reel": true, "track": true, "frames": 120},
+}
+
 
 ## The logotype: the brand mark beside the DEADWEIGHT wordmark, drawn the way the title screen
 ## draws it (paper "DEAD", amber "WEIGHT", cyan measuring rule) but without the spool captions.
@@ -123,11 +160,20 @@ var _saved: int = 0
 
 func _initialize() -> void:
 	var only: String = ""
+	var shot: String = ""
+	var probe: String = ""
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--only="):
 			only = argument.substr(7)
+		elif argument.begins_with("--shot="):
+			shot = argument.substr(7)
+		elif argument.begins_with("--probe"):
+			probe = "probe"
 	_mark = ImageTexture.create_from_image(Image.load_from_file(ProjectSettings.globalize_path(MARK_PATH)))
-	_run.call_deferred(only)
+	if not shot.is_empty() or probe == "probe":
+		_run_live.call_deferred(shot, probe == "probe")
+	else:
+		_run.call_deferred(only)
 
 
 func _run(only: String) -> void:
@@ -137,6 +183,118 @@ func _run(only: String) -> void:
 		await _render(job)
 	print("STORE_ART saved %d file(s)" % _saved)
 	quit(0)
+
+
+## Runs one live shot through the real game (main.tscn) and saves the root viewport as
+## store/art/screenshots/<name>_<width>x<height>.png. With probe the level is only listed.
+func _run_live(name: String, probe: bool) -> void:
+	var shot: Dictionary = LIVE_SHOTS.get(name, {})
+	if shot.is_empty() and not probe:
+		push_error("STORE_ART no live shot named %s" % name)
+		quit(1)
+		return
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	var level_id: String = str(shot.get("level", "l01"))
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--level="):
+			level_id = argument.substr(8)
+	args.append("--level=%s" % level_id)
+	var main: Node = MainScene.instantiate()
+	main.set("override_args", args)
+	root.add_child(main)
+	# A --capture run never pauses on focus loss; an off-screen window can lose focus, so mirror that.
+	main.set("_capture", true)
+	# Achievement toasts would sit in the frame, so every achievement is marked as already earned in
+	# the temp profile (the profile is never the player's save; see --profile in tools/capture-store-art.ps1).
+	var profile: RefCounted = main.get("profile")
+	for achievement_id: String in Achievements.ids():
+		profile.call("unlock_achievement", achievement_id)
+	if not await _wait_for_state(main, "playing"):
+		push_error("STORE_ART %s never reached play" % name)
+		quit(1)
+		return
+	await _frames(SETTLE_FRAMES)
+	var player: RigidBody3D = main.get("player")
+	var tether: Node3D = main.get("tether")
+	var level: Node3D = main.get("level")
+	if probe:
+		_print_probe(level)
+		quit(0)
+		return
+	var from: Vector3 = level.get("spawn_position")
+	if shot["from"] is Vector3:
+		from = shot["from"]
+	# "latch": false casts at a target (an enemy, say) and captures the line in flight.
+	var wait_latch: bool = bool(shot.get("latch", true))
+	var aim: Vector3 = shot["aim"]
+	if wait_latch:
+		aim = _nearest_anchor(aim) + Vector3(0.0, float(shot.get("lift", 0.0)), 0.0)
+	var latched: bool = await _cast_at(player, tether, from, aim, float(shot.get("power", 1.0)), wait_latch)
+	print("STORE_ART %s latched=%s anchor=%s" % [name, str(latched), str(aim)])
+	if wait_latch and not latched:
+		push_error("STORE_ART %s did not latch; adjust its aim, power or lift" % name)
+	# Reel first (shortens the line to a pendulum length), then launch sideways so the line goes taut.
+	if wait_latch:
+		tether.reeling = true
+		await _frames(int(shot.get("reel_frames", 0)))
+		tether.reeling = bool(shot.get("reel", false))
+	var swing: Vector3 = shot.get("swing", Vector3.ZERO)
+	if swing != Vector3.ZERO:
+		player.apply_central_impulse(swing)
+	# Track: the view keeps the anchor plate in frame. Capture early once the swing is fast and taut
+	# (min_speed m/s with at least AMBER_TENSION newtons), otherwise after "frames" physics frames.
+	var track: bool = bool(shot.get("track", false))
+	var min_speed: float = float(shot.get("min_speed", 0.0))
+	for step in int(shot.get("frames", 60)):
+		await process_frame
+		if track and tether.anchored:
+			_look_at(player, aim)
+		var speed: float = player.linear_velocity.length()
+		if min_speed > 0.0 and speed >= min_speed and tether.tension >= Tether.AMBER_AT_TENSION:
+			print("STORE_ART swing at %.1f m/s, %.0f N, after %d frames" % [speed, tether.tension, step])
+			break
+	await RenderingServer.frame_post_draw
+	var image: Image = root.get_texture().get_image()
+	var path: String = ProjectSettings.globalize_path(SCREENSHOT_DIR + "%s_%dx%d.png" % [name, image.get_width(), image.get_height()])
+	var error: Error = image.save_png(path)
+	print("STORE_ART %s %dx%d result=%d" % [path, image.get_width(), image.get_height(), error])
+	quit(0 if error == OK else 1)
+
+
+func _wait_for_state(main: Node, wanted: String) -> bool:
+	for index in LIVE_TIMEOUT_FRAMES:
+		if str(main.get("state")) == wanted:
+			return true
+		await process_frame
+	return false
+
+
+## Lists what a level offers, so anchors and aims can be chosen from real positions.
+func _print_probe(level: Node3D) -> void:
+	print("PROBE spawn %s" % str(level.get("spawn_position")))
+	for node: Node in get_nodes_in_group("anchor"):
+		var body := node as Node3D
+		if body != null:
+			print("PROBE anchor %s" % str(body.global_position))
+	for node: Node in get_nodes_in_group("enemies"):
+		var body := node as Node3D
+		if body != null:
+			print("PROBE enemy %s %s" % [node.name, str(body.global_position)])
+
+
+## The anchor plate nearest to a point, so a shot can name a rough spot instead of an exact plate.
+func _nearest_anchor(point: Vector3) -> Vector3:
+	var best: Vector3 = point
+	var best_distance: float = INF
+	for node: Node in get_nodes_in_group("anchor"):
+		var body := node as Node3D
+		if body == null:
+			continue
+		var distance: float = body.global_position.distance_to(point)
+		if distance < best_distance:
+			best_distance = distance
+			best = body.global_position
+	return best
 
 
 ## Renders one job into a SubViewport of its size and saves the result.
@@ -172,7 +330,11 @@ func _render(job: Dictionary) -> void:
 			player.gun_model.hide()
 	await _frames(SETTLE_FRAMES)
 	if str(job["mode"]) == "cast":
-		await _cast(job, level, player, tether)
+		player.freeze = false
+		player.active = true
+		tether.active = true
+		level.set_active(true)
+		await _cast_at(player, tether, job["from"], job["aim"], float(job.get("power", 1.0)))
 	var overlay := Control.new()
 	overlay.size = Vector2(size_px)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -204,37 +366,41 @@ func _add_camera(stage: Node3D, job: Dictionary) -> void:
 	cam.make_current()
 
 
-## Fires the rod from the spawn at the aim point, lets the weight latch, and holds for "hold"
-## seconds. The camera stays where the job put it, so the line and weight stay in frame.
-func _cast(job: Dictionary, level: Node3D, player: RigidBody3D, tether: Node3D) -> void:
-	var from: Vector3 = job["from"]
-	var aim: Vector3 = job["aim"]
-	player.freeze = false
-	player.reset_at(from)
-	player.active = true
-	tether.active = true
-	level.set_active(true)
-	await _frames(SETTLE_FRAMES)
-	var direction: Vector3 = (aim - player.global_position).normalized()
+func _log_event(event: String) -> void:
+	print("STORE_ART tether event %s" % event)
+
+
+## Turns the player's view (yaw and pitch, as the mouse would) so the camera faces a world point.
+func _look_at(player: RigidBody3D, point: Vector3) -> void:
+	var camera: Camera3D = player.camera
+	var direction: Vector3 = (point - camera.global_position).normalized()
 	player.yaw = atan2(-direction.x, -direction.z)
 	player.pitch = asin(clampf(direction.y, -1.0, 1.0))
+	player.apply_look(Vector2.ZERO)
+
+
+## Places the player at "from", aims the view at "aim", charges a full cast and releases it. Waits
+## until the weight latches on an anchor plate or CAST_TIMEOUT_FRAMES pass. Returns whether it latched.
+## Counts physics frames, so a live run at --fixed-fps 60 is the same every time.
+func _cast_at(player: RigidBody3D, tether: Node3D, from: Vector3, aim: Vector3, power: float, wait_latch: bool = true) -> bool:
+	player.reset_at(from)
+	await _frames(SETTLE_FRAMES)
+	if not tether.event_happened.is_connected(_log_event):
+		tether.event_happened.connect(_log_event)
+	_look_at(player, aim)
 	await _frames(6)
 	tether.begin_charge()
-	await create_timer(float(job.get("charge", 0.8))).timeout
+	# Charge rises with physics steps, so "power" maps directly to a number of frames.
+	await _frames(int(round(clampf(power, 0.0, 1.0) * float(tether.get("charge_time")) * LIVE_FPS)))
 	tether.release_cast()
-	var waited: float = 0.0
-	while not tether.anchored and waited < CAST_TIMEOUT:
+	if not wait_latch:
+		return false
+	var waited: int = 0
+	while not tether.anchored and waited < CAST_TIMEOUT_FRAMES:
 		await process_frame
-		waited += root.get_process_delta_time()
-	print("STORE_ART cast latched=%s after %.2fs" % [str(tether.anchored), waited])
-	await create_timer(float(job.get("hold", 0.4))).timeout
-
-
-func _count_meshes(node: Node) -> int:
-	var total: int = 1 if node is MeshInstance3D else 0
-	for child: Node in node.get_children():
-		total += _count_meshes(child)
-	return total
+		waited += 1
+	print("STORE_ART cast latched=%s after %d frames" % [str(tether.anchored), waited])
+	return bool(tether.anchored)
 
 
 func _frames(count: int) -> void:
