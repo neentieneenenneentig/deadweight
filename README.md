@@ -90,12 +90,12 @@ powershell -ExecutionPolicy Bypass -File tools/build.ps1 -Target All
 
 ## Project map
 
-- `scripts/main.gd`: game flow, raid state, weapons, extraction, persistence, input routing.
+- `scripts/main.gd`: game flow (title, loading, play, pause, result), weapons, extraction, saving, input routing.
 - `scripts/player.gd`, `scripts/tether.gd`: rigid-body player and the rod (cast, spool, rope forces).
-- `scripts/world.gd`, `scripts/enemy.gd`: the Sluice Gate level, salvage, extraction, enemies.
+- `scripts/level_base.gd`, `scripts/level_catalog.gd`, `scripts/levels/`, `scripts/enemy.gd`: the level framework, the level list, each level, enemies.
 - `scripts/hud.gd`, `scripts/audio.gd`, `scripts/fx.gd`: interface, procedural audio, effects.
-- `scripts/profile.gd`, `upgrades.gd`, `achievements.gd`, `settings.gd`, `scripts/ui/`: v1.0
-  modules in progress (see TASKS.md).
+- `scripts/profile.gd`, `upgrades.gd`, `achievements.gd`, `settings.gd`, `scripts/ui/`: save data,
+  workshop, achievements, settings and the menus.
 - `tests/`: headless suites run by `tests/run_all.ps1`.
 
 All game art and sound are generated in code. Engine credits and licences are in

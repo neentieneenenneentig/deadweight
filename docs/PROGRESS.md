@@ -151,6 +151,37 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
 - Follow-ups: F10 must wire `restart_requested`, `menu_requested`, `next_level_requested` and
   `level_requested("range")`. The tutorial callout and CONTINUE improve once C1 exists.
 
+## 2026-11-03: F10 Main flow switch-over
+- Model: Claude Sonnet 5.5.
+- Rewrote scripts/main.gd as the CONTRACT 4.7 state machine (boot, title, menu, loading, playing,
+  paused, result) over `UIRoot` and `Catalog` levels. Title = Sluice Gate in practice mode with a
+  slow attract camera. `start_level(id, force_practice)` shows the loading screen, builds the level
+  (difficulty -> `damage_scale`, quality), and starts play; restart, next level, quit to title,
+  resume, settings, workshop purchases, reset progress and quit are all wired. Pause on Esc/Start,
+  Android back and focus loss. Mouse captured only while playing. The old HUD is kept in game only
+  (hidden while paused so touches reach the pause menu); its own menus never show.
+- Results go through `profile.record_run` (practice runs only add play stats) plus
+  `Achievements.end_of_run`, are saved at once, and shown with `ui.show_result`. Settings apply live
+  (FOV, look sensitivity, invert Y, quality, engine, audio) and save after 0.6 s; purchases, results
+  and quit save immediately. Boot awards achievements implied by saved progress.
+- Command line: `--profile --level --screen --cam --hide-ui --unlock-all --touch --capture
+  --capture-path --capture-delay --windowed`, plus `--practice` (kept from the prototype); tests set
+  `override_args`.
+- Deleted scripts/world.gd; tests/level_preview.gd lost its `--legacy` option. scripts/fx.gd:
+  `_free_later` now uses a child Timer (the old SceneTreeTimer lambda logged "Lambda capture was
+  freed" when a level was freed with effects alive).
+- Tests: tests/flow_test.gd, 97 checks (title, practice, pause/resume by action, Esc, Android back,
+  focus loss, restart, quit to title, full raid by teleport with a 6 s extraction, result, saved
+  profile, failed run, retry, sidearm, workshop, live settings, reset, arguments, quit saves).
+  QUALITY GATE: PASSED (37 scripts, 5 suites).
+- Captures in .tools/captures/F10/ (title, levels, HUD, result, pause, loading; a 20 s run and a
+  touch run in Compatibility had no errors).
+- Deviations: F11 items already done here are listed in its card. `range` cannot start until F8,
+  so the flow test uses a forced practice run of l01 where the card says "range".
+- Follow-ups: G1 changes the player signal signatures (`damaged`, `died`) and `reset_at(where, yaw)`;
+  main.gd has marked connections in `_build_nodes`. The title level is rebuilt on every return to the
+  title (about 0.3 s); fine for now.
+
 ---
 Template:
 ```

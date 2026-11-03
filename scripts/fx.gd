@@ -141,8 +141,12 @@ static func _usable(parent: Node) -> bool:
 	return is_instance_valid(parent) and parent.is_inside_tree()
 
 
+## The timer is a child of the node, so it disappears with it when a level is freed early
+## (a SceneTreeTimer lambda would log "Lambda capture was freed" in that case).
 static func _free_later(node: Node, seconds: float) -> void:
-	var timer := node.get_tree().create_timer(seconds, false)
-	timer.timeout.connect(func() -> void:
-		if is_instance_valid(node):
-			node.queue_free())
+	var timer := Timer.new()
+	timer.one_shot = true
+	timer.wait_time = maxf(seconds, 0.01)
+	node.add_child(timer)
+	timer.timeout.connect(node.queue_free)
+	timer.start()

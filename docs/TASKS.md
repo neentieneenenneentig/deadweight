@@ -33,7 +33,7 @@ owner = needs the human (devices, accounts).
 | F7 | Level framework core + catalog + SLUICE GATE port | — | L | A | shell, vision | MUST | done |
 | F8 | Level features (anchors, updrafts, hazards, hints) + PRACTICE RANGE | F7 | M | A | shell, vision | MUST | todo |
 | F9 | Navigation mesh + level validation suite | F7 | M | A | shell | MUST | todo |
-| F10 | Main flow switch-over (new menus + catalog levels) | F1, F3, F7 | L | A | shell, vision | MUST | todo |
+| F10 | Main flow switch-over (new menus + catalog levels) | F1, F3, F7 | L | A | shell, vision | MUST | done |
 | F11 | Main run systems: stats, achievements, checkpoints, sidearm, hints | F10 | M | A | shell | MUST | todo |
 | G1 | Player v2: movement + camera feel | F10 | M | A | shell | MUST | todo |
 | G2 | Tether v2: upgrades, recover, anchors, smash, events | F10 | M | A | shell | MUST | todo |
@@ -442,13 +442,15 @@ and its .uid.
 
 ### F11 — Main run systems
 **Edit:** scripts/main.gd, tests/flow_test.gd.
+**Already done in F10:** run stats (time, damage, shots, kills, casts, max speed, max airtime in
+`run_stats`), end-of-run achievements, the difficulty `damage_scale`, and the simple fall-out rule
+(practice resets to spawn, a raid kills). Replace the fall-out rule with the checkpoint rule below
+and update the flow_test that covers it.
 **Do:**
-- Run stats: time, damage, shots, kills, casts, max speed, max airtime.
 - Achievements:
   - live: FIRST_CAST, TERMINAL, HANG_TIME;
   - FIRST_ANCHOR and DEADWEIGHT once the tether supports them;
-  - end of run via achievements.gd;
-  - toasts and `platform.unlock_achievement`.
+  - toasts and `platform.unlock_achievement` (the end-of-run unlocks already work);
 - Checkpoints: the last safe ground every 0.5 s. Falling below kill_y costs 35 damage, cuts the
   line and respawns at the checkpoint.
 - Range extraction: a banner, then the cases reset.
