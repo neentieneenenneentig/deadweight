@@ -183,8 +183,6 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   title (about 0.3 s); fine for now.
 
 ---
-Template:
-```
 ## 2026-11-03: F2 input map + platform, F11 run systems
 
 - F2 (built by a Haiku sub-agent, reviewed and re-run by me): `scripts/input_setup.gd` (register, glyph, expand_tokens), `scripts/platform.gd` (optional GodotSteam, unlock_achievement, vibrate, is_mobile, haptics flag), `tests/input_test.gd` (117 checks). The Steam path is unverified because GodotSteam is not in this environment.
@@ -199,6 +197,27 @@ Template:
 - flow_test: 107 checks, including the fall, checkpoint, FIRST_CAST, FIRST_EXTRACT once, the magazine tier and hint tokens. The gate passes (40 scripts, 6 suites).
 - Follow-ups: F8 must provide `reset_cases` and the `repeatable` info flag. DEADWEIGHT stays unverified in play until enemies take smash damage. G1 changes `reset_at`, which still sets health to 100 inside player.gd.
 
+## 2026-11-03: F8 level features + PRACTICE RANGE
+
+- Model: claude-haiku-5-5 (sub-agent), reviewed by lead.
+- Changed: `scripts/level_base.gd` (anchor, updraft, hazard, water, hint_zone, light with a cap of 6, skyline, perimeter, is_hazard_at, is_safe_ground, restock_cases), `scripts/levels/range.gd` (new: grid, markers at 5–40 m, platforms at 5/10/15/20/30 m, anchor gantry, updraft tower, pillar slalom, case, extraction; `repeatable` and `practice` flags; `reset_cases()`), `tests/world_test.gd` (10 new checks; two catalog checks now expect `range` to be available), `tests/flow_test.gd` (the unavailable-level probe now uses `tutorial`, because `range` now exists).
+- Tests: world_test 74 checks pass. Full gate: QUALITY GATE PASSED (41 scripts, 6 suites). Captures: `.tools/captures/F8/`.
+- Deviations: range par times are 0.0 (no clock). Updraft lifts the player and the `cast_weight` group only. Hazard zap plays for all three kinds.
+- Follow-ups: main.gd does not connect `level.hint_requested`, so hints don't show. tether.gd does not add weights to `cast_weight` and does not latch anchors, so updrafts and anchors do nothing to the rod yet. Main never sets the "hazard" death cause. Gantry plates are small from spawn; the 30 m and 40 m labels nearly touch; the 5 m label clips at the left edge of the spawn view.
+
+## 2026-11-03: F5 UI screens C (level select, workshop, records)
+
+- Model: claude-haiku-5-5 (sub-agent), reviewed by lead.
+- Changed: `scripts/ui/levels_screen.gd`, `scripts/ui/workshop_screen.gd`, `scripts/ui/records_screen.gd` (all replace stubs), `tests/ui_preview.gd` (fake mixed profile; new shots workshop_bought, workshop_denied, levels_stub).
+- Level select: practice levels on a top strip, then floodworks / foundry / spillway columns. Cards show number, title, blurb, medal or lock, best time, bonus x/y, par S/G. Locked and unbuilt cards keep focus; a press plays ui_denied and shakes, and never emits `level_requested`.
+- Workshop: one focusable card per track with pips, NOW/NEXT, and a BUY button that is disabled with its reason ("NEED n MORE" / "MAXED"). Purchases flash the pip and show feedback.
+- Records: lifetime stats, focusable per-level medal rows, and a 2-column achievement grid.
+- Tests: `ui_preview` at 1280x720, touch and 2400x1080 reports 0 problems. Gate: QUALITY GATE PASSED. Captures: `.tools/captures/F5/`.
+- Deviations: BUY is a disabled Button inside a focusable card, because a disabled Button cannot take focus. Records rows and achievement tiles are focusable for grid navigation.
+- Follow-ups: workshop descriptions and some blurbs truncate at 720p. F6 should cover locked-never-emits and the BUY states. Gamepad navigation is not driven by real input yet.
+
+Template:
+```
 ## YYYY-MM-DD: Txx <title>
 - Model:
 - Changed:

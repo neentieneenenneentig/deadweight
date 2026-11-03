@@ -28,10 +28,10 @@ owner = needs the human (devices, accounts).
 | F2 | Input map + platform services | — | S | B | shell | MUST | done |
 | F3 | UI screens A: title, loading, pause, result (+stubs, preview) | — | M | B | shell, vision | MUST | done |
 | F4 | UI screens B: settings, credits | F3 | M | B | shell, vision | MUST | done |
-| F5 | UI screens C: level select, workshop, records | F3 | M | B | shell, vision | MUST | todo |
+| F5 | UI screens C: level select, workshop, records | F3 | M | B | shell, vision | MUST | done (2026-11-03) |
 | F6 | UI test suite | F3, F4, F5 | M | B | shell | MUST | todo |
 | F7 | Level framework core + catalog + SLUICE GATE port | — | L | A | shell, vision | MUST | done |
-| F8 | Level features (anchors, updrafts, hazards, hints) + PRACTICE RANGE | F7 | M | A | shell, vision | MUST | todo |
+| F8 | Level features (anchors, updrafts, hazards, hints) + PRACTICE RANGE | F7 | M | A | shell, vision | MUST | done (2026-11-03) |
 | F9 | Navigation mesh + level validation suite | F7 | M | A | shell | MUST | todo |
 | F10 | Main flow switch-over (new menus + catalog levels) | F1, F3, F7 | L | A | shell, vision | MUST | done |
 | F11 | Main run systems: stats, achievements, checkpoints, sidearm, hints | F10 | M | A | shell | MUST | done |

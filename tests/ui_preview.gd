@@ -5,7 +5,8 @@ extends SceneTree
 ## Options after "--": --tag=<text> (file name suffix), --out=<folder>, --touch (touch UI),
 ## --only=<screen,...> (title_fresh title pause loading result_won result_lost levels workshop
 ## records settings settings_controls settings_video settings_audio settings_touch credits
-## credits_end). Add --rendering-method gl_compatibility for the mobile renderer.
+## credits_end, workshop_bought, workshop_denied, levels_stub). Add --rendering-method
+## gl_compatibility for the mobile renderer. levels_stub swaps in a stand-in catalog (last shot).
 ## The profile is private to this script: nothing is read from or written to the real save.
 
 const Catalog = preload("res://scripts/level_catalog.gd")
@@ -39,6 +40,8 @@ func _run() -> void:
 	_fresh = _make_profile(false)
 	_ui = UiRoot.new()
 	root.add_child(_ui)
+	# Stands in for main.gd: spend the salvage on a purchase, then refresh the workshop.
+	_ui.connect("upgrade_requested", _on_upgrade)
 	await _frames(4)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_out))
 	var size: Vector2 = root.get_visible_rect().size
@@ -63,6 +66,9 @@ func _run() -> void:
 	if bool(_ui.get("touch_enabled")):
 		failures += await _shot("settings_touch", suffix, func() -> void: _open_settings_tab("touch"))
 	failures += await _shot("credits_end", suffix, func() -> void: _ui.call("show_credits"), true)
+	failures += await _shot("workshop_bought", suffix, func() -> void: _workshop_press("reel"))
+	failures += await _shot("workshop_denied", suffix, func() -> void: _workshop_press("quickdraw"))
+	failures += await _shot("levels_stub", suffix, func() -> void: _show_stub_levels())
 	print("UI PREVIEW %s: %d problem(s)" % [suffix, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -129,15 +135,79 @@ func _make_profile(with_progress: bool) -> RefCounted:
 	profile.lifetime_salvage = 610
 	profile.tutorial_done = true
 	profile.levels["l01"] = {"completed": true, "best_time": 118.4, "medal": 2, "bonus_found": [0], "attempts": 5, "extractions": 3}
+	profile.levels["tutorial"] = {"completed": true, "best_time": 74.2, "medal": 1, "bonus_found": [], "attempts": 2, "extractions": 1}
 	profile.upgrades["spool"] = 2
 	profile.upgrades["reel"] = 1
+	profile.upgrades["weight"] = 4        # maxed
+	profile.upgrades["quickdraw"] = 3     # next tier costs 250: more than the 245 banked
 	profile.achievements["FIRST_CAST"] = true
 	profile.achievements["FIRST_ANCHOR"] = true
 	profile.achievements["FIRST_EXTRACT"] = true
+	profile.achievements["GRADUATE"] = true
 	profile.stats["play_time"] = 5230.0
 	profile.stats["casts"] = 412
+	profile.stats["kills"] = 37
+	profile.stats["smash_kills"] = 9
+	profile.stats["deaths"] = 6
+	profile.stats["extractions"] = 4
 	profile.stats["max_speed"] = 38.5
+	profile.stats["max_airtime"] = 12.4
 	return profile
+
+
+## Workshop purchase the way main.gd does it: spend the salvage, then refresh. A refusal does nothing.
+func _on_upgrade(id: String) -> void:
+	var profile: RefCounted = _ui.get("profile")
+	if profile == null or not profile.purchase(id):
+		return
+	_ui.call("refresh")
+
+
+## Fresh profile, workshop open, one press on a track (affordable or not).
+func _workshop_press(id: String) -> void:
+	_ui.call("bind", _make_profile(true))
+	_ui.call("show_workshop")
+	var screen: Object = _ui.call("get_screen", "workshop")
+	screen.call("_on_row", id)
+
+
+## Level select over a stand-in catalog: shows a playable card, a locked card and unbuilt cards,
+## which the real catalog cannot show yet (only l01 is built, and l02 is never locked there).
+func _show_stub_levels() -> void:
+	_ui.call("bind", _make_profile(true))
+	_ui.call("set_sources", StubCatalog.new(), null, null)
+	_ui.call("show_level_select")
+
+
+## Stand-in level catalog for the levels_stub shot (same data shape as CONTRACT 4.12 and 5.6).
+class StubCatalog extends RefCounted:
+	const ORDER := ["tutorial", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "range"]
+	const DATA := {
+		"tutorial": {"available": false},
+		"l01": {"available": true, "title": "SLUICE GATE", "zone": "floodworks", "number": 1, "blurb": "Canal yard, pump house, high gantry, relay yard.", "par_silver": 150.0, "par_gold": 95.0, "bonus": 2, "cases": 3},
+		"l02": {"available": true, "title": "PUMP ROW", "zone": "floodworks", "number": 2, "blurb": "Pumps, a drowned stair and hounds in the dark.", "par_silver": 180.0, "par_gold": 120.0, "bonus": 2, "cases": 3},
+		"l03": {"available": true, "title": "OVERFLOW", "zone": "floodworks", "number": 3, "blurb": "The spillway runs over the top of the gantry.", "par_silver": 210.0, "par_gold": 140.0, "bonus": 1, "cases": 3},
+		"l04": {"available": false}, "l05": {"available": false}, "l06": {"available": false},
+		"l07": {"available": false}, "l08": {"available": false}, "l09": {"available": false},
+		"range": {"available": true, "title": "PRACTICE RANGE", "number": -1, "practice": true, "blurb": "Cases restock on every extraction. Nothing here is saved."},
+	}
+
+	func all_ids() -> Array[String]:
+		var ids: Array[String] = []
+		for id: String in ORDER:
+			ids.append(id)
+		return ids
+
+	func campaign_ids() -> Array[String]:
+		return ["l01", "l02", "l03"]
+
+	func info(id: String) -> Dictionary:
+		var result: Dictionary = {"id": id, "script": ""}
+		result.merge(DATA.get(id, {}), true)
+		return result
+
+	func next_id(_id: String) -> String:
+		return ""
 
 
 func _won_result() -> Dictionary:
