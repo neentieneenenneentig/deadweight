@@ -51,6 +51,7 @@ owner = needs the human (devices, accounts).
 | A1 | Sound effects synthesis | — | L | A | shell | MUST | done (2026-11-03) |
 | A2 | Audio engine v2 | A1, F11 | M | B | shell | MUST | done (2026-11-03) |
 | A3 | Music (adaptive layers; MVP fallback allowed) | A2 | L | A | shell | MUST | done, MVP (2026-11-03) |
+| A4 | Audio event routing + HUD alert | A2, E3 | S | B | shell | MUST | todo |
 | C1 | Tutorial: INDUCTION | F8, F9, F11, G2 | M | A | shell, vision | MUST | done 2026-11-03 |
 | C2 | Level l02 PUMP ROW | F8, F9 | M | A | shell, vision | MUST | done 2026-11-03 |
 | C3 | Level l03 OVERFLOW | F8, F9 | M | A | shell, vision | MUST | done 2026-11-03 |
@@ -679,6 +680,30 @@ tests/audio_test.gd; in scripts/main.gd, only music calls.
 - **MVP fallback** if quota runs short: one stem per track and no intensity layers.
 **Acceptance:** stems are equal length and seamless with peak ≤ −1 dBFS; tests extended; the gate
 passes.
+
+### A4 — Audio event routing + HUD alert
+**Edit:**
+- scripts/player.gd: event emission only;
+- scripts/enemy.gd: sentry sounds only;
+- scripts/main.gd: sound routing and the HUD `alert` key only;
+- scripts/level_base.gd: the deep-water splash only;
+- tests/audio_test.gd.
+
+**Do:** every §5.11 id that has a WAV but is never played gets wired to the real moment:
+- `land`, `land_hard` and `footstep` (stride-timed, grounded, not while sliding);
+- `death`;
+- `kill` (not for dummies) and `switch` (rod ↔ sidearm);
+- `extract_ready`, `extract_tick` and `extract_break`;
+- `checkpoint`, if checkpoints exist;
+- `sentry_charge` and `sentry_shot` (positional, like the drone);
+- `splash` (entering deep water).
+
+Send the HUD `alert` key (§5.9). It is true while any non-dummy enemy is tracking, which is threat_level > 0.
+
+**Acceptance:**
+- audio_test asserts each id is emitted by its source, using a stub or a spy on the event signal;
+- no id plays every frame, because the concurrency limits hold;
+- the gate passes.
 
 ---
 

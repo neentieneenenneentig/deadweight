@@ -893,7 +893,7 @@ func _on_tether_event(event: String) -> void:
 		"spool_limit":
 			set_hint("SPOOL LIMIT  /  {lock} holds the line, {reel} takes it in", 2.5)
 		"severed":
-			set_hint("LINE SEVERED  /  keep your line clear of concrete", 3.0)
+			set_hint("LINE SEVERED  /  too many bends, take a straighter line", 3.0)
 		"overload":
 			set_hint("LINE OVERLOAD  /  cast again", 3.0)
 		"no_clearance":
