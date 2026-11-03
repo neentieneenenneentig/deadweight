@@ -194,7 +194,7 @@ func _test_raid_to_result() -> void:
 	_check(result["salvage"] == 3 * 15 + 2 * 30 + 10 + 25 + 50, "salvage = cases + bonus caches + the three first-time medal bonuses")
 	_check(result["bank"] == result["salvage"] and _main.profile.bank == result["salvage"], "the bank holds the reward")
 	_check(result["new_best"] and result["best_time"] == result["time"], "the first clear is a new best")
-	_check(result["next_level"] == "", "no next level exists yet")
+	_check(result["next_level"] == "l02", "the result offers the next campaign level")
 	# The fall above cost condition, so Untouched is lost; Ghost (no sidearm shots) still awards.
 	_check((result["achievements"] as Array).has("Ghost") and not (result["achievements"] as Array).has("Untouched"), "end-of-run achievements follow the run (the fall cost Untouched)")
 	_check((result["achievements"] as Array).has("Bring Something Back"), "the first extraction unlocks Bring Something Back")

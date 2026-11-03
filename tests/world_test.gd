@@ -76,15 +76,21 @@ func _run() -> void:
 
 
 func _test_framework() -> void:
-	_check(Catalog.campaign_ids() == ["l01"], "catalog lists only the campaign levels that exist")
+	# These checks hold as levels land: l09 (v1.1) is the stand-in for a level without a script.
+	var campaign: Array[String] = Catalog.campaign_ids()
+	_check(campaign.has("l01") and not campaign.has("l09") and not campaign.has("range"), "catalog lists only the campaign levels that exist")
 	_check(Catalog.all_ids().size() == 11 and Catalog.all_ids()[10] == "range", "catalog lists all eleven levels, range last")
 	var details: Dictionary = Catalog.info("l01")
 	_check(details["available"] and details["title"] == "SLUICE GATE" and details["zone"] == "floodworks", "catalog merges the level INFO")
-	_check(not Catalog.info("l02")["available"], "levels without a script are unavailable")
+	_check(not Catalog.info("l09")["available"], "levels without a script are unavailable")
 	_check(Catalog.info("range")["practice"] and Catalog.info("range")["available"], "the range is practice and available now that its script exists")
-	_check(Catalog.info("bogus").is_empty() and Catalog.create("bogus") == null and Catalog.create("l02") == null, "unknown or missing levels give empty info and no instance")
-	_check(Catalog.next_id("l01") == "" and Catalog.next_id("range") == "", "no level follows the last available one")
-	_check(Catalog.zone_ids("floodworks") == ["l01", "range"] and Catalog.zone_ids("foundry").is_empty(), "zone lists hold available levels only")
+	_check(Catalog.info("bogus").is_empty() and Catalog.create("bogus") == null and Catalog.create("l09") == null, "unknown or missing levels give empty info and no instance")
+	_check(Catalog.next_id(campaign[campaign.size() - 1]) == "" and Catalog.next_id("range") == "", "no level follows the last available one")
+	var floodworks: Array[String] = Catalog.zone_ids("floodworks")
+	var all_available: bool = true
+	for id: String in floodworks:
+		all_available = all_available and bool(Catalog.info(id)["available"])
+	_check(floodworks.has("l01") and floodworks.has("range") and all_available and Catalog.zone_ids("spillway").is_empty(), "zone lists hold available levels only")
 	var info: Dictionary = _world.get("info")
 	_check(_world.get("level_id") == "l01" and info["title"] == "SLUICE GATE", "created level knows its id and INFO")
 	_check(int(info["cases"]) == int(_world.get("total_loot")) and int(info["bonus"]) == int(_world.get("total_bonus")), "INFO case and bonus counts match the built level")

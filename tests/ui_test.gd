@@ -596,7 +596,7 @@ func _test_workshop() -> void:
 # --- Level select -------------------------------------------------------------------------------
 
 func _test_level_locks() -> void:
-	# Real catalog: only l01 has a script, so the rest show as coming soon. Range and l01 are open.
+	# Real catalog: levels without a script (l09 is v1.1) show as coming soon. Range and l01 are open.
 	_use_profile(_fresh_profile())
 	_ui.hide_all()
 	_ui.show_level_select()
@@ -606,7 +606,7 @@ func _test_level_locks() -> void:
 	var states: Dictionary = levels.get("_states")
 	_check(states.get("l01") == "open", "levels: l01 is playable on a fresh profile")
 	_check(states.get("range") == "open", "levels: PRACTICE RANGE is playable")
-	_check(states.get("tutorial") == "soon", "levels: unbuilt tutorial shows as coming soon")
+	_check(states.get("l09") == "soon", "levels: unbuilt l09 shows as coming soon")
 	for id: String in cards.keys():
 		if states[id] == "open":
 			continue
