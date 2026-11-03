@@ -1,0 +1,46 @@
+; DEADWEIGHT v1.0 - first-person fishing-rod movement action for PC (Steam) and Android (Google Play).
+; Engine settings owned by the integrator. Request changes through docs/CONTRACT.md section 9.
+config_version=5
+
+[application]
+config/name="DEADWEIGHT"
+config/description="Cast impossibly heavy weights, catch the line, and fly."
+config/version="1.0.0"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.svg"
+boot_splash/bg_color=Color(0.035, 0.055, 0.065, 1)
+boot_splash/show_image=false
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=0
+
+[rendering]
+renderer/rendering_method="forward_plus"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+textures/default_filters/anisotropic_filtering_level=2
+anti_aliasing/quality/msaa_3d=1
+environment/defaults/default_clear_color=Color(0.035, 0.055, 0.065, 1)
+
+[physics]
+3d/physics_engine="Jolt Physics"
+common/physics_ticks_per_second=90
+common/physics_interpolation=true
+3d/default_gravity=12.0
+
+[input_devices]
+pointing/emulate_touch_from_mouse=false
+pointing/emulate_mouse_from_touch=true
+
+[audio]
+driver/enable_input=false
+
+[debug]
+gdscript/warnings/untyped_declaration=0

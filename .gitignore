@@ -1,0 +1,22 @@
+# Godot cache
+.godot/
+
+# Local toolchain, Android build template and build outputs.
+# tools/setup.ps1 and tools/build.ps1 recreate all of these.
+.tools/
+android/
+builds/
+
+# Signing material: never commit
+*.keystore
+*.jks
+upload-key.properties
+export_credentials.cfg
+
+# Noise
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+desktop.ini
+.codebase-memory/
