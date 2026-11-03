@@ -260,6 +260,19 @@ Weights: group `cast_weight`, layer 4, mask 1|8. Anchor latch on contact with a 
 group `anchor`. Smash: enemy contact (group `enemies`) at relative speed > 9 m/s calls
 `take_damage(dmg, "weight")`. Loose weights are cleaned up after detach.
 
+Wrapping (G3): the line is a polyline from the player to the weight with wrap points between.
+- A wrap is added at the first segment that layer-1 geometry blocks (a ray test). A hit within
+  `WEIGHT_CONTACT` (0.35 m) of the weight is the weight touching a surface, so it does not block.
+  The wrap sits `WRAP_OFFSET` (0.12 m) off the surface and slides along it toward the far end, to
+  the corner that clears the geometry on the shorter side (search step `WRAP_SEARCH_STEP`, range `WRAP_SEARCH_RANGE`).
+- A wrap is dropped when its neighbours see each other with `WRAP_MARGIN` (0.08 m) of clearance
+  (sphere sweep), or when it collapses within `MIN_SEGMENT` (0.02 m) of a neighbour.
+- At most `MAX_WRAPS` (8). A ninth needed wrap, or a non-finite state, severs the line (`severed`).
+- Tension is `rope_force(total, line_length, separating_speed)` with `total` the sum of all segments.
+  The player is pulled along the first segment and the weight along the last.
+- `get_wrap_points()` returns a copy of the wrap list, player end first. Empty when the line is straight.
+- The old 0.24 s obstruction-cut rule is gone.
+
 ### 4.10 `scripts/fx.gd` — static effect helpers (Integrator, exists)
 
 `burst(parent, position, normal, color, amount, speed, lifetime, size)`,

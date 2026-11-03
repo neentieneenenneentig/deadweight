@@ -1,7 +1,7 @@
 extends Node3D
 ## A free moving weight and tension-only elastic line. All line forces are paired.
-## Owns casting, spool, reel, recover, the anchor latch, smash and impact events (CONTRACT 4.9).
-## Line wrapping and line visuals beyond the basic ribbon come in later tasks.
+## Owns casting, spool, reel, recover, the anchor latch, line wrapping, smash and impact events (CONTRACT 4.9).
+## Line visuals beyond the basic ribbon come in a later task.
 
 const FxScript = preload("res://scripts/fx.gd")
 
@@ -26,7 +26,15 @@ const DAMPING: float = 1200.0
 const MAX_TENSION: float = 22000.0          # N, the catch force cap
 const MIN_LINE: float = 1.8                 # m, the reel never takes the line shorter than this
 const LOAD_TAKE_UP: float = 0.04            # m of slack allowed past the distance on free spool
-const OBSTRUCTION_CUT_TIME: float = 0.24    # s of blocked line before it is severed (G3 replaces this)
+# Wrapping around layer-1 geometry (G3). The line bends at wrap points, at most MAX_WRAPS of them.
+const MAX_WRAPS: int = 8                    # a ninth needed wrap severs the line
+const WRAP_OFFSET: float = 0.12             # m a wrap sits off the surface, along its normal
+const WRAP_MARGIN: float = 0.08             # m of clearance a chord needs before its wrap is dropped
+const WRAP_SEARCH_STEP: float = 0.05        # m between candidate corners while sliding along a surface
+const WRAP_SEARCH_RANGE: float = 6.0        # m a candidate corner may slide from the first hit
+const WEIGHT_CONTACT: float = 0.35          # m; a hit this close to the weight is the weight touching a surface
+const MIN_SEGMENT: float = 0.02             # m; a wrap this close to a neighbour has collapsed onto it
+const LINE_LAYER: int = 1                   # world geometry only
 # Recover, smash and impacts.
 const RECOVER_DISTANCE: float = 2.2         # m; a reeled weight this close to the rod tip is recovered
 const SMASH_MIN_SPEED: float = 9.0          # m/s; slower enemy contacts are only bumps
@@ -49,6 +57,7 @@ var reeling: bool = false
 var reel_strength: float = 1.0
 var charging: bool = false
 var charge: float = 0.0
+## Deployed line on the spool. The wrapped line's total length is kept at or under this while locked.
 var line_length: float = 0.0
 var tension: float = 0.0
 ## True while the weight is latched on an anchor plate (frozen, line acts as a fixed pivot).
@@ -66,8 +75,9 @@ var _assist_direction: Vector3 = Vector3.ZERO
 var _line_view: MeshInstance3D
 var _line_material: StandardMaterial3D
 var _loose_weights: Array[Dictionary] = []
+## Wrap points in order from the player end toward the weight. The line bends at each one.
+var _wraps: Array[Vector3] = []
 var _cast_cooldown: float = 0.0
-var _blocked_time: float = 0.0
 var _smash_cooldown: float = 0.0
 var _impact_cooldown: float = 0.0
 var _previous_speed: float = 0.0
@@ -150,7 +160,7 @@ func _cast(power: float) -> void:
 	anchored = false
 	_at_spool_limit = false
 	_stalled = false
-	_blocked_time = 0.0
+	_wraps.clear()
 	_cast_cooldown = CAST_COOLDOWN
 	event_happened.emit("cast")
 
@@ -231,6 +241,7 @@ func cut() -> void:
 	_assist_remaining = 0.0
 	_at_spool_limit = false
 	_stalled = false
+	_wraps.clear()
 	_line_view.mesh = null
 
 
@@ -249,6 +260,7 @@ func clear() -> void:
 	anchored = false
 	_at_spool_limit = false
 	_stalled = false
+	_wraps.clear()
 	line_length = 0.0
 	tension = 0.0
 	if is_instance_valid(_line_view):
@@ -285,7 +297,7 @@ func _age_loose_weights(delta: float) -> void:
 			_loose_weights.remove_at(index)
 
 
-## One physics step for the attached weight: assist, contacts, spool, reel, rope and line rules.
+## One physics step for the attached weight: assist, contacts, wraps, spool, reel, rope and line rules.
 func _step_weight(delta: float) -> void:
 	if _assist_remaining > 0.0:
 		var fraction: float = minf(delta, _assist_remaining) / delta
@@ -293,26 +305,35 @@ func _step_weight(delta: float) -> void:
 		_assist_remaining -= delta
 	if not anchored:
 		_check_contacts(maxf(_previous_speed, weight.linear_velocity.length()))
-	var displacement: Vector3 = weight.global_position - player.global_position
-	var distance: float = displacement.length()
-	if distance < 0.01:
+	var origin: Vector3 = player.global_position
+	if weight.global_position.distance_to(origin) < 0.01:
 		return
-	var direction: Vector3 = displacement / distance
+	# Drop the wraps the line no longer needs, then bend the line where geometry now blocks it.
+	_drop_redundant_wraps(origin)
+	if not _add_blocking_wrap(origin):
+		return
+	var points: PackedVector3Array = _line_points(origin)
+	if not _is_finite(points):
+		_sever()
+		return
+	var total: float = _polyline_length(points)
+	var first_dir: Vector3 = (points[1] - points[0]).normalized()
+	var last_dir: Vector3 = (points[points.size() - 1] - points[points.size() - 2]).normalized()
 	if not locked and not reeling:
-		line_length = minf(max_line, maxf(line_length, distance + LOAD_TAKE_UP))
+		line_length = minf(max_line, maxf(line_length, total + LOAD_TAKE_UP))
 		_update_spool_limit()
 	if reeling:
 		_reel_in(delta)
 		# An anchored weight stays latched; only a free weight can be reeled back into the rod.
 		if not anchored and _try_recover():
 			return
-	var relative_speed: float = (weight.linear_velocity - player.linear_velocity).dot(direction)
-	tension = rope_force(distance, line_length, relative_speed)
+	# Each end is pulled along its own end segment: the player toward the first point, the weight toward the last.
+	var relative_speed: float = last_dir.dot(weight.linear_velocity) - first_dir.dot(player.linear_velocity)
+	tension = rope_force(total, line_length, relative_speed)
 	if tension > 0.0:
-		var force: Vector3 = direction * tension
-		player.apply_central_force(force)
-		weight.apply_central_force(-force)
-	_check_line_rules(delta, distance)
+		player.apply_central_force(first_dir * tension)
+		weight.apply_central_force(-last_dir * tension)
+	_check_line_rules(total)
 
 
 ## Emits spool_limit once each time free spool reaches the line maximum.
@@ -346,6 +367,7 @@ func _try_recover() -> bool:
 	line_length = 0.0
 	_at_spool_limit = false
 	_stalled = false
+	_wraps.clear()
 	_line_view.mesh = null
 	event_happened.emit("recover")
 	return true
@@ -407,19 +429,143 @@ func _impact(speed: float) -> void:
 	event_happened.emit("weight_impact")
 
 
-## Obstruction and overload rules. Both sever the line through cut().
-func _check_line_rules(delta: float, distance: float) -> void:
-	# A simple line does not wrap: sustained obstruction severs it visibly.
-	var query := PhysicsRayQueryParameters3D.create(player.global_position + Vector3.UP * 0.35, weight.global_position, 1)
-	var obstruction: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
-	if not obstruction.is_empty() and (obstruction.position as Vector3).distance_to(weight.global_position) > 0.65:
-		_blocked_time += delta
-	else:
-		_blocked_time = 0.0
-	if _blocked_time > OBSTRUCTION_CUT_TIME:
-		cut()
-		event_happened.emit("severed")
-	elif distance > max_line * 2.0:
+# --- Wrapping (CONTRACT 4.9) ---------------------------------------------------------------------
+
+## The line as a polyline: the player end, each wrap in order, then the weight.
+func _line_points(origin: Vector3) -> PackedVector3Array:
+	var points := PackedVector3Array()
+	points.append(origin)
+	for wrap_point in _wraps:
+		points.append(wrap_point)
+	points.append(weight.global_position)
+	return points
+
+
+func _polyline_length(points: PackedVector3Array) -> float:
+	var total: float = 0.0
+	for s in range(points.size() - 1):
+		total += points[s].distance_to(points[s + 1])
+	return total
+
+
+func _is_finite(points: PackedVector3Array) -> bool:
+	for point in points:
+		if not point.is_finite():
+			return false
+	return weight.linear_velocity.is_finite() and player.linear_velocity.is_finite()
+
+
+## The wrap points the line bends around, from the player end toward the weight. Empty when the line is straight.
+func get_wrap_points() -> PackedVector3Array:
+	return PackedVector3Array(_wraps)
+
+
+## Severs the line on overflow or a degenerate state, through the same path as an obstruction cut.
+func _sever() -> void:
+	cut()
+	event_happened.emit("severed")
+
+
+## Adds a wrap at the first blocked segment. Returns false when the line was severed instead.
+func _add_blocking_wrap(origin: Vector3) -> bool:
+	var blocked: Dictionary = _first_blocked_segment(_line_points(origin))
+	if blocked.is_empty():
+		return true
+	var corner: Vector3 = blocked["point"]
+	if _wraps.size() >= MAX_WRAPS or not corner.is_finite():
+		_sever()
+		return false
+	_wraps.insert(int(blocked["index"]), corner)
+	return true
+
+
+## Drops each wrap whose neighbours see each other again with WRAP_MARGIN to spare, or that has
+## collapsed onto a neighbour. Walks from the weight end so the earlier indices stay valid.
+func _drop_redundant_wraps(origin: Vector3) -> void:
+	for index in range(_wraps.size() - 1, -1, -1):
+		var points: PackedVector3Array = _line_points(origin)
+		var before: Vector3 = points[index]
+		var wrap_point: Vector3 = points[index + 1]
+		var after: Vector3 = points[index + 2]
+		var collapsed: bool = wrap_point.distance_to(before) < MIN_SEGMENT or wrap_point.distance_to(after) < MIN_SEGMENT
+		if collapsed or _clear_with_margin(before, after):
+			_wraps.remove_at(index)
+
+
+## The first segment of the line that world geometry blocks, as {index, point}: index is where the wrap
+## is inserted and point is the corner it bends around. Empty when the whole line is clear.
+func _first_blocked_segment(points: PackedVector3Array) -> Dictionary:
+	for index in range(points.size() - 1):
+		# Only the segment into the weight may touch: a weight resting on a plate is not blocked by it.
+		var end_contact: float = WEIGHT_CONTACT if index == points.size() - 2 else 0.0
+		var hit: Dictionary = _blocking_hit(points[index], points[index + 1], end_contact)
+		if hit.is_empty():
+			continue
+		var surface: Vector3 = hit["position"]
+		var normal: Vector3 = hit["normal"]
+		if normal.is_zero_approx():
+			normal = Vector3.UP
+		var corner: Vector3 = _corner_point(surface, normal, points[index], points[index + 1], end_contact)
+		return {"index": index, "point": corner}
+	return {}
+
+
+## The first world hit on the segment a to b, or empty when it is clear. A hit within end_contact of b is
+## that end touching geometry, so it does not block.
+func _blocking_hit(a: Vector3, b: Vector3, end_contact: float) -> Dictionary:
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(a, b, LINE_LAYER))
+	if hit.is_empty():
+		return hit
+	var at: Vector3 = hit["position"]
+	if at.distance_to(b) < end_contact:
+		return {}
+	return hit
+
+
+## True when both legs a to mid and mid to b are clear of world geometry.
+func _chain_clear(a: Vector3, mid: Vector3, b: Vector3, end_contact: float) -> bool:
+	return _blocking_hit(a, mid, 0.0).is_empty() and _blocking_hit(mid, b, end_contact).is_empty()
+
+
+## Where a line that hits a surface at hit bends around it. The wrap sits WRAP_OFFSET off the surface and
+## slides along it, toward the far end, until the bent line clears the geometry. The shorter way round wins.
+func _corner_point(hit: Vector3, normal: Vector3, from: Vector3, to: Vector3, end_contact: float) -> Vector3:
+	var base: Vector3 = hit + normal * WRAP_OFFSET
+	var across: Vector3 = (to - hit).slide(normal)
+	if across.length() < 0.01:
+		return base
+	var along: Vector3 = across.normalized()
+	var best: Vector3 = base
+	var best_length: float = INF
+	var steps: int = int(WRAP_SEARCH_RANGE / WRAP_SEARCH_STEP)
+	for direction in [along, -along]:
+		for step in range(1, steps + 1):
+			var candidate: Vector3 = base + direction * (WRAP_SEARCH_STEP * float(step))
+			if _chain_clear(from, candidate, to, end_contact):
+				var length: float = from.distance_to(candidate) + candidate.distance_to(to)
+				if length < best_length:
+					best_length = length
+					best = candidate
+				break
+	return best
+
+
+## True when a sphere of WRAP_MARGIN can sweep from a to b without touching world geometry.
+func _clear_with_margin(a: Vector3, b: Vector3) -> bool:
+	var ball := SphereShape3D.new()
+	ball.radius = WRAP_MARGIN
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = ball
+	query.transform = Transform3D(Basis(), a)
+	query.motion = b - a
+	query.collision_mask = LINE_LAYER
+	var fractions: PackedFloat32Array = get_world_3d().direct_space_state.cast_motion(query)
+	return fractions.size() == 2 and fractions[0] >= 1.0 and fractions[1] >= 1.0
+
+
+## Overload rule: a line stretched past twice its maximum is cut.
+func _check_line_rules(total: float) -> void:
+	if total > max_line * 2.0:
 		cut()
 		event_happened.emit("overload")
 
@@ -428,17 +574,22 @@ func _process(_delta: float) -> void:
 	if not is_instance_valid(weight) or not is_instance_valid(player):
 		return
 	var rod: Node3D = player.get("rod_tip") as Node3D
-	var start: Vector3 = rod.global_position
-	var end: Vector3 = weight.global_position
-	var slack: float = maxf(0.0, line_length - start.distance_to(end))
+	var points: PackedVector3Array = _line_points(rod.global_position)
+	var total: float = _polyline_length(points)
+	var sag_max: float = minf(maxf(0.0, line_length - total) * 0.3, 5.0)
 	var mesh := ImmediateMesh.new()
 	_line_material.albedo_color = Color("edb268") if tension > 8000.0 else Color("b5ddd5")
 	mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, _line_material)
-	for i in range(17):
-		var ratio: float = float(i) / 16.0
-		var point: Vector3 = start.lerp(end, ratio)
-		point.y -= sin(ratio * PI) * minf(slack * 0.3, 5.0)
-		mesh.surface_add_vertex(to_local(point))
+	# Each segment sags in proportion to its share of the line, so the rope droops between wraps too.
+	for s in range(points.size() - 1):
+		var a: Vector3 = points[s]
+		var b: Vector3 = points[s + 1]
+		var sag: float = sag_max * a.distance_to(b) / maxf(total, 0.001)
+		for i in range(17):
+			var ratio: float = float(i) / 16.0
+			var point: Vector3 = a.lerp(b, ratio)
+			point.y -= sin(ratio * PI) * sag
+			mesh.surface_add_vertex(to_local(point))
 	mesh.surface_end()
 	_line_view.mesh = mesh
 

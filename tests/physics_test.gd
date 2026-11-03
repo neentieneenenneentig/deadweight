@@ -354,6 +354,7 @@ func _tether_v2_checks() -> void:
 	await _tether_spool_limit_check()
 	await _tether_smash_check()
 	await _tether_impact_check()
+	await _tether_wrap_checks()
 
 
 ## A player and a tether in one world. Returns {"player", "tether"} as untyped values for the checks.
@@ -601,3 +602,119 @@ func _tether_impact_check() -> void:
 	_check(impacts.size() == 1, "weight_impact is throttled to one per 0.15 s")
 	world.queue_free()
 	await process_frame
+
+
+# --- Wrapping (G3) -------------------------------------------------------------------------------
+# The corner scene: a 2 x 4 x 2 box between the player at (0, 20, 0) and a weight at (4, 20, -6).
+# The straight line clips the box's near face, so the line must bend around its corner at (2.5, 20, -2).
+const WRAP_BOX_CENTER := Vector3(1.5, 20.0, -3.0)
+const WRAP_BOX_SIZE := Vector3(2.0, 4.0, 2.0)
+
+
+func _tether_wrap_checks() -> void:
+	await _tether_wrap_corner_check()
+	await _tether_wrap_overflow_check()
+	await _tether_wrap_rate_check()
+
+
+## Puts the weight at a spot and stops both bodies, so each wrap check starts from rest.
+func _park_weight(line, player_body, at: Vector3) -> void:
+	line.weight.gravity_scale = 0.0
+	line.weight.global_position = at
+	line.weight.linear_velocity = Vector3.ZERO
+	player_body.linear_velocity = Vector3.ZERO
+
+
+## A box corner adds one wrap point at the corner, the wrap holds while the line is blocked, and it is
+## removed once the weight is somewhere the player can see directly.
+func _tether_wrap_corner_check() -> void:
+	var world := _new_world()
+	var rig := _tether_rig(world, Vector3(0, 20, 0))
+	var line = rig["tether"]
+	var player_body = rig["player"]
+	_add_box(world, WRAP_BOX_CENTER, WRAP_BOX_SIZE, 1, "")
+	line._cast(0.0)
+	await _frames(3)
+	_park_weight(line, player_body, Vector3(4, 20, -6))
+	# Slack line: the total length stays under the deployed length, so no tension is involved here.
+	line.line_length = 14.0
+	await _frames(2)
+	var wraps: PackedVector3Array = line.get_wrap_points()
+	_check(wraps.size() == 1, "a box corner between the line and the weight adds one wrap point")
+	_check(wraps.size() == 1 and wraps[0].distance_to(Vector3(2.5, 20, -2)) < 0.5, "the wrap point sits at the box corner")
+	var finite := true
+	for i in range(60):
+		await physics_frame
+		finite = finite and is_finite(line.tension) and is_finite(line.line_length)
+		finite = finite and line.weight.global_position.is_finite() and player_body.global_position.is_finite()
+		finite = finite and line.get_wrap_points().size() == 1
+	_check(finite, "the wrap holds while the line is blocked, and every value stays finite")
+	_park_weight(line, player_body, Vector3(-4, 20, -6))
+	await _frames(3)
+	_check(line.get_wrap_points().is_empty(), "the wrap point is removed once sight returns")
+	world.queue_free()
+	await process_frame
+
+
+## Eight wraps the line still needs, plus a ninth. A thin fence stands between the player and the weight,
+## and the injected wraps alternate sides in pairs (++--++--), so every wrap's chord crosses the fence and
+## none is dropped as redundant. The ninth need must sever the line.
+func _tether_wrap_overflow_check() -> void:
+	var world := _new_world()
+	var rig := _tether_rig(world, Vector3(0, 20, -0.5))
+	var line = rig["tether"]
+	var player_body = rig["player"]
+	_add_box(world, Vector3(0, 20, 0), Vector3(12, 4, 0.2), 1, "")
+	var events: Array = []
+	line.event_happened.connect(func(event: String) -> void: events.append(event))
+	line._cast(0.0)
+	await _frames(3)
+	_park_weight(line, player_body, Vector3(2.5, 20, 0.5))
+	line.line_length = 40.0
+	var sides := [0.2, 0.2, -0.2, -0.2, 0.2, 0.2, -0.2, -0.2]
+	for i in range(Tether.MAX_WRAPS):
+		line._wraps.append(Vector3(-1.75 + 0.5 * float(i), 20.0, float(sides[i])))
+	await _frames(2)
+	_check(events.has("severed") and not is_instance_valid(line.weight), "a ninth needed wrap severs the line")
+	_check(line.get_wrap_points().is_empty(), "a severed line keeps no wrap points")
+	world.queue_free()
+	await process_frame
+
+
+## The same wrapped pull at 60 Hz and 120 Hz moves the player about the same distance in 0.1 s.
+func _tether_wrap_rate_check() -> void:
+	var slow: Dictionary = await _wrap_pull(60)
+	var fast: Dictionary = await _wrap_pull(120)
+	var moved_slow: float = slow["moved"]
+	var moved_fast: float = fast["moved"]
+	_check(bool(slow["finite"]) and bool(fast["finite"]), "a wrapped pull keeps every value finite at 60 and 120 Hz")
+	_check(moved_slow > 0.02 and absf(moved_slow - moved_fast) <= 0.2 * maxf(moved_slow, moved_fast), "60 Hz and 120 Hz wrapped pulls agree within 20 percent")
+	print("WRAP PULL 60Hz=", moved_slow, " 120Hz=", moved_fast)
+
+
+## Runs the corner pull at a physics rate and reports how far the player moved and whether values stayed finite.
+func _wrap_pull(ticks: int) -> Dictionary:
+	var previous: int = Engine.physics_ticks_per_second
+	Engine.physics_ticks_per_second = ticks
+	var world := _new_world()
+	var rig := _tether_rig(world, Vector3(0, 20, 0))
+	var line = rig["tether"]
+	var player_body = rig["player"]
+	_add_box(world, WRAP_BOX_CENTER, WRAP_BOX_SIZE, 1, "")
+	line._cast(0.0)
+	await _frames(3)
+	_park_weight(line, player_body, Vector3(4, 20, -6))
+	# Locked and a little short of the wrapped length (about 7.5 m), so the wrap carries real tension.
+	line.line_length = 7.3
+	line.locked = true
+	var start: Vector3 = player_body.global_position
+	var finite := true
+	for i in range(int(0.1 * float(ticks))):
+		await physics_frame
+		finite = finite and is_finite(line.tension) and is_finite(line.line_length)
+		finite = finite and player_body.global_position.is_finite() and line.weight.global_position.is_finite()
+	var moved: float = player_body.global_position.distance_to(start)
+	Engine.physics_ticks_per_second = previous
+	world.queue_free()
+	await process_frame
+	return {"moved": moved, "finite": finite}
