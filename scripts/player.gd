@@ -422,15 +422,15 @@ func _build_viewmodel() -> void:
 	camera.add_child(rod_model)
 	var grip := _box(rod_model, Vector3(0.075, 0.08, 0.4), ROD_GRIP, Color("eadac4"))
 	grip.rotation.x = -0.12
-	_box(rod_model, Vector3(0.08, 0.084, 0.045), Vector3(0.32, -0.27, -0.69), Color("e4aa52"))
-	_box(rod_model, Vector3(0.12, 0.10, 0.15), Vector3(0.32, -0.34, -0.6), Color("0d181c"))
+	_box(rod_model, Vector3(0.08, 0.084, 0.045), Vector3(0.32, -0.27, -0.69), Color("c5a264"))
+	_box(rod_model, Vector3(0.12, 0.10, 0.15), Vector3(0.32, -0.34, -0.6), Color("473c52"))
 	_build_spool()
 	_build_blank()
 	rod_tip = Node3D.new()
 	rod_tip.position = ROD_TIP
 	rod_model.add_child(rod_tip)
-	_box(rod_model, Vector3(0.10, 0.11, 0.2), Vector3(0.33, -0.34, -0.37), Color("765e49"))
-	_box(rod_model, Vector3(0.12, 0.14, 0.38), Vector3(0.34, -0.40, -0.17), Color("344748"))
+	_box(rod_model, Vector3(0.10, 0.11, 0.2), Vector3(0.33, -0.34, -0.37), Color("bd8380"))
+	_box(rod_model, Vector3(0.12, 0.14, 0.38), Vector3(0.34, -0.40, -0.17), Color("819c96"))
 	_build_sidearm()
 
 
@@ -446,12 +446,12 @@ func _build_spool() -> void:
 	drum.height = 0.08
 	drum.radial_segments = 12
 	reel.mesh = drum
-	reel.material_override = _material(Color("cd9951"))
+	reel.material_override = _material(Color("c5a264"))
 	reel.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# The drum's axis is laid along x so it turns about the same axle as the pivot.
 	reel.rotation.z = PI * 0.5
 	_spool.add_child(reel)
-	_box(_spool, Vector3(0.09, 0.014, 0.014), Vector3(0.0, SPOOL_RADIUS, 0.0), Color("3b2a1c"))
+	_box(_spool, Vector3(0.09, 0.014, 0.014), Vector3(0.0, SPOOL_RADIUS, 0.0), Color("473c52"))
 
 
 ## The blank is one tapered tube rebuilt each frame (one surface, one draw call). The guides are a
@@ -459,7 +459,8 @@ func _build_spool() -> void:
 func _build_blank() -> void:
 	_blank_material = StandardMaterial3D.new()
 	_blank_material.albedo_color = Color("b7a0b9")
-	_blank_material.roughness = 0.45
+	_blank_material.albedo_texture = preload("res://assets/dreamscape/porcelain.png")
+	_blank_material.roughness = 0.35
 	# The tube is open at both ends and seen from inside at the butt, so draw both faces.
 	_blank_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_blank_mesh = ImmediateMesh.new()
@@ -474,7 +475,7 @@ func _build_blank() -> void:
 	_guides = guide_set
 	var guide_view := MultiMeshInstance3D.new()
 	guide_view.multimesh = _guides
-	guide_view.material_override = _material(Color("8fa19c"))
+	guide_view.material_override = _material(Color("c5a264"))
 	guide_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	rod_model.add_child(guide_view)
 
@@ -486,16 +487,16 @@ func _build_sidearm() -> void:
 	camera.add_child(gun_model)
 	_box(gun_model, Vector3(0.085, 0.085, 0.34), Vector3(0.27, -0.25, -0.5), Color("705b78"))
 	_box(gun_model, Vector3(0.078, 0.05, 0.38), Vector3(0.27, -0.19, -0.52), Color("eadac4"))
-	_box(gun_model, Vector3(0.04, 0.04, 0.06), Vector3(0.27, -0.205, -0.80), Color("1a262b"))
-	_box(gun_model, Vector3(0.012, 0.02, 0.02), Vector3(0.27, -0.15, -0.72), Color("e3b369"))
-	_box(gun_model, Vector3(0.04, 0.02, 0.03), Vector3(0.27, -0.15, -0.36), Color("253139"))
-	var grip := _box(gun_model, Vector3(0.07, 0.17, 0.09), Vector3(0.27, -0.33, -0.44), Color("111d22"))
+	_box(gun_model, Vector3(0.04, 0.04, 0.06), Vector3(0.27, -0.205, -0.80), Color("2f2638"))
+	_box(gun_model, Vector3(0.012, 0.02, 0.02), Vector3(0.27, -0.15, -0.72), Color("c5a264"))
+	_box(gun_model, Vector3(0.04, 0.02, 0.03), Vector3(0.27, -0.15, -0.36), Color("473c52"))
+	var grip := _box(gun_model, Vector3(0.07, 0.17, 0.09), Vector3(0.27, -0.33, -0.44), Color("819c96"))
 	grip.rotation.x = -0.12
-	_box(gun_model, Vector3(0.02, 0.05, 0.11), Vector3(0.27, -0.27, -0.46), Color("253139"))
-	_box(gun_model, Vector3(0.06, 0.02, 0.085), Vector3(0.27, -0.42, -0.44), Color("697a76"))
-	_box(gun_model, Vector3(0.10, 0.12, 0.17), Vector3(0.27, -0.35, -0.42), Color("765e49"))
-	_box(gun_model, Vector3(0.13, 0.14, 0.28), Vector3(0.28, -0.41, -0.22), Color("344748"))
-	muzzle = _box(gun_model, Vector3(0.12, 0.10, 0.10), Vector3(0.27, -0.205, -0.86), Color("ffc46a"))
+	_box(gun_model, Vector3(0.02, 0.05, 0.11), Vector3(0.27, -0.27, -0.46), Color("473c52"))
+	_box(gun_model, Vector3(0.06, 0.02, 0.085), Vector3(0.27, -0.42, -0.44), Color("d6c9b0"))
+	_box(gun_model, Vector3(0.10, 0.12, 0.17), Vector3(0.27, -0.35, -0.42), Color("bd8380"))
+	_box(gun_model, Vector3(0.13, 0.14, 0.28), Vector3(0.28, -0.41, -0.22), Color("819c96"))
+	muzzle = _box(gun_model, Vector3(0.12, 0.10, 0.10), Vector3(0.27, -0.205, -0.86), Color("e9a86a"))
 	muzzle.material_override = _material(Color("ffdc92"), true)
 	muzzle.visible = false
 	gun_model.visible = false
@@ -595,23 +596,34 @@ func _ring(fraction: float) -> PackedVector3Array:
 	return ring
 
 
-## Rebuilds the tapered tube from the butt to the tip as quads split into triangles.
+## Rebuilds the tapered tube from the butt to the tip as quads split into triangles. Immediate
+## surfaces carry no normals unless set, so each vertex gets the radial direction from its ring centre.
 func _rebuild_blank() -> void:
 	_blank_mesh.clear_surfaces()
 	_blank_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES, _blank_material)
 	var previous: PackedVector3Array = _ring(0.0)
+	var previous_centre: Vector3 = _blank_point(0.0)
 	for segment in range(1, BLANK_SEGMENTS + 1):
-		var current: PackedVector3Array = _ring(float(segment) / float(BLANK_SEGMENTS))
+		var fraction: float = float(segment) / float(BLANK_SEGMENTS)
+		var current: PackedVector3Array = _ring(fraction)
+		var current_centre: Vector3 = _blank_point(fraction)
 		for side in range(BLANK_SIDES):
 			var next_side: int = (side + 1) % BLANK_SIDES
-			_blank_mesh.surface_add_vertex(previous[side])
-			_blank_mesh.surface_add_vertex(current[side])
-			_blank_mesh.surface_add_vertex(current[next_side])
-			_blank_mesh.surface_add_vertex(previous[side])
-			_blank_mesh.surface_add_vertex(current[next_side])
-			_blank_mesh.surface_add_vertex(previous[next_side])
+			_emit_blank_vertex(previous[side], previous_centre)
+			_emit_blank_vertex(current[side], current_centre)
+			_emit_blank_vertex(current[next_side], current_centre)
+			_emit_blank_vertex(previous[side], previous_centre)
+			_emit_blank_vertex(current[next_side], current_centre)
+			_emit_blank_vertex(previous[next_side], previous_centre)
 		previous = current
+		previous_centre = current_centre
 	_blank_mesh.surface_end()
+
+
+## One blank vertex with its outward normal (from the ring centre) so the porcelain catches the light.
+func _emit_blank_vertex(point: Vector3, centre: Vector3) -> void:
+	_blank_mesh.surface_set_normal((point - centre).normalized())
+	_blank_mesh.surface_add_vertex(point)
 
 
 ## Each guide is the shared torus, laid across the blank at its fraction and sized to the blank there.
