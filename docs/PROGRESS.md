@@ -216,6 +216,24 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
 - Deviations: BUY is a disabled Button inside a focusable card, because a disabled Button cannot take focus. Records rows and achievement tiles are focusable for grid navigation.
 - Follow-ups: workshop descriptions and some blurbs truncate at 720p. F6 should cover locked-never-emits and the BUY states. Gamepad navigation is not driven by real input yet.
 
+## 2026-11-03: F9 navigation + level validation
+
+- Model: claude-haiku-5-5 (sub-agent), reviewed by lead.
+- Changed: `scripts/level_base.gd` (navigation only: `bake_navigation(synchronous = true)` bakes a NavigationRegion3D from layer-1 static colliders with the §4.11 agent values; the threaded path sets `navigation_ready`; `get_nav_path` over the region's map), `tests/levels_test.gd` (new).
+- Contract: §4.11 default changed to `synchronous: bool = true` to match the card.
+- Tests: levels_test 65 checks, 0 failures (l01 and range; 9 unbuilt levels skipped). l01 route 287 m, bake 49 ms, 12300 triangles. range route 147 m, bake 36 ms. Gate: QUALITY GATE PASSED.
+- Deviations: the map and region use `use_async_iterations = false`, so a sync bake is queryable on return. Godot rounds radius 0.4 to 0.5 and climb 0.25 to 0.2 (one WARNING per bake); the contract values are kept. Draw calls read 0 headless.
+- Follow-ups: the navmesh sits about 0.4 m above floor points, so check it before AI uses path heights. Par mismatch: the route-based suggestion for l01 is 42/25 s, against INFO 150/95 s. This is a design call for C10. `build()` does not clear the old navmesh, so F10's switch-over should call `bake_navigation` after each build.
+
+## 2026-11-03: F6 UI test suite
+
+- Model: claude-haiku-5-5 (sub-agent), reviewed by lead.
+- Changed: `tests/ui_test.gd` (new). No UI files changed.
+- Covers: focus on open for every screen, ui_cancel and BACK, button signals, settings value types, the workshop BUY states, locked levels never emitting, layouts at 1280x720, 1280x800, 960x720, 800x450 and 2400x1080, title and settings overlap, toast focus.
+- Tests: ui_test 211 checks, 0 failures, no script errors. Gate: QUALITY GATE PASSED (43 scripts, 8 suites). Uses `user://test_f6.cfg` and never saves.
+- Deviations: loading has no focusable control, so its check asserts that nothing takes focus. Layouts use the shipped expand stretch, so 800x450 lays out at 1280x720.
+- Follow-ups: with stretch disabled, several views overflow at raw 960x720 and 800x450 (records, result, result_lost, title, workshop, pause). This is latent, but any stretch change will expose it.
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>
