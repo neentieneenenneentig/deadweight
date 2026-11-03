@@ -116,10 +116,10 @@ func _test_upgrades() -> void:
 	_eq(damaged["reel_force"], 14000.0, "negative tier clamps to 0")
 	_eq(damaged["weight_mass"], 130.0, "non-numeric tier counts as 0")
 	_eq(damaged["max_health"], 140.0, "float tier is accepted")
-	_eq(Upgrades.COSTS, [40, 90, 160, 250], "tier costs")
+	_eq(Upgrades.COSTS, [30, 55, 85, 120], "tier costs")
 	_eq(Upgrades.max_tier(), 4, "max tier")
 	_eq(Upgrades.ORDER.size(), 6, "six tracks")
-	_eq(Upgrades.total_cost(), 540 * 6, "cost to max everything")
+	_eq(Upgrades.total_cost(), 290 * 6, "cost to max everything")
 	_eq(Upgrades.describe("spool", 1), "48 M LINE", "describe spool")
 	_eq(Upgrades.describe("reel", 0), "14 KN / 9 M/S", "describe reel stock")
 	_eq(Upgrades.describe("reel", 2), "18.5 KN / 12 M/S", "describe reel tier 2")
@@ -380,14 +380,14 @@ func _write_text(file_path: String, text: String) -> void:
 
 func _test_purchases() -> void:
 	var profile: RefCounted = _fresh()
-	_eq(profile.upgrade_cost("spool"), 40, "first tier costs 40")
-	profile.bank = 39
-	_expect(not profile.can_purchase("spool"), "39 salvage cannot buy a 40 upgrade")
+	_eq(profile.upgrade_cost("spool"), 30, "first tier costs 30")
+	profile.bank = 29
+	_expect(not profile.can_purchase("spool"), "29 salvage cannot buy a 30 upgrade")
 	_expect(not profile.purchase("spool"), "purchase fails when short")
-	_eq(profile.bank, 39, "failed purchase keeps the bank")
+	_eq(profile.bank, 29, "failed purchase keeps the bank")
 	_eq(profile.upgrade_tier("spool"), 0, "failed purchase keeps the tier")
-	profile.bank = 40 + 90 + 160 + 250 + 7
-	var expected_costs: Array[int] = [40, 90, 160, 250]
+	profile.bank = 30 + 55 + 85 + 120 + 7
+	var expected_costs: Array[int] = [30, 55, 85, 120]
 	for tier in range(4):
 		_eq(profile.upgrade_cost("spool"), expected_costs[tier], "cost of tier %d" % (tier + 1))
 		_expect(profile.purchase("spool"), "buy tier %d" % (tier + 1))

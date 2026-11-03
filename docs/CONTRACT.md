@@ -117,7 +117,7 @@ func unlock_achievement(id: String) -> bool             # true only when newly u
 
 ```
 const ORDER := ["spool", "reel", "weight", "plating", "quickdraw", "sidearm"]
-const COSTS := [40, 90, 160, 250]
+const COSTS := [30, 55, 85, 120]
 const DEFS := {
   "spool": {"title": "SPOOL", "desc": String, "stat_label": String, "values": [...5 entries]},
   ...                                   # values per tier 0..4, see DESIGN upgrades table

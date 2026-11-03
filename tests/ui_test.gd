@@ -22,15 +22,15 @@ const EDGE_TOLERANCE := 0.5
 const OVERLAP_TOLERANCE := 1.0
 const FOCUS_FRAMES := 3
 const SETTLE_FRAMES := 30
-## Expected BUY button of each track with the progress profile (bank 245): [disabled, text].
-## Tiers: spool 2, reel 1, weight 4 (maxed), quickdraw 3 (250 needed), plating and sidearm 0.
+## Expected BUY button of each track with the progress profile (bank 115): [disabled, text].
+## Tiers: spool 2, reel 1, weight 4 (maxed), quickdraw 3 (120 needed), plating and sidearm 0.
 const WORKSHOP_STATES := {
-	"spool": [false, "BUY  160"],
-	"reel": [false, "BUY  90"],
+	"spool": [false, "BUY  85"],
+	"reel": [false, "BUY  55"],
 	"weight": [true, "MAXED"],
-	"plating": [false, "BUY  40"],
+	"plating": [false, "BUY  30"],
 	"quickdraw": [true, "NEED 5 MORE"],
-	"sidearm": [false, "BUY  40"],
+	"sidearm": [false, "BUY  30"],
 }
 
 var _checks: int = 0
@@ -181,10 +181,10 @@ func _fresh_profile() -> ProfileScript:
 	return profile
 
 
-## A mixed-progress profile: l01 cleared, spool/reel/weight/quickdraw upgraded, 245 salvage banked.
+## A mixed-progress profile: l01 cleared, spool/reel/weight/quickdraw upgraded, 115 salvage banked.
 func _progress_profile() -> ProfileScript:
 	var profile: ProfileScript = _fresh_profile()
-	profile.bank = 245
+	profile.bank = 115
 	profile.lifetime_salvage = 610
 	profile.tutorial_done = true
 	profile.levels["l01"] = {"completed": true, "best_time": 118.4, "medal": 2, "bonus_found": [0], "attempts": 5, "extractions": 3}
@@ -560,10 +560,10 @@ func _test_workshop() -> void:
 	_profile.bank = 0
 	_ui.refresh()
 	var plating: Button = entries["plating"]["buy"]
-	_check(plating.disabled and plating.text == "NEED 40 MORE", "workshop, bank 0: plating says NEED 40 MORE")
+	_check(plating.disabled and plating.text == "NEED 30 MORE", "workshop, bank 0: plating says NEED 30 MORE")
 	var spool: Button = entries["spool"]["buy"]
-	_check(spool.disabled and spool.text == "NEED 160 MORE", "workshop, bank 0: spool says NEED 160 MORE")
-	_profile.bank = 245
+	_check(spool.disabled and spool.text == "NEED 85 MORE", "workshop, bank 0: spool says NEED 85 MORE")
+	_profile.bank = 115
 	_ui.refresh()
 	# An unaffordable card is denied, never sent to main.
 	_clear_emits()
@@ -588,7 +588,7 @@ func _test_workshop() -> void:
 	await _frames(2)
 	_stand_in_main = false
 	_check(_last_args("upgrade_requested") == ["plating"] and _profile.upgrade_tier("plating") == 1, "workshop: an affordable track is bought through upgrade_requested")
-	_check(_profile.bank == 205, "workshop: the purchase spends 40 salvage")
+	_check(_profile.bank == 85, "workshop: the purchase spends 30 salvage")
 	status = workshop.get("_status")
 	_check("RAISED TO TIER 1" in status.text, "workshop: purchase feedback names the new tier")
 

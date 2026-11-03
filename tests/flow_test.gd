@@ -253,16 +253,16 @@ func _test_failed_run_and_retry() -> void:
 func _test_menus_and_settings() -> void:
 	var profile: RefCounted = _main.profile
 	# Workshop purchases.
-	profile.bank = 100
+	profile.bank = 80
 	_main.ui.upgrade_requested.emit("spool")
 	await _frames(2)
-	_check(profile.upgrade_tier("spool") == 1 and profile.bank == 60, "buying an upgrade spends the bank")
+	_check(profile.upgrade_tier("spool") == 1 and profile.bank == 50, "buying an upgrade spends the bank")
 	_main.ui.upgrade_requested.emit("spool")
 	await _frames(2)
-	_check(profile.upgrade_tier("spool") == 1 and profile.bank == 60, "an unaffordable upgrade changes nothing")
+	_check(profile.upgrade_tier("spool") == 1 and profile.bank == 50, "an unaffordable upgrade changes nothing")
 	var reloaded: RefCounted = ProfileScript.new()
 	reloaded.load_profile(PATH)
-	_check(reloaded.upgrade_tier("spool") == 1 and reloaded.bank == 60, "a purchase is saved immediately")
+	_check(reloaded.upgrade_tier("spool") == 1 and reloaded.bank == 50, "a purchase is saved immediately")
 	# Settings apply live and save after a short delay.
 	_main.ui.setting_changed.emit("invert_y", true)
 	_main.ui.setting_changed.emit("look_sensitivity", 2.0)

@@ -4,7 +4,7 @@ extends RefCounted
 ## Tier 0 is the stock rig; tiers 1..4 are bought in order for COSTS[tier].
 
 const ORDER := ["spool", "reel", "weight", "plating", "quickdraw", "sidearm"]
-const COSTS := [40, 90, 160, 250]
+const COSTS := [30, 55, 85, 120]
 ## Cast assist force per kilogram of sinker: heavier weights keep the same launch feel.
 const ASSIST_PER_KG := 100.0
 

@@ -53,7 +53,7 @@ no ads, no data collection.
 
 - Required case 15 salvage, bonus cache 30, paid on every successful extraction.
 - First-time medal bonuses per level: bronze 10, silver 25, gold 50 (each paid once).
-- Upgrade tier costs: 40, 90, 160, 250. Six tracks × four tiers.
+- Upgrade tier costs: 30, 55, 85, 120 (C10: all tracks maxed ≈ two first campaign clears). Six tracks × four tiers.
 
 ## Upgrades (tier 0 = stock)
 
