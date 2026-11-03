@@ -152,6 +152,7 @@ var _updrafts: Array[Dictionary] = []                # volume records with "stre
 var _hint_zones: Array[Dictionary] = []              # {box, text, duration, fired}
 var _light_count: int = 0
 var _zap_time: float = -10.0                         # clock time of the last hazard_zap
+var _in_water: bool = false                          # inside a deep-water volume; the splash plays on entry (A4)
 var _nav_region: NavigationRegion3D                  # holds the level's navmesh; child of the level
 var _pending_nav_mesh: NavigationMesh                # threaded bake in flight, applied when it ends
 
@@ -199,6 +200,7 @@ func _reset_build_state() -> void:
 	_light_count = 0
 	_label_count = 0
 	_has_extraction = false
+	_in_water = false
 	if is_instance_valid(_stage):
 		_stage.free()
 	_stage = Node3D.new()
@@ -811,6 +813,7 @@ func hazard_damage_at(position: Vector3, delta: float) -> float:
 func _update_features(delta: float) -> void:
 	_apply_updrafts()
 	_apply_hazards(delta)
+	_track_water_entry()
 	_check_hint_zones()
 
 
@@ -853,6 +856,23 @@ func _zap_hazard() -> void:
 	var audio: Node = get_tree().get_first_node_in_group("game_audio")
 	if is_instance_valid(audio) and audio.has_method("play"):
 		audio.call("play", "hazard_zap")
+
+
+## Plays the splash once when the player enters a deep-water volume, not on every frame inside it (A4).
+func _track_water_entry() -> void:
+	if not is_instance_valid(_player):
+		return
+	var local: Vector3 = to_local(_player.global_position)
+	var inside: bool = false
+	for record: Dictionary in _hazards:
+		if str(record["kind"]) == "water" and (record["box"] as AABB).has_point(local):
+			inside = true
+			break
+	if inside and not _in_water:
+		var audio: Node = get_tree().get_first_node_in_group("game_audio")
+		if is_instance_valid(audio) and audio.has_method("play"):
+			audio.call("play", "splash")
+	_in_water = inside
 
 
 ## Each hint zone asks for its hint once per build, the first time the player enters it.

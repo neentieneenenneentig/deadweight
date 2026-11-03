@@ -702,6 +702,9 @@ func _tick_sentry(delta: float) -> void:
 			# Idle: the head sweeps slowly from side to side.
 			_turret.rotation.y = sin(_clock * 0.4) * 0.8
 		return
+	# The wind-up starts from zero: one charge cue per shot, not one per tick (A4).
+	if _aim_time <= 0.0:
+		_play("sentry_charge")
 	_aim_time += delta
 	var origin: Vector3 = global_position + Vector3(0, 1.68, 0)
 	# The last fraction of the wind-up commits the aim: a dodge can evade the shot.
@@ -723,6 +726,7 @@ func _tick_sentry(delta: float) -> void:
 			end = hit["position"]
 			if hit["collider"] == target:
 				target.call("take_damage", 16.0 * damage_scale, kind, global_position)
+		_play("sentry_shot")
 		fired.emit(origin, end)
 
 

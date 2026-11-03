@@ -38,6 +38,11 @@ const STICK_LOOK_SPEED: float = 3.0
 const STICK_CURVE: float = 1.6
 ## Analog input beyond this counts as the pad being used (smaller values are stick drift).
 const DEVICE_SWITCH_STRENGTH: float = 0.4
+## Landing cues (A4): a touchdown under LAND_MIN_SPEED is a step and stays silent; at or above
+## LAND_HARD_SPEED it plays land_hard. A checkpoint cue needs the player to move this far from the last cue.
+const LAND_MIN_SPEED: float = 2.0
+const LAND_HARD_SPEED: float = 10.0
+const CHECKPOINT_CUE_METRES: float = 15.0
 
 ## Command-line user arguments (CONTRACT 4.7). Tests set this before adding the node to the tree;
 ## when empty the real arguments after "--" are used.
@@ -90,6 +95,8 @@ var _attract_time: float = 0.0
 var _checkpoint: Vector3 = Vector3.ZERO
 var _checkpoint_yaw: float = 0.0
 var _checkpoint_timer: float = 0.0
+## Where the last checkpoint cue played (A4). The checkpoint itself is silent and rolls every 0.5 s.
+var _checkpoint_cue: Vector3 = Vector3.ZERO
 var _device: String = "kbm"
 ## The hint as it was given, with {tokens}, so a device switch can expand it again.
 var _hint_raw: String = ""
@@ -132,6 +139,8 @@ func _build_nodes() -> void:
 	add_child(player)
 	player.damaged.connect(_on_damage)
 	player.died.connect(_on_player_died)
+	player.landed.connect(_on_player_landed)
+	player.footstep.connect(_on_player_footstep)
 	tether = TetherScript.new()
 	tether.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(tether)
@@ -298,10 +307,7 @@ func _build_level(id: String, practice_mode: bool) -> void:
 	add_child(level)
 	move_child(level, 0)
 	level.loot_collected.connect(_on_loot)
-	level.extraction_changed.connect(func(inside: bool) -> void:
-		extraction_inside = inside
-		if not inside:
-			extraction_time = 0.0)
+	level.extraction_changed.connect(_on_extraction_changed)
 	level.threat_changed.connect(func(message: String) -> void:
 		if state == "playing":
 			set_hint(message, 2.5))
@@ -328,6 +334,7 @@ func _begin_play() -> void:
 	player.apply_look(Vector2.ZERO)
 	_checkpoint = level.get("spawn_position")
 	_checkpoint_yaw = float(level.get("spawn_yaw"))
+	_checkpoint_cue = _checkpoint
 	_checkpoint_timer = CHECKPOINT_SECONDS
 	player.active = true
 	tether.active = true
@@ -532,7 +539,9 @@ func _process(delta: float) -> void:
 			"bonus": (level.get("collected_bonus") as Array).size(),
 			"total_bonus": int(level.get("total_bonus")),
 			"extraction_ready": cases >= total,
-			"airborne": not player.grounded
+			"airborne": not player.grounded,
+			# A tracking, non-dummy enemy sets the alert (CONTRACT 5.9); threat_level is 0 when none track.
+			"alert": float(level.call("threat_level")) > 0.0
 		})
 		# Objective markers (G7): uncollected cases and bonuses, plus the extraction gate (CONTRACT 5.8).
 		hud.set_objectives(level.call("get_objectives"))
@@ -564,7 +573,11 @@ func _physics_process(delta: float) -> void:
 			ammo += loaded
 			reserve -= loaded
 	if extraction_inside and int(level.get("collected_loot")) >= int(level.get("total_loot")):
+		var seconds_before: int = int(extraction_time)
 		extraction_time += delta
+		# One tick per whole second of the hold; the last second before completion is the final tick.
+		if int(extraction_time) > seconds_before and extraction_time < EXTRACTION_SECONDS:
+			_sfx("extract_tick")
 		if extraction_time >= EXTRACTION_SECONDS:
 			if bool((level.get("info") as Dictionary).get("repeatable", false)):
 				_extract_repeatable()
@@ -637,6 +650,10 @@ func _track_checkpoint(delta: float) -> void:
 	if player.grounded and player.global_position.y > float(level.get("kill_y")) + 2.0:
 		_checkpoint = player.global_position
 		_checkpoint_yaw = player.yaw
+		# The cue marks new ground, not each half-second refresh: it plays once the player has moved on.
+		if _checkpoint.distance_to(_checkpoint_cue) >= CHECKPOINT_CUE_METRES:
+			_checkpoint_cue = _checkpoint
+			_sfx("checkpoint")
 
 
 ## A fall below kill_y cuts the line and returns the player to the last safe ground.
@@ -746,6 +763,7 @@ func _action(action: String, pressed: bool) -> void:
 				tether.charging = false
 				tether.charge = 0.0
 				weapon = "SIDEARM" if weapon == "ROD" else "ROD"
+				_sfx("switch")
 		"reload":
 			if pressed and ammo < magazine_size() and reserve > 0 and _reload_time <= 0.0:
 				_reload_time = 1.5
@@ -847,6 +865,9 @@ func _on_loot(kind: String, _value: int) -> void:
 	if state != "playing":
 		return
 	_sfx("loot")
+	# The last case turns the extraction gate on.
+	if kind == "case" and int(level.get("collected_loot")) >= int(level.get("total_loot")):
+		_sfx("extract_ready")
 	if kind == "case":
 		set_hint("CASE SECURED  /  %d OF %d  /  extraction banks your haul" % [int(level.get("collected_loot")), int(level.get("total_loot"))], 3.0)
 	else:
@@ -864,13 +885,37 @@ func _on_damage(amount: float, _source: String, _from_position: Vector3) -> void
 
 
 func _on_player_died(_source: String) -> void:
+	if state == "playing":
+		_sfx("death")
 	_finish(false, _death_cause())
+
+
+## Landing and footstep cues come from the player's signals (A4). Only a live raid makes sound.
+func _on_player_landed(impact_speed: float) -> void:
+	if state != "playing" or impact_speed < LAND_MIN_SPEED:
+		return
+	_sfx("land_hard" if impact_speed >= LAND_HARD_SPEED else "land")
+
+
+func _on_player_footstep() -> void:
+	if state == "playing":
+		_sfx("footstep")
+
+
+## Leaving the pad mid-hold breaks the extraction (A4). The pad clears the hold progress either way.
+func _on_extraction_changed(inside: bool) -> void:
+	if not inside and extraction_time > 0.0 and state == "playing":
+		_sfx("extract_break")
+	extraction_inside = inside
+	if not inside:
+		extraction_time = 0.0
 
 
 func _on_enemy_killed(kind: String, by: String) -> void:
 	# Training dummies refill and respawn; they never count as kills or earn achievements.
 	if kind == "dummy":
 		return
+	_sfx("kill")
 	run_stats["kills"] = int(run_stats["kills"]) + 1
 	if by in ["smash", "weight"]:
 		run_stats["smash_kills"] = int(run_stats["smash_kills"]) + 1

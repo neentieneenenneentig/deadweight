@@ -257,7 +257,8 @@ func _air_control(state: PhysicsDirectBodyState3D, wish: Vector3, step: float) -
 
 func _count_footsteps(state: PhysicsDirectBodyState3D) -> void:
 	var ground_speed: float = Vector2(state.linear_velocity.x, state.linear_velocity.z).length()
-	if ground_speed < 0.5:
+	# Steps need move input: coasting or sliding on momentum with no input makes no footstep sound (A4).
+	if ground_speed < 0.5 or move_input.length() <= 0.05:
 		return
 	_step_distance += ground_speed * state.step
 	if _step_distance >= STEP_DISTANCE:
