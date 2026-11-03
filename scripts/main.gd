@@ -100,6 +100,11 @@ var _checkpoint_cue: Vector3 = Vector3.ZERO
 var _device: String = "kbm"
 ## The hint as it was given, with {tokens}, so a device switch can expand it again.
 var _hint_raw: String = ""
+## --fps overlay (Q1a): a corner readout plus one stdout sample per second for tools/perf.ps1.
+var _fps_on: bool = false
+var _fps_label: Label
+var _fps_frame_ms: PackedFloat32Array = PackedFloat32Array()
+var _fps_clock: float = 0.0
 
 
 func _ready() -> void:
@@ -113,6 +118,8 @@ func _ready() -> void:
 	if "--touch" in _args:
 		Input.emulate_touch_from_mouse = true
 	_apply_settings()
+	if "--fps" in _args:
+		_build_fps_overlay()
 	_catch_up_achievements()
 	var cam_text: String = _arg_value("--cam=", "")
 	if not cam_text.is_empty():
@@ -498,6 +505,8 @@ func _build_result(won: bool, cause: String) -> Dictionary:
 # --- Per-frame ---------------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	if _fps_on:
+		_update_fps_overlay(delta)
 	if not is_instance_valid(hud):
 		return
 	if state == "title" or state == "menu":
@@ -1127,6 +1136,53 @@ func _register_inputs() -> void:
 		var event := InputEventMouseButton.new()
 		event.button_index = MOUSE_BUTTON_LEFT if action_name == "cast" else MOUSE_BUTTON_RIGHT
 		InputMap.action_add_event(action_name, event)
+
+
+# --- FPS overlay (--fps) -----------------------------------------------------------------------
+# Top-right readout for desktop measurement. Once per second it also prints one line that
+# tools/perf.ps1 parses: FPS_SAMPLE fps=<frames/s> ms=<mean frame ms> ms99=<99th percentile frame ms>
+# draws=<draw calls in the last frame> setup=<CPU frame setup ms>. Nothing is shown or printed without --fps.
+
+func _build_fps_overlay() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 128
+	add_child(layer)
+	var root := Control.new()
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(root)
+	_fps_label = Label.new()
+	_fps_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_fps_label.offset_left = -360.0
+	_fps_label.offset_right = -8.0
+	_fps_label.offset_top = 8.0
+	_fps_label.offset_bottom = 30.0
+	_fps_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fps_label.text = "FPS --"
+	root.add_child(_fps_label)
+	_fps_on = true
+
+
+## Collects frame times every frame; once a second it updates the readout and prints a sample.
+func _update_fps_overlay(delta: float) -> void:
+	_fps_frame_ms.append(delta * 1000.0)
+	_fps_clock += delta
+	if _fps_clock < 1.0:
+		return
+	var frames: int = _fps_frame_ms.size()
+	var ordered: PackedFloat32Array = _fps_frame_ms.duplicate()
+	ordered.sort()
+	var p99: float = ordered[clampi(ceili(frames * 0.99) - 1, 0, frames - 1)]
+	var fps: float = frames / _fps_clock
+	var mean_ms: float = _fps_clock * 1000.0 / frames
+	var draws: int = int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
+	# Frame setup is CPU render prep. It keeps scaling with scene cost even when vsync pins fps.
+	var setup_ms: float = RenderingServer.get_frame_setup_time_cpu()
+	_fps_label.text = "%d FPS  %.1f ms (p99 %.1f)  %d draws" % [roundi(fps), mean_ms, p99, draws]
+	print("FPS_SAMPLE fps=%.1f ms=%.2f ms99=%.2f draws=%d setup=%.2f" % [fps, mean_ms, p99, draws, setup_ms])
+	_fps_frame_ms.clear()
+	_fps_clock = 0.0
 
 
 # --- Captures ----------------------------------------------------------------------------------
