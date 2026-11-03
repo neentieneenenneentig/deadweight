@@ -380,6 +380,43 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   - Forward+ spawn views of l02 and l03 are over 160 draw calls; §7 budgets Compatibility.
 - Gate: QUALITY GATE PASSED (56 scripts, 10 suites).
 
+## 2026-11-03: A4 audio routing, C5 l05 CRANE YARD, C6 l06 CRUCIBLE; v1.0 campaign content complete
+
+- Model: Haiku 5.5 executors (three in parallel), lead Opus 5.5.
+- A4 (`main.gd`, `player.gd`, `enemy.gd`, `level_base.gd`, `tests/audio_test.gd`):
+  - `land` / `land_hard` play by impact speed (silent under 2 m/s, hard from 10 m/s).
+  - `footstep` needs move input, so coasting makes no steps.
+  - `death`, `kill` (not dummies) and `switch` are routed.
+  - `extract_ready` plays on the last case, `extract_tick` once per second of the hold, and `extract_break` on leaving mid-hold.
+  - `checkpoint` plays at most once per 15 m of new ground.
+  - `sentry_charge` and `sentry_shot` are positional.
+  - `splash` plays once on entering deep water.
+  - The HUD `alert` key is true while threat_level > 0.
+  - audio_test spies on game_audio: 92 checks.
+  - Open: the thresholds and spacing are guesses. Headless runs are silent, so playtest by ear.
+- Lead: the "LINE SEVERED" hint now names too many bends, matching G3's wrap rule.
+- C5 (`scripts/levels/l05_crane_yard.gd`):
+  - three gantry cranes with two anchor plates under each arm, 15 m over the lane, so swinging arm to arm is the fast route;
+  - container stacks in two columns with alleys, 4 on-foot cases (one on a loading dock) and 2 rod-only caches (arm nest, stack lid);
+  - 3 hounds and 2 drones, cut from six enemies for the draw-call budget.
+  - levels_test 36/0; route 220 m; par 30/20 s.
+  - Spawn draw calls: Compatibility 154, Forward+ 174.
+  - The spawn is about 39 m from the first arm anchor, just inside the 40 m rule. The look is pale for "night"; a 5th amber light is possible.
+- C6 (`scripts/levels/l06_crucible.gd`):
+  - a round furnace hall with a solid porcelain teapot in a 13 m heat pool;
+  - catwalk rings at 4.5 m and 9 m on three ramps;
+  - a ceiling ring at 17 m and radial beams, carrying 4 + 2 anchors;
+  - 5 on-foot cases, and 2 rod-only caches on beam nests at 15 m (nothing walkable is above 9 m);
+  - 2 sentries and 1 drone, with no hounds because of the draw-call budget.
+  - levels_test 38/0; route 308 m; par 45/25 s.
+  - Spawn draw calls: Compatibility 150, Forward+ 138.
+  - Builder note: ramps must finish on a slab's outer edge, not inside it, or the nav path stops short.
+- Open:
+  - The navmesh ignores hazards, so heat-pool routes may cut through them and the route length is optimistic.
+  - levels_test does not assert that bonus caches are off-foot.
+  - At Compatibility spawn, enemies cost about 11–17 draw calls each and pickups about 9. Consider pickup and enemy shadow settings in Q1.
+- Gate: QUALITY GATE PASSED (58 scripts, 10 suites). All six v1.0 campaign levels plus the tutorial and the range now exist.
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>

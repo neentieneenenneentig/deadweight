@@ -51,13 +51,13 @@ owner = needs the human (devices, accounts).
 | A1 | Sound effects synthesis | — | L | A | shell | MUST | done (2026-11-03) |
 | A2 | Audio engine v2 | A1, F11 | M | B | shell | MUST | done (2026-11-03) |
 | A3 | Music (adaptive layers; MVP fallback allowed) | A2 | L | A | shell | MUST | done, MVP (2026-11-03) |
-| A4 | Audio event routing + HUD alert | A2, E3 | S | B | shell | MUST | todo |
+| A4 | Audio event routing + HUD alert | A2, E3 | S | B | shell | MUST | done 2026-11-03 |
 | C1 | Tutorial: INDUCTION | F8, F9, F11, G2 | M | A | shell, vision | MUST | done 2026-11-03 |
 | C2 | Level l02 PUMP ROW | F8, F9 | M | A | shell, vision | MUST | done 2026-11-03 |
 | C3 | Level l03 OVERFLOW | F8, F9 | M | A | shell, vision | MUST | done 2026-11-03 |
 | C4 | Level l04 SLAG LINE | F8, F9, E2 | M | A | shell, vision | MUST | done 2026-11-03 |
-| C5 | Level l05 CRANE YARD | F8, F9, E2 | M | A | shell, vision | MUST | todo |
-| C6 | Level l06 CRUCIBLE | F8, F9, E2 | M | A | shell, vision | MUST | todo |
+| C5 | Level l05 CRANE YARD | F8, F9, E2 | M | A | shell, vision | MUST | done 2026-11-03 |
+| C6 | Level l06 CRUCIBLE | F8, F9, E2 | M | A | shell, vision | MUST | done 2026-11-03 |
 | C7 | Level l07 THE STEPS | F8, F9, E2 | M | A | shell, vision | LATER | todo |
 | C8 | Level l08 DAMWALL | F8, F9, E2 | M | A | shell, vision | LATER | todo |
 | C9 | Level l09 HEADWATER | F8, F9, E2 | M | A | shell, vision | LATER | todo |
