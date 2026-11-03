@@ -301,7 +301,7 @@ func get_objectives() -> Array                      # 5.8
 func threat_level() -> float                        # 0..1 for music/HUD
 func is_hazard_at(position: Vector3) -> bool
 func is_safe_ground(position: Vector3) -> bool      # for checkpoints
-func bake_navigation(synchronous: bool = false) -> void
+func bake_navigation(synchronous: bool = true) -> void
 func get_nav_path(from: Vector3, to: Vector3) -> PackedVector3Array
 func _design() -> void                              # override
 ```

@@ -26,7 +26,7 @@ extends Node3D
 ##
 ## Features (task F8): anchor, updraft, hazard, water, hint_zone, light, skyline, perimeter. They
 ## are described in the "Level features" section near the end of this file.
-## Not here yet (task F9): navigation baking.
+## Navigation (task F9): bake_navigation() and get_nav_path(), near the end of this file.
 
 signal loot_collected(kind: String, value: int)    # kind "case" | "bonus"; value = salvage
 signal extraction_changed(inside: bool)
@@ -45,6 +45,13 @@ const MAX_SLOPE_DEGREES := 35.0
 const SHOT_RANGE := 160.0
 const LAYER_WORLD := 1
 const LAYER_WEAPON_TARGETS := 1 | 4 | 8
+# Navmesh settings (CONTRACT 4.11): the agent is a 0.4 m radius, 1.8 m tall capsule.
+const NAV_CELL_SIZE := 0.25                          # metres, horizontal
+const NAV_CELL_HEIGHT := 0.2                         # metres, vertical
+const NAV_AGENT_RADIUS := 0.4
+const NAV_AGENT_HEIGHT := 1.8
+const NAV_MAX_CLIMB := 0.25
+const NAV_MAX_SLOPE := 38.0                          # degrees
 
 const GLOW_KEYS := ["cyan", "amber", "red", "orange", "white"]
 const NO_SHADOW_KEYS := ["cyan", "amber", "red", "orange", "white", "water", "glass"]
@@ -138,6 +145,8 @@ var _updrafts: Array[Dictionary] = []                # volume records with "stre
 var _hint_zones: Array[Dictionary] = []              # {box, text, duration, fired}
 var _light_count: int = 0
 var _zap_time: float = -10.0                         # clock time of the last hazard_zap
+var _nav_region: NavigationRegion3D                  # holds the level's navmesh; child of the level
+var _pending_nav_mesh: NavigationMesh                # threaded bake in flight, applied when it ends
 
 
 # --- Lifecycle ----------------------------------------------------------------------------------
@@ -537,13 +546,82 @@ func is_safe_ground(position: Vector3) -> bool:
 	return normal.y > 0.7 and not is_hazard_at(hit["position"])
 
 
-## Navigation arrives with task F9.
-func bake_navigation(_synchronous: bool = false) -> void:
-	pass
+## Bakes the walking navmesh from every solid collider on layer 1 (the same shapes that stop the
+## player), using the CONTRACT 4.11 agent settings. synchronous = true bakes before returning, so
+## navigation_ready is true on return; false bakes on a worker thread and sets navigation_ready
+## when the new mesh is live. Call after build(); the level must be in the scene tree.
+func bake_navigation(synchronous: bool = true) -> void:
+	navigation_ready = false
+	var mesh: NavigationMesh = _new_navigation_mesh()
+	var geometry := NavigationMeshSourceGeometryData3D.new()
+	# Parsing reads the scene tree, so it always runs here on the main thread; only the bake is threaded.
+	NavigationServer3D.parse_source_geometry_data(mesh, geometry, self)
+	if synchronous:
+		_pending_nav_mesh = null                     # supersedes a threaded bake that is still running
+		NavigationServer3D.bake_from_source_geometry_data(mesh, geometry)
+		_apply_navigation_mesh(mesh)
+	else:
+		_pending_nav_mesh = mesh
+		NavigationServer3D.bake_from_source_geometry_data_async(mesh, geometry, _on_navigation_baked.bind(mesh))
 
 
-func get_nav_path(_from: Vector3, _to: Vector3) -> PackedVector3Array:
-	return PackedVector3Array()
+## Walkable path from from to to on the level's navmesh, as world points (the first point is the
+## start projected onto the mesh, the last is the closest walkable point to to). Empty until
+## navigation_ready is true, or when no path exists.
+func get_nav_path(from: Vector3, to: Vector3) -> PackedVector3Array:
+	if not navigation_ready or not is_instance_valid(_nav_region):
+		return PackedVector3Array()
+	return NavigationServer3D.map_get_path(_nav_region.get_navigation_map(), from, to, true)
+
+
+## Settings for a new level navmesh. Parsing takes static colliders (not mesh instances), so the
+## dressing that has no collision (grid lines, water, skyline, hazard shells) never blocks a path.
+static func _new_navigation_mesh() -> NavigationMesh:
+	var mesh := NavigationMesh.new()
+	mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
+	mesh.geometry_collision_mask = LAYER_WORLD
+	mesh.cell_size = NAV_CELL_SIZE
+	mesh.cell_height = NAV_CELL_HEIGHT
+	mesh.agent_radius = NAV_AGENT_RADIUS
+	mesh.agent_height = NAV_AGENT_HEIGHT
+	mesh.agent_max_climb = NAV_MAX_CLIMB
+	mesh.agent_max_slope = NAV_MAX_SLOPE
+	return mesh
+
+
+## Makes mesh the level's walkable area. Each bake builds a fresh NavigationMesh, so the server never
+## reads a resource that a background bake is still writing.
+func _apply_navigation_mesh(mesh: NavigationMesh) -> void:
+	var region: NavigationRegion3D = _ensure_navigation_region()
+	region.navigation_mesh = mesh
+	NavigationServer3D.map_force_update(region.get_navigation_map())
+	navigation_ready = true
+
+
+## Threaded bake finished: swap in the new mesh (the server calls this on the main thread). A bake
+## that was superseded by a newer request or a synchronous bake is dropped here.
+func _on_navigation_baked(mesh: NavigationMesh) -> void:
+	if mesh != _pending_nav_mesh:
+		return
+	_pending_nav_mesh = null
+	_apply_navigation_mesh(mesh)
+
+
+func _ensure_navigation_region() -> NavigationRegion3D:
+	if is_instance_valid(_nav_region):
+		return _nav_region
+	_nav_region = NavigationRegion3D.new()
+	_nav_region.name = "NavigationRegion"
+	add_child(_nav_region)
+	# Match the level's cell size to the map so the server does not warn about a mismatch.
+	var map: RID = _nav_region.get_navigation_map()
+	NavigationServer3D.map_set_cell_size(map, NAV_CELL_SIZE)
+	NavigationServer3D.map_set_cell_height(map, NAV_CELL_HEIGHT)
+	# By default the server syncs maps on worker threads, a few physics frames late. Syncing on the
+	# calling thread makes map_force_update finish before it returns, so a sync bake is usable at once.
+	NavigationServer3D.map_set_use_async_iterations(map, false)
+	NavigationServer3D.region_set_use_async_iterations(_nav_region.get_rid(), false)
+	return _nav_region
 
 
 ## Shadows, glow and SSAO by quality level (0 low, 1 medium, 2 high).
