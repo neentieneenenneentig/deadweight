@@ -1,7 +1,7 @@
 extends SceneTree
 ## Real-physics integration checks for salvage, extraction, weapon hits, and enemy tells.
 
-const WorldScript = preload("res://scripts/world.gd")
+const Catalog = preload("res://scripts/level_catalog.gd")
 const PlayerScript = preload("res://scripts/player.gd")
 const EnemyScript = preload("res://scripts/enemy.gd")
 
@@ -12,6 +12,8 @@ var _failures: int = 0
 var _checks: int = 0
 var _loot_total: int = 0
 var _loot_events: int = 0
+var _loot_kinds: Array[String] = []
+var _salvage: int = 0
 var _extraction_events: Array[bool] = []
 
 
@@ -27,13 +29,14 @@ func _run() -> void:
 	_player.freeze = true
 	_player.set("active", true)
 	_player.global_position = Vector3(0, 0.92, 14)
-	_world = WorldScript.new()
+	_world = Catalog.create("l01")
 	_scene.add_child(_world)
 	_world.call("build", _player, true)
 	_world.connect("loot_collected", _on_loot)
 	_world.connect("extraction_changed", _on_extraction)
 	await _frames(4)
 	_check(get_nodes_in_group("enemies").is_empty(), "practice has no enemies")
+	await _test_framework()
 	await _test_salvage()
 	await _test_extraction()
 	await _test_weapon_collision()
@@ -44,6 +47,65 @@ func _run() -> void:
 	await _frames(3)
 	print("WORLD TEST: %d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
+
+
+func _test_framework() -> void:
+	_check(Catalog.campaign_ids() == ["l01"], "catalog lists only the campaign levels that exist")
+	_check(Catalog.all_ids().size() == 11 and Catalog.all_ids()[10] == "range", "catalog lists all eleven levels, range last")
+	var details: Dictionary = Catalog.info("l01")
+	_check(details["available"] and details["title"] == "SLUICE GATE" and details["zone"] == "floodworks", "catalog merges the level INFO")
+	_check(not Catalog.info("l02")["available"], "levels without a script are unavailable")
+	_check(Catalog.info("range")["practice"] and not Catalog.info("range")["available"], "the range is known to be practice before it exists")
+	_check(Catalog.info("bogus").is_empty() and Catalog.create("bogus") == null and Catalog.create("l02") == null, "unknown or missing levels give empty info and no instance")
+	_check(Catalog.next_id("l01") == "" and Catalog.next_id("range") == "", "no level follows the last available one")
+	_check(Catalog.zone_ids("floodworks") == ["l01"] and Catalog.zone_ids("foundry").is_empty(), "zone lists hold available levels only")
+	var info: Dictionary = _world.get("info")
+	_check(_world.get("level_id") == "l01" and info["title"] == "SLUICE GATE", "created level knows its id and INFO")
+	_check(int(info["cases"]) == int(_world.get("total_loot")) and int(info["bonus"]) == int(_world.get("total_bonus")), "INFO case and bonus counts match the built level")
+	_check((_world.get("spawn_position") as Vector3).is_equal_approx(Vector3(0, 0.95, 14)), "spawn is floor + 0.95")
+	_check((_world.get("extraction_position") as Vector3).is_equal_approx(Vector3(16, 0, -116)), "extraction position is the pad floor centre")
+	_check(get_nodes_in_group("sun").size() == 1 and get_nodes_in_group("world_env").size() == 1, "sun and world environment are grouped")
+	var statics: int = 0
+	var triangles: int = 0
+	var meshes: int = 0
+	var labels: int = 0
+	var bodies: int = 0
+	var shapes: int = 0
+	for node in _world.find_children("*", "", true, false):
+		if node is MeshInstance3D:
+			meshes += 1
+			if node.name.begins_with("Static_"):
+				statics += 1
+				triangles += (node.mesh as Mesh).get_faces().size() / 3
+		elif node is Label3D:
+			labels += 1
+		elif node is StaticBody3D:
+			bodies += 1
+		elif node is CollisionShape3D:
+			shapes += 1
+	print("LEVEL l01: %d staged primitives merged into %d meshes, %d triangles, %d labels, %d collision shapes" % [int(_world.get("_pending_count")), statics, triangles, labels, shapes])
+	_check(statics >= 6 and statics <= 14, "static geometry merged to one mesh per material")
+	_check(meshes <= 80, "scene holds few mesh instances after merging")
+	_check(triangles <= 250000, "level stays inside the triangle budget")
+	_check(labels <= 60, "level stays inside the Label3D budget")
+	_check(bodies == 1 and shapes > 100, "all solid primitives share one static body")
+	_check(int(_world.get("_pending_count")) > 300, "the prototype's primitives were staged before merging")
+	for quality in [0, 1, 2, 5]:
+		_world.call("apply_quality", quality)
+	var sun: DirectionalLight3D = get_first_node_in_group("sun")
+	_check(int(_world.get("quality")) == 2 and sun.shadow_enabled, "quality clamps and high quality enables shadows")
+	_world.call("apply_quality", 0)
+	_check(not sun.shadow_enabled, "low quality disables sun shadows")
+	_world.call("apply_quality", 2)
+	_check(_world.call("is_safe_ground", Vector3(0, 0, 0)), "open floor is safe ground")
+	_check(not _world.call("is_safe_ground", Vector3(0, -50, 0)), "the void is not safe ground")
+	_check(not _world.call("is_hazard_at", Vector3.ZERO), "no hazards yet")
+	_check(is_zero_approx(float(_world.call("threat_level"))), "no enemies, no threat")
+	var objectives: Array = _world.call("get_objectives")
+	_check(objectives.size() == 6, "objectives list 3 cases, 2 bonus caches and the extraction")
+	var extract_objective: Dictionary = objectives[objectives.size() - 1]
+	_check(extract_objective["kind"] == "extract" and not extract_objective["active"], "extraction objective starts locked")
+	_check(objectives[0]["kind"] == "case" and objectives[3]["kind"] == "bonus", "objectives are cases first, then bonus caches")
 
 
 func _test_salvage() -> void:
@@ -62,6 +124,17 @@ func _test_salvage() -> void:
 	await _move_player(Vector3(-13, 0.9, -91))
 	_check(_loot_total == 3 and _loot_events == 3, "all three physical cache locations are collectible")
 	_check(int(_world.get("total_loot")) == 3, "world objective matches available case count")
+	_check(int(_world.get("collected_loot")) == 3, "level tracks collected cases")
+	_check(_salvage == 45 and _loot_kinds == ["case", "case", "case"], "each case pays 15 salvage and reports kind case")
+	_check(int(_world.get("total_bonus")) == 2, "level declares two bonus caches")
+	await _move_player(Vector3(0, 9.1, -54))
+	await _move_player(Vector3(-15, 6.3, -93))
+	_check(_loot_kinds.slice(3) == ["bonus", "bonus"], "both bonus caches report kind bonus")
+	_check(_salvage == 45 + 60, "each bonus cache pays 30 salvage")
+	_check(_world.get("collected_bonus") == [0, 1], "level tracks collected bonus indices")
+	_check(int(_world.get("collected_loot")) == 3, "bonus caches do not count as required cases")
+	var objectives: Array = _world.call("get_objectives")
+	_check(objectives.size() == 1 and objectives[0]["kind"] == "extract" and objectives[0]["active"], "only the unlocked extraction remains as an objective")
 
 
 func _test_extraction() -> void:
@@ -158,7 +231,7 @@ func _test_sentry_telegraph() -> void:
 func _test_raid_population() -> void:
 	_world.queue_free()
 	await _frames(3)
-	_world = WorldScript.new()
+	_world = Catalog.create("l01")
 	_scene.add_child(_world)
 	_world.call("build", _player, false)
 	await _frames(3)
@@ -205,9 +278,12 @@ func _frames(count: int) -> void:
 		await physics_frame
 
 
-func _on_loot(value: int) -> void:
-	_loot_total += value
+func _on_loot(kind: String, value: int) -> void:
+	_loot_kinds.append(kind)
+	if kind == "case":
+		_loot_total += 1
 	_loot_events += 1
+	_salvage += value
 
 
 func _on_extraction(inside: bool) -> void:

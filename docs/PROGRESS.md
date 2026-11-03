@@ -105,6 +105,32 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   bonuses are once-only.
 - Follow-ups: F10 should call `Achievements.progress_unlocks(profile)` at boot to catch up.
 
+## 2026-11-03: F7 level framework, catalog, SLUICE GATE port
+- Model: Claude Sonnet 5.5.
+- Added scripts/level_base.gd (builder API, zone presets for all three zones, triplanar grime
+  materials, pickups, extraction pad, shooting, objectives, quality levels, per-material mesh
+  merging with one shared collider body), scripts/level_catalog.gd (CONTRACT 4.12, plus
+  `all_ids()`), scripts/levels/l01_sluice.gd (port of world.gd with two new rod-only bonus
+  caches: RIGGING NEST and RELAY ROOF) and tests/level_preview.gd (spawn + three overviews,
+  draw-call counts, `--legacy` for the old world.gd).
+- tests/world_test.gd now runs against `Catalog.create("l01")`: every prototype check is kept
+  and 36 framework checks are added (64 total): catalog, INFO vs built counts, merging, budgets,
+  bonus pickups, objectives, quality, safe ground.
+- Numbers (Forward+, same camera): draw calls 1100 -> 198 at the spawn view (762-849 -> 146-179
+  in the overviews); 485 staged primitives merge into 9 meshes; 10,680 triangles in the merged
+  statics; 25 labels; 132 collision shapes in one StaticBody3D. Compatibility renders the same
+  (captures in .tools/captures/F7/).
+- scripts/enemy.gd (WORLD-owned): added `signal died(kind, by)` and `take_damage(amount, source)`
+  so the level can forward `enemy_killed`. No other behaviour changed.
+- Tests: QUALITY GATE: PASSED (27 scripts, 4 suites); the old game still boots.
+- Deviations: `sign()` is a GDScript built-in, so the builder is `signboard()` (CONTRACT 4.11
+  updated). `crate()` no longer adds a Label3D (label budget). Spawn is floor + 0.95 at (0,0,14).
+  Enemy `params` are accepted but only `health` is used until E1/E2. F8/F9 functions
+  (anchor, updraft, hazard, water, hint_zone, light, skyline, perimeter, navigation) are not
+  there yet; is_hazard_at/get_nav_path return neutral values.
+- Follow-ups: main.gd still builds scripts/world.gd; F10 switches it to the catalog and deletes
+  world.gd.
+
 ---
 Template:
 ```

@@ -2,6 +2,7 @@ extends CharacterBody3D
 
 signal fired(origin: Vector3, end: Vector3)
 signal alerted(text: String)
+signal died(kind: String, by: String)
 
 var target: Node3D
 var kind: String = "hound"
@@ -217,7 +218,7 @@ func _can_see_player() -> bool:
 	return not hit.is_empty() and hit["collider"] == target
 
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, source: String = "bullet") -> void:
 	if _dead or amount <= 0.0:
 		return
 	health -= amount
@@ -228,6 +229,7 @@ func take_damage(amount: float) -> void:
 	if health <= 0.0:
 		_dead = true
 		active = false
+		died.emit(kind, source)
 		collision_layer = 0
 		collision_mask = 0
 		remove_from_group("enemies")

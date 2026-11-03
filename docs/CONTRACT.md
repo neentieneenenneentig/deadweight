@@ -322,7 +322,7 @@ crate(base: Vector3, size: Vector3, yaw := 0.0)
 barrier(base: Vector3, length: float, yaw := 0.0)
 platform(top_center: Vector3, size: Vector2, material := "dark", supports := true)   # pad, top at top_center.y
 pillar(base: Vector3, height: float, width := 0.9, material := "rust")
-sign(title: String, position: Vector3, subtitle := "", accent := "amber", yaw := 0.0)
+signboard(title: String, position: Vector3, subtitle := "", accent := "amber", yaw := 0.0)   # not "sign": that is a GDScript built-in
 label(text: String, position: Vector3, font_size := 32, color := Color(...), pixel_size := 0.012, billboard := false, yaw := 0.0) -> Label3D
 anchor(position: Vector3, facing := Vector3.DOWN)  # magnetic plate, latches weights
 updraft(base: Vector3, size: Vector3, strength := 26.0)     # rising air column (acceleration m/s^2)
