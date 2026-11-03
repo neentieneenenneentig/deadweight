@@ -23,7 +23,8 @@ owner = needs the human (devices, accounts).
 | R4 | Third-party notices + privacy policy | — | S | C/B | shell | MUST | done |
 | R5 | Store copy, release checklist, README | — | M | C | web | MUST | done |
 | R6 | Store art + screenshots | C6, G7, F11 | M | B | shell, vision | MUST | done 2026-11-03 |
-| R6b | Live action screenshots | R6 | S | B | shell, vision | MUST | todo |
+| R6b | Live action screenshots | R6 | S | B | shell, vision | MUST | done 2026-11-03 |
+| R6c | Screenshot framing pass | R6b | S | B | shell, vision | SHOULD | todo |
 | R7 | Store copy, notices + AI disclosure for the dreamscape | V1 | S | C | — | MUST | done 2026-11-03 |
 | V1 | Art direction: The Department of Unfinished Gravity (owner, via Codex) | — | L | — | shell, vision | MUST | done (2026-11-03) |
 | P1 | Android full-game unlock (Play Billing); only if the owner picks model A | F5, F10, O3b | M | A | shell, owner | MUST if A | todo |
@@ -226,6 +227,19 @@ files; keep the names or update the list in the script.
 **Acceptance:**
 - at least 6 of the 9 HUD shots and 3 of the 4 touch shots show the rope in use;
 - sizes are exact, and every image has been viewed.
+
+### R6c — Screenshot framing pass
+**Edit:** tools/store_art.gd (LIVE_SHOTS), store/art/screenshots/*.
+**Do:** R6b's swings work, but the camera looks almost straight up at a plate 7–8 m away, so
+most of each frame is sky and the line is a short stub. Reframe the shots:
+- cast from 15–25 m away;
+- look forward along the swing velocity, pitched about 10–20° up, so the line runs from the rod
+  up into the frame and the level stays visible below;
+- add one real hound chase with TRACKED;
+- add a taut swing in touch_02;
+- add a teapot-pool shot in l06, starting from the 9 m rim.
+**Acceptance:** every shot reads as "fast rope swing through a strange place" at thumbnail size,
+and every image has been viewed.
 
 ### G7b — HUD readability pass
 **Edit:** scripts/hud.gd, tests/hud_test.gd.

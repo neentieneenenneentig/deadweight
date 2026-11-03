@@ -505,6 +505,14 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   - The presets: Low has no shadows or MSAA; Medium has 2 splits at 70 m and 2× MSAA; High has 4 splits at 100 m, 4× MSAA, glow and SSAO. Render scale is a separate user slider (mobile default 0.85).
 - Gate: subsets pass (hud, audio, ui, flow, meta, levels); the full gate runs after R6b.
 
+## 2026-11-03: R6b live action screenshots
+
+- Model: Haiku 5.5 executor; lead Opus 5.5 review.
+- `tools/store_art.gd` `--shot=<name>` drives the real main.tscn: it casts through the real tether, latches a plate, launches or reels, then captures (`--fixed-fps 60`, so runs reproduce). `capture-store-art.ps1` is now a per-shot wrapper that clears stale files by id.
+- In use: 8 of 9 HUD shots and 3 of 4 touch shots show a latched, taut line at 16–22 M/S (hud_01 is a hound smash; touch_02 is marginal).
+- Lead review: an improvement on the standing poses, but not yet store-quality. The camera looks up at plates 7–8 m away, so the frames are mostly sky with a short line. That is card R6c.
+- Gate: QUALITY GATE PASSED (59 scripts, 10 suites).
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>
