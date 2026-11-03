@@ -38,6 +38,36 @@ const SHAKE_DECAY: float = 1.4
 ## Largest lens offset (fraction of the viewport) at full shake. Offsets move the lens, not the aim.
 const SHAKE_OFFSET: float = 0.03
 
+## Viewmodel geometry in camera space. The blank runs from ROD_BUTT to ROD_TIP and rod_tip sits at
+## the tip, so the line leaves the rod exactly where it is drawn.
+const ROD_BUTT: Vector3 = Vector3(0.32, -0.25, -0.65)
+const ROD_TIP: Vector3 = Vector3(0.14, 0.02, -1.65)
+const ROD_GRIP: Vector3 = Vector3(0.32, -0.29, -0.53)
+const GUN_GRIP: Vector3 = Vector3(0.27, -0.23, -0.42)
+const GUN_MUZZLE: Vector3 = Vector3(0.27, -0.23, -0.82)
+## How far the blank belly sags at full tension, in metres.
+const ROD_SAG: float = 0.26
+const BLANK_SEGMENTS: int = 12
+const BLANK_SIDES: int = 8
+const BLANK_BUTT_RADIUS: float = 0.024
+const BLANK_TIP_RADIUS: float = 0.006
+## Guides sit along the blank at these fractions (0 = butt, 1 = tip).
+const GUIDE_FRACTIONS := [0.1, 0.25, 0.42, 0.6, 0.76, 0.9, 0.985]
+const GUIDE_TUBE: float = 0.18
+const GUIDE_GAP: float = 0.008
+## The reel spool turns about its axle; line speed is divided by this radius.
+const SPOOL_CENTER: Vector3 = Vector3(0.27, -0.32, -0.6)
+const SPOOL_RADIUS: float = 0.075
+## Cast spring: stiffness and damping per second, and the forward kick the cast gives the tip.
+const WHIP_STIFFNESS: float = 180.0
+const WHIP_DAMPING: float = 6.0
+const WHIP_KICK: float = 3.0
+## A charge above this that drops to zero on the rod counts as a cast.
+const CAST_MIN_CHARGE: float = 0.05
+## The rod stops this far in front of a wall, and slides back by at most MAX_CLEARANCE_PULL.
+const CLEARANCE_MARGIN: float = 0.12
+const MAX_CLEARANCE_PULL: float = 0.35
+
 var camera: Camera3D
 var health: float = 100.0
 var max_health: float = 100.0
@@ -58,6 +88,22 @@ var muzzle: MeshInstance3D
 var charge_feedback: float = 0.0
 var tension_feedback: float = 0.0
 var kick: float = 0.0
+## Viewmodel state: eased pose values, the cast spring, the spool and the clearance pulls.
+var _cock: float = 0.0
+var _bend: float = 0.0
+var _whip: float = 0.0
+var _whip_velocity: float = 0.0
+var _rod_pull: float = 0.0
+var _gun_pull: float = 0.0
+var _spool_angle: float = 0.0
+var _line_speed: float = 0.0
+var _last_charge: float = 0.0
+var _last_weapon: String = "ROD"
+var _spool: Node3D
+var _blank_mesh: ImmediateMesh
+var _blank_material: StandardMaterial3D
+var _guides: MultiMesh
+var _materials: Dictionary = {}
 var _jump_buffer: float = 0.0
 var _coyote_time: float = 0.0
 var _reset_position: Vector3 = Vector3.ZERO
@@ -231,22 +277,7 @@ func _process(delta: float) -> void:
 	_fov_blend = lerpf(_fov_blend, clampf(speed / FOV_KICK_SPEED, 0.0, 1.0), minf(1.0, delta * 3.0))
 	camera.fov = _base_fov + FOV_KICK * _fov_blend
 	_update_shake(delta)
-	kick = move_toward(kick, 0.0, delta * 3.2)
-	rod_model.position = Vector3(0.0, -charge_feedback * 0.08, charge_feedback * 0.16 + kick * 0.07)
-	rod_model.rotation.x = charge_feedback * 0.24 + tension_feedback * 0.10
-	gun_model.rotation.x = kick * 0.18
-	_shot_flash = maxf(0.0, _shot_flash - delta)
-	muzzle.visible = _shot_flash > 0.0
-	var rod_mesh := ImmediateMesh.new()
-	rod_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, rod_bend.material_override)
-	for i in range(9):
-		var fraction: float = float(i) / 8.0
-		var point := Vector3(0.32 - fraction * 0.18, -0.25 + fraction * 0.27, -0.65 - fraction * 1.0)
-		point.y -= sin(fraction * PI * 0.5) * tension_feedback * 0.22
-		rod_mesh.surface_add_vertex(point)
-	rod_mesh.surface_end()
-	rod_bend.mesh = rod_mesh
-	rod_tip.position = Vector3(0.14, 0.02 - tension_feedback * 0.22, -1.65)
+	_update_viewmodel(delta)
 
 
 ## Trauma model: the shake is trauma squared, scaled by the camera_shake setting. It moves only
@@ -335,9 +366,18 @@ func add_shake(amount: float) -> void:
 	_trauma = clampf(_trauma + maxf(amount, 0.0), 0.0, 1.0)
 
 
-func set_feedback(charge: float, tension: float, weapon: String) -> void:
+## Per-frame state from main. charge and tension drive the rod; weapon picks the model. line_speed
+## is metres of line paying out (positive) or reeling in (negative) per second and spins the spool.
+## It defaults to 0, so callers that only pass the first three values still work.
+func set_feedback(charge: float, tension: float, weapon: String, line_speed: float = 0.0) -> void:
+	# A charge that drops to zero on the rod is the cast: the tip whips forward and recoils.
+	if _last_charge > CAST_MIN_CHARGE and charge <= 0.0 and weapon == "ROD" and _last_weapon == "ROD":
+		_whip_velocity -= WHIP_KICK
+	_last_charge = charge
+	_last_weapon = weapon
 	charge_feedback = charge
 	tension_feedback = clampf(tension / 22000.0, 0.0, 1.0)
+	_line_speed = line_speed
 	rod_model.visible = weapon == "ROD"
 	gun_model.visible = weapon == "SIDEARM"
 
@@ -347,12 +387,19 @@ func shot_effect() -> void:
 	_shot_flash = 0.045
 
 
-func _material(color: Color, emissive: bool = false) -> StandardMaterial3D:
+## Materials are cached by colour, so every part of one colour shares one material.
+func _material(color: Color, unshaded: bool = false) -> StandardMaterial3D:
+	var key: String = "%s/%s" % [color.to_html(), str(unshaded)]
+	if _materials.has(key):
+		return _materials[key] as StandardMaterial3D
 	var result := StandardMaterial3D.new()
 	result.albedo_color = color
-	result.roughness = 0.75
-	if emissive:
+	result.roughness = 0.35
+	if not unshaded:
+		result.albedo_texture = preload("res://assets/dreamscape/porcelain.png")
+	if unshaded:
 		result.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_materials[key] = result
 	return result
 
 
@@ -368,40 +415,242 @@ func _box(parent: Node3D, size: Vector3, at: Vector3, color: Color) -> MeshInsta
 	return node
 
 
+## Builds both viewmodels under the camera. The rod is a grip, reel, tapered blank, guides and tip;
+## the sidearm is a small pistol. Both are shown or hidden by set_feedback.
 func _build_viewmodel() -> void:
 	rod_model = Node3D.new()
 	camera.add_child(rod_model)
-	var grip := _box(rod_model, Vector3(0.075, 0.08, 0.4), Vector3(0.32, -0.29, -0.53), Color("273940"))
+	var grip := _box(rod_model, Vector3(0.075, 0.08, 0.4), ROD_GRIP, Color("eadac4"))
 	grip.rotation.x = -0.12
 	_box(rod_model, Vector3(0.08, 0.084, 0.045), Vector3(0.32, -0.27, -0.69), Color("e4aa52"))
 	_box(rod_model, Vector3(0.12, 0.10, 0.15), Vector3(0.32, -0.34, -0.6), Color("0d181c"))
-	var reel := MeshInstance3D.new()
-	var spool := CylinderMesh.new()
-	spool.top_radius = 0.075
-	spool.bottom_radius = 0.075
-	spool.height = 0.08
-	spool.radial_segments = 12
-	reel.mesh = spool
-	reel.material_override = _material(Color("cd9951"))
-	reel.position = Vector3(0.27, -0.32, -0.6)
-	reel.rotation.z = PI * 0.5
-	rod_model.add_child(reel)
-	rod_bend = MeshInstance3D.new()
-	rod_bend.material_override = _material(Color("c7d7ce"), true)
-	rod_model.add_child(rod_bend)
+	_build_spool()
+	_build_blank()
 	rod_tip = Node3D.new()
+	rod_tip.position = ROD_TIP
 	rod_model.add_child(rod_tip)
 	_box(rod_model, Vector3(0.10, 0.11, 0.2), Vector3(0.33, -0.34, -0.37), Color("765e49"))
 	_box(rod_model, Vector3(0.12, 0.14, 0.38), Vector3(0.34, -0.40, -0.17), Color("344748"))
+	_build_sidearm()
+
+
+## The reel spool sits on a pivot so it can turn about its axle. A dark stripe on the rim shows the turn.
+func _build_spool() -> void:
+	_spool = Node3D.new()
+	_spool.position = SPOOL_CENTER
+	rod_model.add_child(_spool)
+	var reel := MeshInstance3D.new()
+	var drum := CylinderMesh.new()
+	drum.top_radius = SPOOL_RADIUS
+	drum.bottom_radius = SPOOL_RADIUS
+	drum.height = 0.08
+	drum.radial_segments = 12
+	reel.mesh = drum
+	reel.material_override = _material(Color("cd9951"))
+	reel.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# The drum's axis is laid along x so it turns about the same axle as the pivot.
+	reel.rotation.z = PI * 0.5
+	_spool.add_child(reel)
+	_box(_spool, Vector3(0.09, 0.014, 0.014), Vector3(0.0, SPOOL_RADIUS, 0.0), Color("3b2a1c"))
+
+
+## The blank is one tapered tube rebuilt each frame (one surface, one draw call). The guides are a
+## MultiMesh, so all of them also cost one draw call.
+func _build_blank() -> void:
+	_blank_material = StandardMaterial3D.new()
+	_blank_material.albedo_color = Color("b7a0b9")
+	_blank_material.roughness = 0.45
+	# The tube is open at both ends and seen from inside at the butt, so draw both faces.
+	_blank_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_blank_mesh = ImmediateMesh.new()
+	rod_bend = MeshInstance3D.new()
+	rod_bend.mesh = _blank_mesh
+	rod_bend.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	rod_model.add_child(rod_bend)
+	var guide_set := MultiMesh.new()
+	guide_set.transform_format = MultiMesh.TRANSFORM_3D
+	guide_set.mesh = _build_guide_mesh()
+	guide_set.instance_count = GUIDE_FRACTIONS.size()
+	_guides = guide_set
+	var guide_view := MultiMeshInstance3D.new()
+	guide_view.multimesh = _guides
+	guide_view.material_override = _material(Color("8fa19c"))
+	guide_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	rod_model.add_child(guide_view)
+
+
+## The pistol matches the rod's palette: frame, slide, sights, grip, magazine and a muzzle flash
+## that shows on each shot.
+func _build_sidearm() -> void:
 	gun_model = Node3D.new()
 	camera.add_child(gun_model)
-	_box(gun_model, Vector3(0.095, 0.10, 0.30), Vector3(0.27, -0.23, -0.57), Color("253139"))
-	_box(gun_model, Vector3(0.065, 0.18, 0.09), Vector3(0.27, -0.33, -0.46), Color("111d22"))
-	_box(gun_model, Vector3(0.07, 0.025, 0.22), Vector3(0.27, -0.17, -0.57), Color("697a76"))
-	_box(gun_model, Vector3(0.022, 0.025, 0.025), Vector3(0.27, -0.15, -0.69), Color("e3b369"))
+	_box(gun_model, Vector3(0.085, 0.085, 0.34), Vector3(0.27, -0.25, -0.5), Color("705b78"))
+	_box(gun_model, Vector3(0.078, 0.05, 0.38), Vector3(0.27, -0.19, -0.52), Color("eadac4"))
+	_box(gun_model, Vector3(0.04, 0.04, 0.06), Vector3(0.27, -0.205, -0.80), Color("1a262b"))
+	_box(gun_model, Vector3(0.012, 0.02, 0.02), Vector3(0.27, -0.15, -0.72), Color("e3b369"))
+	_box(gun_model, Vector3(0.04, 0.02, 0.03), Vector3(0.27, -0.15, -0.36), Color("253139"))
+	var grip := _box(gun_model, Vector3(0.07, 0.17, 0.09), Vector3(0.27, -0.33, -0.44), Color("111d22"))
+	grip.rotation.x = -0.12
+	_box(gun_model, Vector3(0.02, 0.05, 0.11), Vector3(0.27, -0.27, -0.46), Color("253139"))
+	_box(gun_model, Vector3(0.06, 0.02, 0.085), Vector3(0.27, -0.42, -0.44), Color("697a76"))
 	_box(gun_model, Vector3(0.10, 0.12, 0.17), Vector3(0.27, -0.35, -0.42), Color("765e49"))
 	_box(gun_model, Vector3(0.13, 0.14, 0.28), Vector3(0.28, -0.41, -0.22), Color("344748"))
-	muzzle = _box(gun_model, Vector3(0.12, 0.10, 0.10), Vector3(0.27, -0.23, -0.78), Color("ffc46a"))
+	muzzle = _box(gun_model, Vector3(0.12, 0.10, 0.10), Vector3(0.27, -0.205, -0.86), Color("ffc46a"))
 	muzzle.material_override = _material(Color("ffdc92"), true)
 	muzzle.visible = false
 	gun_model.visible = false
+
+
+## One viewmodel pass per frame: eases the pose, runs the cast spring, spins the spool, keeps both
+## models out of walls and rebuilds the blank. rod_tip is updated even while the sidearm is out,
+## because the line still leaves from it.
+func _update_viewmodel(delta: float) -> void:
+	kick = move_toward(kick, 0.0, delta * 3.2)
+	_shot_flash = maxf(0.0, _shot_flash - delta)
+	muzzle.visible = _shot_flash > 0.0
+	_cock = lerpf(_cock, charge_feedback, minf(1.0, delta * 14.0))
+	_bend = lerpf(_bend, tension_feedback, minf(1.0, delta * 10.0))
+	_update_whip(delta)
+	_spool_angle = fposmod(_spool_angle + _line_speed / SPOOL_RADIUS * delta, TAU)
+	_spool.rotation.x = _spool_angle
+	_rod_pull = _ease_pull(_rod_pull, _clearance_pull(ROD_GRIP, ROD_TIP), delta)
+	rod_model.position = Vector3(0.0, -_cock * 0.08, _cock * 0.16 + _rod_pull)
+	# Tilting the rod up as it is pushed back keeps the tip clear of low walls.
+	rod_model.rotation.x = _cock * 0.24 + _bend * 0.10 + _whip + _rod_pull * 0.6
+	rod_tip.position = _blank_point(1.0)
+	if rod_model.visible:
+		_rebuild_blank()
+		_place_guides()
+	_gun_pull = _ease_pull(_gun_pull, _clearance_pull(GUN_GRIP, GUN_MUZZLE), delta)
+	gun_model.position = Vector3(0.0, 0.0, _gun_pull)
+	gun_model.rotation.x = kick * 0.18
+
+
+## Damped spring for the cast. The release kicks the tip forward; the spring carries it past rest
+## and recoils it back, then it settles.
+func _update_whip(delta: float) -> void:
+	var accel: float = -WHIP_STIFFNESS * _whip - WHIP_DAMPING * _whip_velocity
+	_whip_velocity += accel * delta
+	_whip += _whip_velocity * delta
+
+
+## Forward clearance. A ray runs in camera space from the grip to the rest tip. If world geometry
+## stands in front of the tip, it returns how far the rod must slide back toward the camera.
+func _clearance_pull(from_local: Vector3, tip_local: Vector3) -> float:
+	var world: World3D = get_world_3d()
+	if world == null or not is_instance_valid(camera):
+		return 0.0
+	var query := PhysicsRayQueryParameters3D.create(camera.to_global(from_local), camera.to_global(tip_local), 1)
+	var hit: Dictionary = world.direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return 0.0
+	var hit_depth: float = camera.to_local(hit["position"] as Vector3).z
+	return clampf(hit_depth + CLEARANCE_MARGIN - tip_local.z, 0.0, MAX_CLEARANCE_PULL)
+
+
+## Slides back quickly when a wall appears and eases out slowly, so the rod never snaps.
+func _ease_pull(current: float, target: float, delta: float) -> float:
+	var rate: float = 18.0 if target > current else 4.0
+	return lerpf(current, target, minf(1.0, delta * rate))
+
+
+## Point on the blank at fraction f. The sag grows with f squared: the butt stays stiff and the
+## tip bends the most.
+func _blank_point(fraction: float) -> Vector3:
+	var point: Vector3 = ROD_BUTT.lerp(ROD_TIP, fraction)
+	point.y -= _bend * ROD_SAG * fraction * fraction
+	return point
+
+
+## Direction of the blank at fraction f (the derivative of _blank_point, normalised).
+func _blank_tangent(fraction: float) -> Vector3:
+	var direction: Vector3 = ROD_TIP - ROD_BUTT
+	direction.y -= _bend * ROD_SAG * 2.0 * fraction
+	return direction.normalized()
+
+
+func _blank_radius(fraction: float) -> float:
+	return lerpf(BLANK_BUTT_RADIUS, BLANK_TIP_RADIUS, fraction)
+
+
+## Frame along the blank: x is the side, y is up and z points along the tangent toward the tip.
+func _blank_basis(fraction: float) -> Basis:
+	var tangent: Vector3 = _blank_tangent(fraction)
+	var side: Vector3 = tangent.cross(Vector3.UP)
+	if side.length_squared() < 0.0001:
+		side = Vector3.RIGHT
+	side = side.normalized()
+	return Basis(side, side.cross(tangent).normalized(), tangent)
+
+
+## Ring of BLANK_SIDES points around the blank at fraction f.
+func _ring(fraction: float) -> PackedVector3Array:
+	var frame: Basis = _blank_basis(fraction)
+	var centre: Vector3 = _blank_point(fraction)
+	var radius: float = _blank_radius(fraction)
+	var ring := PackedVector3Array()
+	for side_index in range(BLANK_SIDES):
+		var angle: float = TAU * float(side_index) / float(BLANK_SIDES)
+		ring.append(centre + (frame.x * cos(angle) + frame.y * sin(angle)) * radius)
+	return ring
+
+
+## Rebuilds the tapered tube from the butt to the tip as quads split into triangles.
+func _rebuild_blank() -> void:
+	_blank_mesh.clear_surfaces()
+	_blank_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES, _blank_material)
+	var previous: PackedVector3Array = _ring(0.0)
+	for segment in range(1, BLANK_SEGMENTS + 1):
+		var current: PackedVector3Array = _ring(float(segment) / float(BLANK_SEGMENTS))
+		for side in range(BLANK_SIDES):
+			var next_side: int = (side + 1) % BLANK_SIDES
+			_blank_mesh.surface_add_vertex(previous[side])
+			_blank_mesh.surface_add_vertex(current[side])
+			_blank_mesh.surface_add_vertex(current[next_side])
+			_blank_mesh.surface_add_vertex(previous[side])
+			_blank_mesh.surface_add_vertex(current[next_side])
+			_blank_mesh.surface_add_vertex(previous[next_side])
+		previous = current
+	_blank_mesh.surface_end()
+
+
+## Each guide is the shared torus, laid across the blank at its fraction and sized to the blank there.
+func _place_guides() -> void:
+	for index in range(GUIDE_FRACTIONS.size()):
+		var fraction: float = GUIDE_FRACTIONS[index]
+		var guide_scale: float = _blank_radius(fraction) + GUIDE_GAP
+		var frame: Basis = _blank_basis(fraction).scaled(Vector3.ONE * guide_scale)
+		_guides.set_instance_transform(index, Transform3D(frame, _blank_point(fraction)))
+
+
+## One unit torus for every guide: major radius 1 and tube GUIDE_TUBE, lying in the XY plane with its
+## axis along z, which matches the blank frame.
+func _build_guide_mesh() -> ArrayMesh:
+	var major: int = 10
+	var minor: int = 4
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var indices := PackedInt32Array()
+	for i in range(major):
+		var theta: float = TAU * float(i) / float(major)
+		var radial := Vector3(cos(theta), sin(theta), 0.0)
+		for j in range(minor):
+			var phi: float = TAU * float(j) / float(minor)
+			verts.append(radial * (1.0 + GUIDE_TUBE * cos(phi)) + Vector3(0.0, 0.0, GUIDE_TUBE * sin(phi)))
+			normals.append(radial * cos(phi) + Vector3(0.0, 0.0, sin(phi)))
+	for i in range(major):
+		for j in range(minor):
+			var a: int = i * minor + j
+			var b: int = ((i + 1) % major) * minor + j
+			var c: int = ((i + 1) % major) * minor + (j + 1) % minor
+			var d: int = i * minor + (j + 1) % minor
+			for index in [a, b, c, a, c, d]:
+				indices.append(index)
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh

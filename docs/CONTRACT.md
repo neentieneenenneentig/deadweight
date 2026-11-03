@@ -577,13 +577,18 @@ wind, reel, tension creak. `get_stream("drone_hum")` returns a loop for drone pl
 
 ## 8. Visual style
 
-Palette anchors (Floodworks): concrete `#35484a`, light concrete `#647371`, dark `#14282f`,
-rust `#81513b`, hazard yellow `#d8a84e`, cyan `#5ad6c8`, amber `#ffc46b`, red `#ef654e`.
-UI: ink `#0b171a`, panel `rgba(9,19,22,0.9)`, paper `#e5ebe5`, muted `#94aaa9`,
-amber `#f5b45b`, cyan `#67d5d2`, red `#ed7263`. Red is reserved for danger/enemies, cyan
-for route/objectives/rod information, amber for primary actions and salvage.
-Use triplanar procedural noise textures (NoiseTexture2D, world-space) for grime on large
-surfaces; keep silhouettes bold and readable at speed.
+The Department of Unfinished Gravity (owner-directed visual revision, 2026-11-03):
+absurdist public works architecture with ceramic surfaces, oversized domestic objects,
+unusable doors, repeated arches and a painted afternoon sky. See `docs/DREAMSCAPE.md`.
+Palette anchors (Floodworks): chalk `#d6c9b0`, porcelain `#e2dac6`, plum `#473c52`,
+dusty rose `#bd8380`, brass `#c5a264`, celadon `#819c96`.
+UI: ink `#211c2d`, paper `#f2e6cf`, muted `#b6b2ba`, amber `#e8bd80`, cyan `#a3d5ca`.
+Existing red danger, cyan route/objective, and amber action/salvage cues remain semantic.
+Generated textures are allowed under `assets/dreamscape/`, with exact prompts and provenance.
+Use world-space projection for architecture and an antialiased checker shader for floors.
+Dream dressing joins existing static batches and adds no collision, lights or nav obstacles.
+Compatibility uses at most two sun-shadow cascades; main enemy volumes cast shadows,
+while small fittings do not. Fixed sentry fittings are merged into one mesh.
 
 ## 9. Integrator requests
 

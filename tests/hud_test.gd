@@ -1,7 +1,9 @@
 extends SceneTree
 ## HUD checks: touch routing, lifecycle release, state readouts, medal target, telemetry switch,
-## banner, six viewport layouts (outside the screen, overlaps), safe-area insets and, when run
-## as `-- --shots` with a windowed renderer, the G6 captures in .tools/captures/G6.
+## banner, six viewport layouts (outside the screen, overlaps, also mirrored for left-handed),
+## safe-area insets, G7 markers (projection on and off screen), damage arcs, vignettes, touch
+## options (scale, opacity, mirror) and, when run as `-- --shots` with a windowed renderer, the
+## G7 captures in .tools/captures/G7.
 
 const LAYOUT_SIZES := [
 	Vector2i(1280, 720),
@@ -14,7 +16,7 @@ const LAYOUT_SIZES := [
 const EDGE_TOLERANCE := 0.5
 const OVERLAP_TOLERANCE := 1.0
 const SETTLE_FRAMES := 3
-const CAPTURE_DIR := "res://.tools/captures/G6"
+const CAPTURE_DIR := "res://.tools/captures/G7"
 
 ## A raid in progress with every element populated, so the layout checks see the widest text.
 const FULL_STATE := {
@@ -37,6 +39,7 @@ const EXTRACT_STATE := {
 }
 
 var _hud: CanvasLayer
+var _camera: Camera3D
 var _failures := 0
 var _actions: Array[String] = []
 var _looks: Array[Vector2] = []
@@ -86,6 +89,13 @@ func _frames(count: int) -> void:
 		await process_frame
 
 
+## Full profile settings for apply_settings: the defaults, with the given keys changed.
+func _settings(changes: Dictionary) -> Dictionary:
+	var settings: Dictionary = {"show_telemetry": true, "touch_scale": 1.0, "touch_opacity": 0.8, "touch_left_handed": false}
+	settings.merge(changes, true)
+	return settings
+
+
 func _run() -> void:
 	Input.emulate_mouse_from_touch = false
 	Input.use_accumulated_input = false
@@ -102,6 +112,8 @@ func _run() -> void:
 	_test_state_readouts()
 	_test_medal_target_and_telemetry()
 	_test_banner_and_lifecycle()
+	await _test_markers_and_arcs()
+	await _test_touch_options()
 	await _test_layouts()
 	await _test_safe_area()
 
@@ -109,9 +121,10 @@ func _run() -> void:
 		await _capture_shots()
 
 	_hud.queue_free()
+	_camera.queue_free()
 	await process_frame
 	if _failures == 0:
-		print("HUD TESTS PASSED: two-thumb aim, finger reuse, focus/hide release, state readouts, medal target, telemetry, banner, six layouts, safe area")
+		print("HUD TESTS PASSED: two-thumb aim, finger reuse, focus/hide release, state readouts, captions, vignettes, medal target, telemetry, banner, objective markers on and off screen, damage arcs, touch scale, opacity and left-handed mirror, six layouts (also left-handed), safe area")
 	else:
 		push_error("HUD TESTS FAILED: %d checks" % _failures)
 	quit(0 if _failures == 0 else 1)
@@ -184,6 +197,18 @@ func _test_state_readouts() -> void:
 	_expect(not _hud._extract_bar.visible, "extraction bar stays hidden until every case is recovered")
 	_expect(_hud._mission_label.text == "RECOVER ALL CASES TO EXTRACT", "inside without all cases gives the right objective")
 
+	# Touch captions follow the state.
+	_hud.update_state({"reloading": true, "weapon": "SIDEARM", "reel_state": "REEL STALLED"})
+	_expect(_hud._touch_pads["reload"].caption == "WAIT" and _hud._touch_pads["reel"].caption == "STALL", "captions: reload reads WAIT while reloading, the reel reads STALL when stalled")
+	_hud.update_state({"reloading": false, "reel_state": "LOCKED / TAUT"})
+	_expect(_hud._touch_pads["reload"].caption == "LOAD" and _hud._touch_pads["reel"].caption == "REEL" and _hud._touch_pads["lock"].caption == "FREE", "captions go back to LOAD, REEL and FREE")
+
+	# Vignettes: danger from low health or a hit, speed from high speed.
+	_hud.update_state({"danger": 0.5, "speed": 24.0})
+	_expect(absf(_hud._vignette.strength - 0.5) < 0.001 and absf(_hud._speed_vignette.strength - 1.0) < 0.001, "vignettes: danger and full speed both show")
+	_hud.update_state({"speed": 5.0})
+	_expect(_hud._speed_vignette.strength == 0.0 and _hud._vignette.strength == 0.0, "vignettes: slow and unhurt show nothing")
+
 
 # --- Medal target and telemetry ------------------------------------------------------------------
 
@@ -226,9 +251,148 @@ func _test_banner_and_lifecycle() -> void:
 	_hud.show_game()
 
 
+# --- Objective markers and damage arcs (G7) -------------------------------------------------------
+
+func _test_markers_and_arcs() -> void:
+	root.size = Vector2i(1280, 720)
+	_camera = Camera3D.new()
+	_camera.current = true
+	root.add_child(_camera)
+	await _frames(2)
+	_hud.set_camera(_camera)
+	var view: Vector2 = root.get_visible_rect().size
+	var centre: Vector2 = view * 0.5
+	var bounds: Rect2 = _hud.marker_bounds()
+	# Focal length in pixels for the vertical field of view, so an offset can be checked exactly.
+	var focal: float = (view.y * 0.5) / tan(deg_to_rad(_camera.fov * 0.5))
+
+	# Projection on screen: straight ahead is the centre, and 2 m right at 20 m lands where the lens puts it.
+	var ahead: Dictionary = _hud.project_marker(Vector3(0.0, 0.0, -20.0))
+	var ahead_point: Vector2 = ahead["point"]
+	_expect(bool(ahead["on_screen"]) and ahead_point.distance_to(centre) < 0.5, "projection: a marker straight ahead lands at the screen centre")
+	var right_marker: Dictionary = _hud.project_marker(Vector3(2.0, 0.0, -20.0))
+	var right_point: Vector2 = right_marker["point"]
+	_expect(bool(right_marker["on_screen"]) and absf(right_point.x - (centre.x + focal * 0.1)) < 0.5 and absf(right_point.y - centre.y) < 0.5, "projection: a marker 2 m right at 20 m lands at the lens position")
+	_expect(right_point.distance_to(_camera.unproject_position(Vector3(2.0, 0.0, -20.0))) < 0.01, "projection matches Camera3D.unproject_position")
+
+	# Projection off screen: far right in front, behind to the right, behind up-left, and dead behind.
+	var far_right: Dictionary = _hud.project_marker(Vector3(60.0, 0.0, -10.0))
+	var far_point: Vector2 = far_right["point"]
+	var far_dir: Vector2 = far_right["direction"]
+	_expect(not bool(far_right["on_screen"]) and absf(far_point.x - bounds.end.x) < 0.5 and far_dir.x > 0.99, "off screen: a marker far to the right gets an arrow on the right edge")
+	var behind_right: Dictionary = _hud.project_marker(Vector3(10.0, 0.0, 10.0))
+	var behind_right_point: Vector2 = behind_right["point"]
+	var behind_right_dir: Vector2 = behind_right["direction"]
+	_expect(not bool(behind_right["on_screen"]) and absf(behind_right_point.x - bounds.end.x) < 0.5 and behind_right_dir.x > 0.99, "off screen: a marker behind and to the right gets an arrow on the right edge")
+	var up_left: Dictionary = _hud.project_marker(Vector3(-10.0, 10.0, 10.0))
+	var up_left_point: Vector2 = up_left["point"]
+	var up_left_dir: Vector2 = up_left["direction"]
+	_expect(not bool(up_left["on_screen"]) and up_left_dir.dot(Vector2(-1.0, -1.0).normalized()) > 0.99, "off screen: a marker behind and up-left points up-left")
+	_expect((absf(up_left_point.x - bounds.position.x) < 0.5 or absf(up_left_point.y - bounds.position.y) < 0.5) and bounds.grow(0.5).has_point(up_left_point), "off screen: the up-left arrow sits on the top or left edge")
+	var dead_behind: Dictionary = _hud.project_marker(Vector3(0.0, 0.0, 20.0))
+	var dead_point: Vector2 = dead_behind["point"]
+	var dead_dir: Vector2 = dead_behind["direction"]
+	_expect(not bool(dead_behind["on_screen"]) and absf(dead_point.y - bounds.end.y) < 0.5 and dead_dir.y > 0.99, "off screen: a marker dead behind the camera drops to the bottom edge")
+
+	# The marker list: distance in metres, the nearest active objective is next, done markers are inactive.
+	_hud.set_objectives([
+		{"position": Vector3(0.0, 0.0, -20.0), "kind": "case", "label": "CASE", "active": true},
+		{"position": Vector3(-3.0, 0.0, -10.0), "kind": "bonus", "label": "CACHE", "active": true},
+		{"position": Vector3(0.0, 0.0, -40.0), "kind": "extract", "label": "EXTRACT", "active": false},
+	])
+	var markers: Array = _hud._overlay.markers
+	_expect(markers.size() == 3, "markers: one marker per objective")
+	_expect(is_equal_approx(float(markers[0]["distance"]), 20.0), "markers: the distance is in metres from the camera")
+	_expect(bool(markers[1]["next"]) and not bool(markers[0]["next"]) and not bool(markers[2]["next"]), "markers: the nearest active objective is the next one")
+	_expect(not bool(markers[2]["active"]) and markers[2]["color"] == _hud.EXTRACT_COLOR, "markers: the extraction gate dims until it is ready and is green-white")
+	_expect(markers[1]["color"] == _hud.AMBER and markers[0]["color"] == _hud.CYAN, "markers: bonus is amber and salvage is cyan")
+	_hud.set_objectives([])
+
+	# Damage arcs: the bearing is relative to the camera facing, and each arc lasts about 0.8 s.
+	_hud._tick_effects(1.0)
+	_hud.damage_from(20.0, "hound", Vector3(10.0, 0.0, -10.0))
+	_expect(_hud.arc_count() == 1, "damage: a hit adds one damage arc")
+	var arc_bearing: float = _hud._arcs[0]["bearing"]
+	_expect(absf(arc_bearing - PI * 0.25) < 0.001, "damage: the arc points 45 degrees right of the facing")
+	_hud._tick_effects(0.5)
+	_expect(_hud.arc_count() == 1, "damage: the arc is still up at 0.5 s")
+	_hud._tick_effects(0.35)
+	_expect(_hud.arc_count() == 0, "damage: the arc expires after about 0.8 s")
+	_camera.rotation.y = PI * 0.5
+	_hud.damage_from(10.0, "sentry", Vector3(-10.0, 0.0, 0.0))
+	var facing_bearing: float = _hud._arcs[0]["bearing"]
+	_expect(absf(facing_bearing) < 0.001, "damage: a source straight ahead after turning gives a zero bearing")
+	_camera.rotation.y = 0.0
+	_hud._tick_effects(1.0)
+	_hud.damage_from(20.0, "drone", Vector3(0.0, 0.0, -10.0))
+	await _frames(20)
+	_expect(_hud.arc_count() == 1, "damage: the arc is still up after 20 frames")
+	await _frames(80)
+	_expect(_hud.arc_count() == 0, "damage: the arc is gone after about a second of frames")
+
+
+# --- Touch options (G7) --------------------------------------------------------------------------
+
+func _test_touch_options() -> void:
+	root.size = Vector2i(1280, 720)
+	var canvas: Vector2 = root.get_visible_rect().size
+	_hud.apply_settings(_settings({}))
+	_hud.show_game()
+	await _frames(2)
+	_expect(_hud._stick.get_global_rect().get_center().x < canvas.x * 0.5, "right-handed: the stick panel sits on the left")
+	_expect(_hud._touch_pads["cast"].get_global_rect().get_center().x > canvas.x * 0.5, "right-handed: the cast pad sits on the right")
+
+	# Left-handed mirror: the stick and the thumb pads move to the other side, pause stays top-right.
+	_hud.apply_settings(_settings({"touch_left_handed": true}))
+	await _frames(2)
+	_expect(_hud._stick.get_global_rect().get_center().x > canvas.x * 0.5, "left-handed: the stick panel moves to the right side of the screen")
+	_expect(_hud._touch_pads["cast"].get_global_rect().get_center().x < canvas.x * 0.5, "left-handed: the cast pad moves to the left side")
+	_expect(_hud._touch_pads["pause"].get_global_rect().get_center().x > canvas.x * 0.5, "left-handed: the pause pad stays top-right")
+	var actions_before: int = _actions.size()
+	_touch(2, _pad_center("cast"), true)
+	_touch(2, _pad_center("cast"), false)
+	await process_frame
+	_expect(_actions.size() == actions_before + 2 and _actions[-2] == "cast:down" and _actions[-1] == "cast:up", "left-handed: a touch on the mirrored cast pad fires cast")
+	var stick_centre: Vector2 = _hud._stick.get_global_rect().get_center()
+	_touch(3, stick_centre + Vector2(42.0, -15.0), true)
+	await process_frame
+	_expect(_hud.move_vector.length() > 0.4, "left-handed: the stick moves when touched on its new side")
+	_touch(3, stick_centre + Vector2(42.0, -15.0), false)
+	await process_frame
+	_expect(_hud.move_vector == Vector2.ZERO, "left-handed: releasing the stick stops movement")
+
+	# Scale and opacity: the largest scale keeps every control on screen, in both hands.
+	for left_handed: bool in [false, true]:
+		_hud.apply_settings(_settings({"touch_left_handed": left_handed, "touch_scale": 1.35}))
+		await _frames(2)
+		var hand: String = "left-handed" if left_handed else "right-handed"
+		_expect(absf(_hud._stick.size.x - 158.0 * 1.35) < 0.5, "touch_scale: the stick grows with the setting (" + hand + ")")
+		var outside: Array[String] = []
+		for action in _hud._touch_pads:
+			var rect: Rect2 = _hud._touch_pads[action].get_global_rect()
+			if rect.position.x < 0.0 or rect.position.y < 0.0 or rect.end.x > canvas.x or rect.end.y > canvas.y:
+				outside.append(action)
+		_expect(outside.is_empty(), "touch_scale 1.35 keeps every touch control on screen (" + hand + "): " + str(outside))
+	_hud.apply_settings(_settings({"touch_opacity": 0.4}))
+	_expect(absf(_hud._touch.modulate.a - 0.4) < 0.001, "touch_opacity sets the touch layer alpha")
+	_hud.apply_settings(_settings({"touch_opacity": 5.0}))
+	_expect(absf(_hud._touch.modulate.a - 1.0) < 0.001, "touch_opacity is clamped to 1.0")
+	_hud.apply_settings(_settings({}))
+	_expect(absf(_hud._touch.modulate.a - 0.8) < 0.001 and absf(_hud.touch_scale - 1.0) < 0.001, "apply_settings with defaults restores the touch layout")
+
+
 # --- Layouts -------------------------------------------------------------------------------------
 
+## Right-handed first, then left-handed: the mirrored layout must fit and not overlap too.
 func _test_layouts() -> void:
+	await _run_layouts("")
+	_hud.apply_settings(_settings({"touch_left_handed": true}))
+	await _run_layouts(" (left-handed)")
+	_hud.apply_settings(_settings({}))
+	_hud.set_active(false)
+
+
+func _run_layouts(tag: String) -> void:
 	for dimensions: Vector2i in LAYOUT_SIZES:
 		root.size = dimensions
 		await _frames(SETTLE_FRAMES)
@@ -239,7 +403,7 @@ func _test_layouts() -> void:
 		await _frames(SETTLE_FRAMES)
 		var logical_size: Vector2 = root.get_visible_rect().size
 		var bounds := Rect2(Vector2.ZERO, logical_size)
-		var size_text: String = str(dimensions)
+		var size_text: String = str(dimensions) + tag
 
 		var outside: Array[String] = []
 		_collect_outside(_hud, bounds, outside)
@@ -252,8 +416,7 @@ func _test_layouts() -> void:
 		for action in _hud._touch_pads:
 			var rect: Rect2 = _hud._touch_pads[action].get_rect()
 			_expect(rect.position.x >= 0 and rect.position.y >= 0 and rect.end.x <= logical_size.x and rect.end.y <= logical_size.y, action + " touch control stays visible at " + size_text)
-		print("HUD layout: physical ", dimensions, " / canvas ", logical_size)
-	_hud.set_active(false)
+		print("HUD layout: physical ", dimensions, " / canvas ", logical_size, tag)
 
 
 ## Every HUD panel the overlap check compares. The touch pads are included on touch screens.
@@ -345,6 +508,17 @@ class Backdrop extends Control:
 			draw_rect(Rect2(x, size.y * 0.62 - h, 90.0 + fmod(float(i) * 41.0, 120.0), h), Color(0.2, 0.26, 0.28), true)
 
 
+## Four objectives around the camera: two in front, one off the right edge (inactive, the gate),
+## one behind so it shows as a bottom-edge arrow.
+func _shot_objectives() -> Array:
+	return [
+		{"position": Vector3(-5.0, 0.0, -18.0), "kind": "case", "label": "CASE", "active": true},
+		{"position": Vector3(3.0, 2.5, -26.0), "kind": "bonus", "label": "CACHE", "active": true},
+		{"position": Vector3(44.0, 0.0, -16.0), "kind": "extract", "label": "EXTRACT", "active": false},
+		{"position": Vector3(4.0, 0.0, 24.0), "kind": "case", "label": "CASE", "active": true},
+	]
+
+
 func _capture_shots() -> void:
 	if DisplayServer.get_name() == "headless":
 		print("HUD shots skipped: the headless renderer has no framebuffer to capture")
@@ -357,21 +531,32 @@ func _capture_shots() -> void:
 	var backdrop := Backdrop.new()
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	backdrop_layer.add_child(backdrop)
-	await _shot(dir, "hud_1280x720_kbm", Vector2i(1280, 720), false, FULL_STATE, "CASE SECURED", "2 OF 3 SALVAGED")
+	_hud.set_camera(_camera)
+	_hud.set_objectives(_shot_objectives())
+	await _shot(dir, "hud_1280x720_kbm", Vector2i(1280, 720), false, FULL_STATE, "CASE SECURED", "2 OF 3 SALVAGED", Vector3(-8.0, 0.0, -6.0))
 	await _shot(dir, "hud_2400x1080_extract", Vector2i(2400, 1080), false, EXTRACT_STATE, "EXTRACTION READY", "Hold for six seconds")
 	await _shot(dir, "hud_800x1280_touch", Vector2i(800, 1280), true, FULL_STATE, "CASE SECURED", "2 OF 3 SALVAGED")
+	await _shot(dir, "hud_800x1280_touch_lefthanded", Vector2i(800, 1280), true, FULL_STATE, "CASE SECURED", "2 OF 3 SALVAGED", Vector3.INF, true)
+	_hud.set_objectives([])
+	_hud.apply_settings(_settings({}))
 	backdrop_layer.queue_free()
 	root.size = Vector2i(1280, 720)
 
 
-func _shot(dir: String, shot_name: String, size: Vector2i, touch: bool, state: Dictionary, title: String, subtitle: String) -> void:
+## One capture. arc_from (world space) fires a damage arc just before the frame is taken; left_handed
+## mirrors the touch layout for the shot.
+func _shot(dir: String, shot_name: String, size: Vector2i, touch: bool, state: Dictionary, title: String, subtitle: String, arc_from: Vector3 = Vector3.INF, left_handed: bool = false) -> void:
 	root.size = size
 	_hud.touch_enabled = touch
+	_hud.apply_settings(_settings({"touch_left_handed": left_handed}))
 	_hud.set_active(false)
 	_hud.set_active(true)
 	_hud.update_state(state)
 	_hud.show_banner(title, subtitle, 30.0, "amber")
-	await _frames(60)
+	if arc_from.is_finite():
+		_hud.damage_from(30.0, "hound", arc_from)
+	# The arc lasts 0.8 s, so an arc shot is taken sooner than the others.
+	await _frames(30 if arc_from.is_finite() else 60)
 	await RenderingServer.frame_post_draw
 	var image: Image = root.get_texture().get_image()
 	var path: String = dir + "/" + shot_name + ".png"

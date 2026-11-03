@@ -262,3 +262,19 @@ Template:
 - Deviations:
 - Follow-ups:
 ```
+
+## 2026-11-03: owner-directed absurdist dreamscape
+- Model: Codex (GPT-6).
+- Changed: shared level materials, sky and lighting; new batched dream scenery and checker shader;
+  Sluice Gate skyline and notices; porcelain enemy, tool and weight visuals; menu palette/tagline.
+  Generated three original textures using the built-in image tool, saved in assets/dreamscape/
+  with exact prompts. Research and screenshots: docs/DREAMSCAPE.md and docs/images/.
+- Tests: QUALITY GATE: PASSED (48 scripts parsed, all nine suites pass). Rendered level validation:
+  65 checks pass, 155/62 Compatibility draw calls at campaign/range spawn views, respectively.
+  Forward+ and Compatibility screenshots inspected; title preview reports zero problems.
+- Deviations: this is an explicit owner art-direction request, not a numbered task card. Generated
+  raster art supersedes the old code-only-art rule. Existing uncommitted gameplay work is retained.
+  Corrected four existing drone-test fixture coordinates (double arena offset), with flight fixtures
+  starting in the hover band. Main gameplay rules, saves, collision and navigation remain intact.
+- Follow-ups: physical Android frame-time profiling is still needed. Only l01 and range currently
+  have playable level scripts; this work does not implement the other catalog placeholders.

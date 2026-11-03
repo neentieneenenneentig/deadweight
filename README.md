@@ -3,8 +3,12 @@
 First-person movement action for PC (Steam: Windows, Linux, Steam Deck) and Android (Google Play).
 Your legs are slow and the ground is hostile. Your one real tool is a fishing rod that casts
 impossibly heavy weights: cast, lock the spool, and the weight drags you into the sky. Reel in, cut
-loose, recast in mid-air. Raid abandoned industrial sectors for salvage, outfly robot hounds,
-sentries and drones, and extract.
+loose, recast in mid-air. Raid an impossible public works department for salvage, outfly porcelain
+tea hounds, clockwork sentries and drones, and extract beneath a painted afternoon sky.
+
+The visual direction is **The Department of Unfinished Gravity**, an absurdist dreamscape of
+vacant chairs, suspended doors and ceremonial machinery. See [the art notes](docs/DREAMSCAPE.md)
+for the research, generated assets, screenshots and reproduction commands.
 
 **Status:** a playable prototype (one level, the full raid loop, rod physics, two enemy kinds,
 touch controls) with a working release pipeline. Version 1.0 is being built task by task:
@@ -98,5 +102,7 @@ powershell -ExecutionPolicy Bypass -File tools/build.ps1 -Target All
   workshop, achievements, settings and the menus.
 - `tests/`: headless suites run by `tests/run_all.ps1`.
 
-All game art and sound are generated in code. Engine credits and licences are in
+Models, animation and sound are generated in code. The dreamscape's sky, porcelain surface and
+in-world mural use original AI-generated textures in `assets/dreamscape/`; their exact prompts
+are recorded there. Engine credits and licences are in
 `THIRD_PARTY_NOTICES.txt`, which ships with every build.

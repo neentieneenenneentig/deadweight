@@ -36,6 +36,10 @@ signal enemy_killed(kind: String, by: String)
 
 const EnemyScript = preload("res://scripts/enemy.gd")
 const FX = preload("res://scripts/fx.gd")
+const Dreamscape = preload("res://scripts/dreamscape.gd")
+const DreamProps = preload("res://scripts/dream_props.gd")
+## Enemy kind table (CONTRACT 4.11 enemy()). Dummies are added by task E3; any other kind is skipped.
+const ENEMY_KINDS := ["hound", "sentry", "drone"]
 const ProfileScript = preload("res://scripts/profile.gd")
 
 const PICKUP_RADIUS := 2.0
@@ -66,32 +70,32 @@ const WATER_DPS := 25.0                              # deep water damage per sec
 ## Per-zone look. "colors" must define every material key (CONTRACT 4.11).
 const ZONES := {
 	"floodworks": {
-		"sky_top": "193b4a", "sky_horizon": "b6aa8e", "ground_bottom": "172d34", "ground_horizon": "9ba58e",
-		"ambient": "a8c8cd", "ambient_energy": 0.65, "fog": "536e72", "fog_density": 0.0035,
-		"sun": "ffd5a2", "sun_energy": 1.6, "sun_rotation": Vector3(-32, -24, 0),
+		"sky_top": "628d88", "sky_horizon": "e9cba8", "ground_bottom": "536663", "ground_horizon": "c3c6af",
+		"ambient": "b7c9ce", "ambient_energy": 0.48, "fog": "b6c4b9", "fog_density": 0.0018,
+		"sun": "ffe0b2", "sun_energy": 1.15, "sun_rotation": Vector3(-24, -32, 0),
 		"colors": {
-			"concrete": "35484a", "light_concrete": "647371", "dark": "14282f", "rust": "81513b",
-			"metal": "56666a", "yellow": "d8a84e", "stripe": "25383b", "glass": "7fb7bd", "water": "193e48",
+			"concrete": "d6c9b0", "light_concrete": "e2dac6", "dark": "473c52", "rust": "bd8380",
+			"metal": "819c96", "yellow": "c5a264", "stripe": "473c52", "glass": "b3cfc3", "water": "668a82",
 			"cyan": "5ad6c8", "amber": "ffc46b", "red": "ef654e", "orange": "f08a3c", "white": "c5d0bc",
 		},
 	},
 	"foundry": {
 		"sky_top": "0d0f12", "sky_horizon": "4a3226", "ground_bottom": "0a0b0d", "ground_horizon": "2e2420",
-		"ambient": "8a6a5a", "ambient_energy": 0.5, "fog": "2e211b", "fog_density": 0.006,
-		"sun": "ff9a5a", "sun_energy": 0.9, "sun_rotation": Vector3(-20, 40, 0),
+		"ambient": "b3a6c2", "ambient_energy": 0.45, "fog": "ad8b9b", "fog_density": 0.0028,
+		"sun": "ffc599", "sun_energy": 1.0, "sun_rotation": Vector3(-20, 40, 0),
 		"colors": {
-			"concrete": "3a3d3f", "light_concrete": "5f625f", "dark": "17181a", "rust": "7a3f27",
-			"metal": "5b6168", "yellow": "e0b13a", "stripe": "2a2a2c", "glass": "6c8791", "water": "4a2a14",
+			"concrete": "c7a99c", "light_concrete": "e1cbb5", "dark": "46344c", "rust": "ac777e",
+			"metal": "8b8b9e", "yellow": "c5a264", "stripe": "47394c", "glass": "b4a8c8", "water": "70576e",
 			"cyan": "5ad6c8", "amber": "ffb347", "red": "ff5a40", "orange": "ff7a1a", "white": "e8e0d0",
 		},
 	},
 	"spillway": {
 		"sky_top": "5f8fb8", "sky_horizon": "dce6ea", "ground_bottom": "9db0b6", "ground_horizon": "cfdadb",
-		"ambient": "d6e4ec", "ambient_energy": 0.9, "fog": "c4d4dc", "fog_density": 0.0025,
-		"sun": "fff4e0", "sun_energy": 1.9, "sun_rotation": Vector3(-48, -30, 0),
+		"ambient": "c8d9da", "ambient_energy": 0.55, "fog": "c7d6ce", "fog_density": 0.0017,
+		"sun": "fff4e0", "sun_energy": 1.1, "sun_rotation": Vector3(-34, -30, 0),
 		"colors": {
-			"concrete": "8d9893", "light_concrete": "bcc5c0", "dark": "3e4e55", "rust": "8a6048",
-			"metal": "7c8b92", "yellow": "e6c052", "stripe": "4c5a5e", "glass": "8fbccb", "water": "1f5f86",
+			"concrete": "dce0cf", "light_concrete": "e9e5d4", "dark": "47576c", "rust": "ad8b9e",
+			"metal": "8faea6", "yellow": "c9b079", "stripe": "47576c", "glass": "b8d8d3", "water": "749c9b",
 			"cyan": "5ad6c8", "amber": "ffc46b", "red": "ef654e", "orange": "f08a3c", "white": "eef2ee",
 		},
 	},
@@ -285,9 +289,14 @@ func pipe(from: Vector3, to: Vector3, radius: float, material: String = "rust", 
 func crate(base: Vector3, size: Vector3, yaw: float = 0.0) -> void:
 	var frame: Transform3D = _frame(base, yaw)
 	_part(frame, Vector3.UP * size.y * 0.5, size, "rust", true)
-	for x: float in [-0.37, 0.37]:
-		_part(frame, Vector3(x * size.x, size.y * 0.5, size.z * 0.5 + 0.025), Vector3(0.09, size.y, 0.04), "dark")
-	_part(frame, Vector3(0, size.y - 0.3, size.z * 0.5 + 0.04), Vector3(size.x * 0.8, 0.08, 0.04), "yellow")
+	# Ceremonial filing cabinets retain the original crate's exact solid volume.
+	var drawers: int = maxi(2, int(size.y / 0.85))
+	var height: float = size.y / float(drawers)
+	for i in range(drawers):
+		var y: float = (float(i) + 0.5) * height
+		_part(frame, Vector3(0, y, size.z * 0.5 + 0.025), Vector3(size.x * 0.88, height * 0.82, 0.04), "light_concrete")
+		_part(frame, Vector3(0, y + height * 0.17, size.z * 0.5 + 0.06), Vector3(minf(size.x * 0.24, 0.8), 0.13, 0.03), "dark")
+		_part(frame, Vector3(0, y - height * 0.14, size.z * 0.5 + 0.12), Vector3(minf(size.x * 0.3, 1.0), 0.08, 0.12), "yellow")
 
 
 func barrier(base: Vector3, length: float, yaw: float = 0.0) -> void:
@@ -386,12 +395,12 @@ func extraction(floor_point: Vector3) -> void:
 	add_child(_extract_ring)
 
 
-## Hounds and sentries today; drones and dummies arrive with tasks E2 and E3. Raids only:
+## Hounds, sentries and drones today; dummies arrive with task E3. Raids only:
 ## practice levels skip everything except dummies.
 func enemy(kind: String, position: Vector3, params: Dictionary = {}) -> void:
 	if practice and kind != "dummy":
 		return
-	if kind != "hound" and kind != "sentry":
+	if not ENEMY_KINDS.has(kind):
 		push_warning("Level %s: enemy kind '%s' is not available yet; skipped." % [level_id, kind])
 		return
 	var node := EnemyScript.new()
@@ -628,9 +637,12 @@ func _ensure_navigation_region() -> NavigationRegion3D:
 func apply_quality(value: int) -> void:
 	quality = clampi(value, 0, 2)
 	if is_instance_valid(_sun):
+		# Compatibility spends a draw per mesh per cascade. Two splits keep the
+		# mobile scene budget while Forward+ retains the high-quality four splits.
+		var shadow_quality: int = mini(quality, 1) if RenderingServer.get_current_rendering_method() == "gl_compatibility" else quality
 		_sun.shadow_enabled = quality >= 1
-		_sun.directional_shadow_max_distance = [40.0, 70.0, 100.0][quality]
-		_sun.directional_shadow_mode = [DirectionalLight3D.SHADOW_ORTHOGONAL, DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS][quality]
+		_sun.directional_shadow_max_distance = [40.0, 70.0, 100.0][shadow_quality]
+		_sun.directional_shadow_mode = [DirectionalLight3D.SHADOW_ORTHOGONAL, DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS][shadow_quality]
 	if _environment != null:
 		_environment.glow_enabled = quality >= 2
 		_environment.ssao_enabled = quality >= 2 and RenderingServer.get_current_rendering_method() == "forward_plus"
@@ -991,6 +1003,10 @@ static func _basis_with_up(up: Vector3) -> Basis:
 # --- Build internals ----------------------------------------------------------------------------
 
 func _finish_build() -> void:
+	var dream := Dreamscape.new()
+	dream.name = "DreamAtmosphere"
+	add_child(dream)
+	dream.dress(self)
 	_pending_count = _pending.size()
 	_merge_statics()
 	_build_environment()
@@ -1085,12 +1101,9 @@ func _build_environment() -> void:
 	_environment = Environment.new()
 	_environment.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = Color(str(preset["sky_top"]))
-	sky_material.sky_horizon_color = Color(str(preset["sky_horizon"]))
-	sky_material.ground_bottom_color = Color(str(preset["ground_bottom"]))
-	sky_material.ground_horizon_color = Color(str(preset["ground_horizon"]))
-	sky_material.sun_angle_max = 8.0
+	var sky_material := PanoramaSkyMaterial.new()
+	sky_material.panorama = Dreamscape.SKY
+	sky_material.energy_multiplier = 0.72 if zone == "foundry" else 1.0
 	sky.sky_material = sky_material
 	_environment.sky = sky
 	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
@@ -1100,6 +1113,8 @@ func _build_environment() -> void:
 	_environment.fog_enabled = true
 	_environment.fog_light_color = Color(str(preset["fog"]))
 	_environment.fog_light_energy = 0.65
+	# Sky fog defaults to fully opaque; retain the generated cloud painting.
+	_environment.fog_sky_affect = 0.12
 	_fog_base = float(preset["fog_density"])
 	_environment.fog_density = _fog_base
 	var holder := WorldEnvironment.new()
@@ -1112,6 +1127,12 @@ func _build_environment() -> void:
 	_sun.rotation_degrees = preset["sun_rotation"]
 	_sun.light_color = Color(str(preset["sun"]))
 	_sun.light_energy = float(preset["sun_energy"])
+	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
+		# Closed architectural meshes can use their back faces for depth, avoiding
+		# grazing-angle self-shadow stripes across the broad ceramic floors.
+		_sun.shadow_normal_bias = 3.0
+		_sun.shadow_bias = 0.5
+		_sun.shadow_reverse_cull_face = true
 	_sun.shadow_enabled = true
 	_sun.add_to_group("sun")
 	add_child(_sun)
@@ -1123,21 +1144,14 @@ func _add_pickup(floor_point: Vector3, title: String, kind: String, index: int) 
 	node.position = floor_point
 	add_child(node)
 	var body := MeshInstance3D.new()
-	var shape := BoxMesh.new()
-	shape.size = Vector3(1.2, 0.55, 0.8) if is_case else Vector3(0.9, 0.5, 0.9)
-	body.mesh = shape
-	body.material_override = _materials["yellow" if is_case else "orange"]
+	body.mesh = DreamProps.case_mesh()
+	body.set_surface_override_material(0, _materials["yellow" if is_case else "orange"])
+	body.set_surface_override_material(1, _materials["dark"])
+	body.set_surface_override_material(2, DreamProps.sky_material())
+	if not is_case:
+		body.scale = Vector3.ONE * 0.85
 	body.position.y = 0.4
 	node.add_child(body)
-	for x: float in [-0.4, 0.4]:
-		var stripe := MeshInstance3D.new()
-		var stripe_mesh := BoxMesh.new()
-		stripe_mesh.size = Vector3(0.08, 0.58, 0.82)
-		stripe.mesh = stripe_mesh
-		stripe.material_override = _materials["dark"]
-		stripe.position = Vector3(x, 0.4, 0)
-		body.add_child(stripe)
-		stripe.position = Vector3(x, 0, 0)
 	var marker := Label3D.new()
 	marker.text = ("◇  SALVAGE\n" if is_case else "◇  BONUS CACHE\n") + title
 	marker.position.y = 2.5
@@ -1188,7 +1202,11 @@ static func _zone_materials(zone_name: String) -> Dictionary:
 	return result
 
 
-static func _make_material(key: String, color: Color) -> StandardMaterial3D:
+static func _make_material(key: String, color: Color) -> Material:
+	if key == "concrete":
+		return Dreamscape.floor_material(color)
+	if key == "water":
+		return Dreamscape.water_material(color)
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
 	material.roughness = 0.88
@@ -1199,16 +1217,16 @@ static func _make_material(key: String, color: Color) -> StandardMaterial3D:
 		material.emission_energy_multiplier = 1.0
 		return material
 	if GRIME_KEYS.has(key):
-		# World-space triplanar noise: grime that never stretches, whatever a box's size.
-		material.albedo_texture = _grime()
+		# Generated ceramic patina, world projected so large surfaces retain their scale.
+		material.albedo_texture = Dreamscape.PORCELAIN
 		material.uv1_triplanar = true
 		material.uv1_world_triplanar = true
-		material.uv1_scale = Vector3.ONE * GRIME_SCALE
+		material.uv1_scale = Vector3.ONE * 0.18
 		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	match key:
 		"metal":
-			material.metallic = 0.55
-			material.roughness = 0.45
+			material.metallic = 0.22
+			material.roughness = 0.32
 		"glass":
 			material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			material.albedo_color = Color(color, 0.38)

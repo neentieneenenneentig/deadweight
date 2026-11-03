@@ -27,6 +27,7 @@ var _range_loot: int = 0
 var _deaths: int = 0
 var _death_kind: String = ""
 var _death_by: String = ""
+var _damage_log: Array = []          # [amount, source] for every hit the player takes
 
 
 func _initialize() -> void:
@@ -41,6 +42,7 @@ func _run() -> void:
 	_player.freeze = true
 	_player.set("active", true)
 	_player.global_position = Vector3(0, 0.92, 14)
+	_player.connect("damaged", _on_player_damaged)
 	_world = Catalog.create("l01")
 	_scene.add_child(_world)
 	_world.call("build", _player, true)
@@ -59,6 +61,9 @@ func _run() -> void:
 	await _test_hound_wall_route()
 	await _test_hound_gives_up()
 	await _test_hound_dies_once()
+	await _test_drone_orb_dodge()
+	await _test_drone_orb_hits()
+	await _test_drone_dies_once()
 	_scene.queue_free()
 	await _frames(3)
 	print("WORLD TEST: %d checks, %d failures" % [_checks, _failures])
@@ -351,7 +356,7 @@ func _test_hound_wall_route() -> void:
 	_check(bool(arena.get("navigation_ready")), "arena navmesh bakes with a wall in it")
 	_player.set("health", 100.0)
 	await _move_player(ARENA + Vector3(0, 0.92, -4))
-	var hound: CharacterBody3D = _new_arena_hound(arena, Vector3(0, 0.05, -10))
+	var hound: CharacterBody3D = _new_arena_enemy(arena, "hound", Vector3(0, 0.05, -10))
 	hound.call("set_active", true)
 	await _frames(2)
 	await _move_player(ARENA + Vector3(0, 0.92, 8))   # behind the wall, out of sight
@@ -378,7 +383,7 @@ func _test_hound_gives_up() -> void:
 	await _frames(2)
 	_player.set("health", 100.0)
 	await _move_player(ARENA + Vector3(0, 3.92, 8))   # standing on the platform
-	var hound: CharacterBody3D = _new_arena_hound(arena, Vector3(0, 0.05, -4))
+	var hound: CharacterBody3D = _new_arena_enemy(arena, "hound", Vector3(0, 0.05, -4))
 	var start: Vector3 = hound.global_position
 	hound.call("set_active", true)
 	var ticks: float = float(Engine.physics_ticks_per_second)
@@ -402,8 +407,8 @@ func _test_hound_gives_up() -> void:
 ## Three lethal hits, one death: died fires once, with the hound's kind and the lethal hit's source.
 func _test_hound_dies_once() -> void:
 	var arena: Node3D = _make_arena()
-	var hound: CharacterBody3D = _new_arena_hound(arena, Vector3(0, 0.05, 0))
-	hound.connect("died", _on_hound_died)
+	var hound: CharacterBody3D = _new_arena_enemy(arena, "hound", Vector3(0, 0.05, 0))
+	hound.connect("died", _on_enemy_died)
 	_deaths = 0
 	_check(hound.find_children("*", "MeshInstance3D", true, false).size() <= 14, "hound model stays within 14 mesh instances")
 	hound.call("take_damage", 1.0, "bullet")
@@ -413,6 +418,88 @@ func _test_hound_dies_once() -> void:
 	await _frames(20)
 	hound.call("take_damage", 500.0, "bullet")
 	_check(_deaths == 1 and _death_kind == "hound" and _death_by == "bullet", "a hound killed three times fires died exactly once, with its kind and source")
+	arena.queue_free()
+	await _frames(3)
+
+
+## A drone (CONTRACT 4.13) fires one orb after its charge. The player stands still, so the orb hits and
+## deals 14 x damage_scale (21 at 1.5). The drone also closes to about 12 m and hovers 4-10 m up.
+func _test_drone_orb_hits() -> void:
+	var arena: Node3D = _make_arena()
+	_player.set("health", 100.0)
+	_damage_log.clear()
+	await _move_player(ARENA + Vector3(0, 0.92, 0))
+	# setup() takes arena-local coordinates; start the flying enemy in its hover band.
+	var drone: CharacterBody3D = _new_arena_enemy(arena, "drone", Vector3(0, 7.05, -12))
+	drone.set("damage_scale", 1.5)
+	drone.call("set_active", true)
+	var orb: Node3D = await _wait_for_orb(arena, 8.0)
+	_check(orb != null, "a drone that sees the player charges and launches an orb")
+	if orb != null:
+		var gap: float = drone.global_position.distance_to(_player.global_position)
+		var height: float = drone.global_position.y - ARENA.y
+		_check(gap > 10.5 and gap < 13.5, "the drone closes to about 12 m from the player when it fires")
+		_check(height >= 4.0 and height <= 10.0, "the drone hovers 4-10 m above its anchor when it fires")
+	await _wait_for_damage(4.0)
+	_check(_damage_log.size() == 1 and _damage_log[0][1] == "drone" and is_equal_approx(float(_damage_log[0][0]), 21.0), "a still player takes one drone orb hit of 14 x damage_scale (21 at 1.5)")
+	_check(is_equal_approx(float(_player.get("health")), 79.0), "the orb hit lowers player health by the same amount")
+	arena.queue_free()
+	await _frames(3)
+
+
+## A drone orb can be dodged. The player steps 1.5 m sideways as soon as the orb leaves. The orb still
+## passes the player's old spot (the aim point), and the player takes no damage.
+func _test_drone_orb_dodge() -> void:
+	var arena: Node3D = _make_arena()
+	_player.set("health", 100.0)
+	_damage_log.clear()
+	await _move_player(ARENA + Vector3(0, 0.92, 0))
+	var drone: CharacterBody3D = _new_arena_enemy(arena, "drone", Vector3(0, 7.05, -12))
+	drone.call("set_active", true)
+	var orb: Node3D = await _wait_for_orb(arena, 8.0)
+	_check(orb != null, "a drone orb is in flight toward the player")
+	if orb != null:
+		var stood_at: Vector3 = _player.global_position
+		var aim_point: Vector3 = stood_at + Vector3.UP * 0.2
+		var to_player: Vector3 = stood_at - drone.global_position
+		var side: Vector3 = Vector3(-to_player.z, 0.0, to_player.x).normalized()
+		await _move_player(stood_at + side * 1.5)
+		var ticks: float = float(Engine.physics_ticks_per_second)
+		var closest: float = INF
+		for i in range(int(4.0 * ticks)):
+			await physics_frame
+			if not is_instance_valid(orb):
+				break
+			closest = minf(closest, orb.global_position.distance_to(aim_point))
+		_check(closest < 0.4, "the dodged orb passes the player's previous position")
+		_check(_damage_log.is_empty() and is_equal_approx(float(_player.get("health")), 100.0), "a player who steps aside is missed by the drone orb")
+	arena.queue_free()
+	await _frames(3)
+
+
+## Two lethal hits on a drone: died fires exactly once. The blast hurts the player who stands within
+## 3 m of it, and not one who stands farther away.
+func _test_drone_dies_once() -> void:
+	var arena: Node3D = _make_arena()
+	_player.set("health", 100.0)
+	await _move_player(ARENA + Vector3(0, 0.92, 0))
+	var near: CharacterBody3D = _new_arena_enemy(arena, "drone", Vector3(0, 0.05, 2))
+	near.connect("died", _on_enemy_died)
+	_deaths = 0
+	_damage_log.clear()
+	near.call("take_damage", 20.0, "bullet")
+	_check(_deaths == 0, "a drone survives a hit short of its 45 HP")
+	near.call("take_damage", 30.0, "bullet")
+	near.call("take_damage", 500.0, "bullet")
+	await _frames(20)
+	near.call("take_damage", 500.0, "bullet")
+	_check(_deaths == 1 and _death_kind == "drone" and _death_by == "bullet", "a drone killed three times fires died exactly once, with its kind and source")
+	_check(_damage_log.size() == 1 and _damage_log[0][1] == "drone" and is_equal_approx(float(_damage_log[0][0]), 25.0), "the blast hurts a player within 3 m, once, at 25 x damage_scale")
+	_damage_log.clear()
+	var far: CharacterBody3D = _new_arena_enemy(arena, "drone", Vector3(0, 0.05, -6))
+	far.connect("died", _on_enemy_died)
+	far.call("take_damage", 60.0, "bullet")
+	_check(_deaths == 2 and _damage_log.is_empty(), "a player farther than 3 m from a dying drone takes no blast damage")
 	arena.queue_free()
 	await _frames(3)
 
@@ -439,18 +526,42 @@ func _add_solid(parent: Node3D, center: Vector3, size: Vector3) -> void:
 	parent.add_child(body)
 
 
-func _new_arena_hound(arena: Node3D, location: Vector3) -> CharacterBody3D:
-	var hound: CharacterBody3D = EnemyScript.new()
-	arena.add_child(hound)
-	hound.call("setup", _player, "hound", location)
-	return hound
+func _new_arena_enemy(arena: Node3D, enemy_kind: String, location: Vector3) -> CharacterBody3D:
+	var enemy: CharacterBody3D = EnemyScript.new()
+	arena.add_child(enemy)
+	enemy.call("setup", _player, enemy_kind, location)
+	return enemy
+
+
+## Waits up to `seconds` for a drone orb node to appear under the arena and returns it, or null.
+func _wait_for_orb(arena: Node3D, seconds: float) -> Node3D:
+	var ticks: float = float(Engine.physics_ticks_per_second)
+	for i in range(int(seconds * ticks)):
+		await physics_frame
+		var orbs: Array[Node] = arena.find_children("*DroneOrb*", "MeshInstance3D", false, false)
+		if not orbs.is_empty():
+			return orbs[0] as Node3D
+	return null
+
+
+## Waits up to `seconds` until the player has taken a hit.
+func _wait_for_damage(seconds: float) -> void:
+	var ticks: float = float(Engine.physics_ticks_per_second)
+	for i in range(int(seconds * ticks)):
+		if not _damage_log.is_empty():
+			return
+		await physics_frame
+
+
+func _on_player_damaged(amount: float, source: String, _from_position: Vector3) -> void:
+	_damage_log.append([amount, source])
 
 
 func _planar_gap(a: Node3D, b: Node3D) -> float:
 	return Vector2(a.global_position.x - b.global_position.x, a.global_position.z - b.global_position.z).length()
 
 
-func _on_hound_died(kind: String, by: String) -> void:
+func _on_enemy_died(kind: String, by: String) -> void:
 	_deaths += 1
 	_death_kind = kind
 	_death_by = by

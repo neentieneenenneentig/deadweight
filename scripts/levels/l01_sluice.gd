@@ -68,7 +68,7 @@ func _build_entrance() -> void:
 	box(Vector3(0, 10.4, 8), Vector3(18.5, 1.8, 2), "rust")
 	box(Vector3(0, 10.3, 9.04), Vector3(15.2, 1.2, 0.1), "dark", false)
 	label("D E A D W E I G H T", Vector3(0, 10.3, 9.12), 56, Color("e0cda6"), 0.012)
-	label("FLOODWORKS  /  QUARANTINE SECTOR 09", Vector3(0, 8.7, 8.9), 26, Color("ffc46b"), 0.011)
+	label("FLOODWORKS  /  DEPARTMENT OF UNFINISHED GRAVITY", Vector3(0, 8.7, 8.9), 26, Color("ffc46b"), 0.011)
 	signboard("01   PUMP HOUSE", Vector3(-10, 2.1, -2), "SALVAGE SIGNAL   /   LEFT RAMP")
 	signboard("KEEP MOVING", Vector3(10, 2.1, 2), "CHARGE > CAST > LOCK > REEL")
 	for side: float in [-1.0, 1.0]:
@@ -94,7 +94,7 @@ func _build_pump_house() -> void:
 	box(Vector3(9, 2.5, -21), Vector3(9, 5, 10), "rust")
 	for y: float in [1.2, 2.4, 3.6]:
 		box(Vector3(9, y, -15.95), Vector3(8.2, 0.05, 0.04), "yellow", false)
-	label("C-09", Vector3(9, 3, -15.88), 58, Color("e8bc72"), 0.025)
+	label("09 / TOMORROW", Vector3(9, 3, -15.88), 42, Color("f1ddc4"), 0.025)
 	barrier(Vector3(0, 0, -24), 5.0)
 	crate(Vector3(19, 0, -31), Vector3(6, 3, 4))
 	signboard("02   HIGH GANTRY", Vector3(6, 2.1, -33), "LOOK UP   /   CAST OVER COVER")
@@ -171,12 +171,12 @@ func _build_dressing() -> void:
 	rng.seed = 90421
 	for side: float in [-1.0, 1.0]:
 		for i in range(12):
-			var height: float = rng.randf_range(11.0, 28.0)
+			var height: float = rng.randf_range(6.0, 13.0)
 			var x: float = side * rng.randf_range(36, 55)
 			var z: float = 20.0 - float(i) * 14.0
 			box(Vector3(x, height * 0.5 - 4, z), Vector3(rng.randf_range(8, 15), height, rng.randf_range(7, 12)), "dark", false)
 			if i % 3 == 0:
-				cylinder(Vector3(x, height + 1, z), 1.4, 10, "rust", false)
+				cylinder(Vector3(x, height + 1, z), 1.4, 5, "rust", false)
 		for z: float in [-14.0, -45.0, -78.0, -109.0]:
 			box(Vector3(side * 25.6, 5.6, z), Vector3(0.25, 11.2, 0.25), "rust")
 			box(Vector3(side * 24.2, 11, z), Vector3(3.0, 0.22, 0.3), "dark", false)

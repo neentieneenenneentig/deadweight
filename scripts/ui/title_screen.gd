@@ -3,7 +3,7 @@ extends "res://scripts/ui/screen.gd"
 ## 3D backdrop. CONTINUE (or CAMPAIGN on a fresh profile) opens the next unfinished raid;
 ## PRACTICE RANGE starts the sandbox; the rest open sub screens. QUIT is desktop only.
 
-const TAGLINE := "SALVAGE RAIDS  /  FLOODWORKS QUARANTINE"
+const TAGLINE := "DEPARTMENT OF UNFINISHED GRAVITY"
 
 var _logo: Control
 var _bank_chip: Label

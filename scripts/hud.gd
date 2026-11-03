@@ -2,20 +2,23 @@ extends CanvasLayer
 ## Native in-game interface and touch input. Desktop input belongs to main.gd. Menus, pause and
 ## the result screen belong to ui_root.gd (CONTRACT 4.15). Layout follows CONTRACT 4.14 and 5.9:
 ## vitals top-left, timer and medal target top-centre, objectives top-right, reticle at the
-## centre, weapon and line bottom-centre, hints above them.
+## centre, weapon and line bottom-centre, hints above them. G7 adds world markers and damage
+## arcs under the panels, speed and danger vignettes, and the touch options (CONTRACT 5.2).
 
 const UiTheme = preload("res://scripts/ui/theme.gd")
 
 signal action_requested(action: String, pressed: bool)
 signal look_requested(delta: Vector2)
 
-const PANEL := Color(0.035, 0.075, 0.085, 0.9)
-const PANEL_EDGE := Color(0.43, 0.65, 0.64, 0.18)
-const PAPER := Color("e5ebe5")
-const MUTED := Color("94aaa9")
-const AMBER := Color("f5b45b")
-const CYAN := Color("67d5d2")
-const RED := Color("ed7263")
+const PANEL := UiTheme.PANEL
+const PANEL_EDGE := Color(0.78, 0.69, 0.52, 0.3)
+const PAPER := UiTheme.PAPER
+const MUTED := UiTheme.MUTED
+const AMBER := UiTheme.AMBER
+const CYAN := UiTheme.CYAN
+const RED := UiTheme.RED
+## Extraction markers are green-white so they read apart from the cyan salvage and amber bonus.
+const EXTRACT_COLOR := Color("d2f7d6")
 
 ## Margin kept between the screen edge and every panel, before device insets are added.
 const EDGE := 24.0
@@ -27,11 +30,31 @@ const TENSION_FULL := 25000.0
 const FAST_SPEED := 15.0
 ## On touch the pause pad sits in the top-right corner, so the objectives panel drops below it.
 const TOUCH_TOP_OFFSET := 56.0
+## Damage arcs live this long (seconds) and fade over that time, on a ring round the reticle.
+const ARC_LIFETIME := 0.8
+const ARC_RADIUS := 84.0
+## Half-width of an arc in radians (about 18 degrees either side of the source bearing).
+const ARC_SPAN := 0.32
+const ARC_WIDTH := 4.0
+## Oldest arcs are dropped beyond this count, so a burst of hits stays readable.
+const MAX_ARCS := 6
+## Objective markers and their edge arrows stay this far from the screen edge (before insets).
+const MARKER_EDGE := 44.0
+## Speed band for the speed vignette: nothing below START, full strength at FULL (m/s).
+const SPEED_VIGNETTE_START := 14.0
+const SPEED_VIGNETTE_FULL := 24.0
+## Touch options (CONTRACT 5.2) are clamped to these ranges.
+const TOUCH_SCALE_RANGE := Vector2(0.75, 1.35)
+const TOUCH_OPACITY_RANGE := Vector2(0.3, 1.0)
 
 var move_vector := Vector2.ZERO
 var touch_enabled: bool = false
 ## Numeric readouts (speed, line tension, charge percent) show only when this is on.
 var show_telemetry: bool = true
+## Touch options from the profile: pad size multiplier, pad opacity and the mirrored layout.
+var touch_scale: float = 1.0
+var touch_opacity: float = 0.8
+var touch_left_handed: bool = false
 ## Device insets in canvas pixels (left, top, right, bottom). Tests set it to fake a notch;
 ## a negative x means "use the device".
 var safe_insets_override := Vector4(-1.0, -1.0, -1.0, -1.0)
@@ -40,6 +63,8 @@ var _root: Control
 var _game: Control
 var _touch: Control
 var _vignette: Vignette
+var _speed_vignette: Vignette
+var _overlay: WorldOverlay
 var _health_panel: PanelContainer
 var _health_style: StyleBoxFlat
 var _health_label: Label
@@ -78,17 +103,23 @@ var _hint_override := ""
 var _clock := 0.0
 var _low_health := false
 var _pulse_applied := false
+## Objectives from main.gd (CONTRACT 5.8) and the camera they are projected through.
+var _objectives: Array = []
+var _camera: Camera3D
+## Live damage arcs: {"bearing": float (radians, NAN = no direction), "time", "amount", "source"}.
+var _arcs: Array = []
 
 
-## Full-screen red edge that warns of nearby danger.
+## Full-screen edge tint. Strength 0..1 sets how far the edge glow reaches.
 class Vignette extends Control:
 
-	var danger := 0.0
+	var strength := 0.0
+	var tint := Color(0.83, 0.19, 0.12)
 
 	func _draw() -> void:
-		if danger <= 0.01:
+		if strength <= 0.01:
 			return
-		var edge := Color(0.83, 0.19, 0.12, danger * 0.45)
+		var edge := Color(tint, strength * 0.45)
 		draw_rect(Rect2(Vector2.ZERO, size), edge, false, 7.0)
 		draw_rect(Rect2(Vector2(7, 7), size - Vector2(14, 14)), Color(edge, edge.a * 0.4), false, 15.0)
 
@@ -120,6 +151,70 @@ class Reticle extends Control:
 		if hit > 0.0:
 			for axis in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
 				draw_line(center + axis * 8.0, center + axis * 14.0, Color(1.0, 0.77, 0.4, hit), 2.5, true)
+
+
+## World-space HUD: damage arcs round the reticle and objective markers (diamonds on screen,
+## arrows on the edge when off screen). HUD fills both lists every frame; the panels draw above it.
+class WorldOverlay extends Control:
+
+	var markers: Array = []
+	var arcs: Array = []
+
+	func _draw() -> void:
+		for arc: Dictionary in arcs:
+			_draw_arc(arc)
+		for marker: Dictionary in markers:
+			_draw_marker(marker)
+
+	## Arc fades with its remaining time and points at the source bearing (0 = straight ahead).
+	func _draw_arc(arc: Dictionary) -> void:
+		var fade: float = clampf(float(arc["time"]) / ARC_LIFETIME, 0.0, 1.0)
+		var centre: Vector2 = size * 0.5
+		var width: float = ARC_WIDTH + clampf(float(arc["amount"]) / 25.0, 0.0, 1.0) * 3.0
+		var bearing: float = arc["bearing"]
+		if is_nan(bearing):
+			# No usable direction (fall damage, or a source directly overhead): a faint full ring.
+			draw_arc(centre, ARC_RADIUS, 0.0, TAU, 64, Color(RED, 0.4 * fade), width, true)
+			return
+		var heading: float = Vector2(sin(bearing), -cos(bearing)).angle()
+		draw_arc(centre, ARC_RADIUS, heading - ARC_SPAN, heading + ARC_SPAN, 24, Color(RED, 0.95 * fade), width, true)
+
+	## Entry keys (from HUD._marker_entry): on_screen, point, direction, color, active, next, distance.
+	## Done (inactive) markers dim, the next objective is largest and brightest.
+	func _draw_marker(marker: Dictionary) -> void:
+		var color: Color = marker["color"]
+		var alpha: float = 1.0 if bool(marker["next"]) else (0.7 if bool(marker["active"]) else 0.3)
+		color.a *= alpha
+		var label: String = "%d M" % roundi(float(marker["distance"]))
+		var point: Vector2 = marker["point"]
+		if bool(marker["on_screen"]):
+			var radius: float = 13.0 if bool(marker["next"]) else 9.0
+			var diamond := PackedVector2Array([
+				point + Vector2(0, -radius), point + Vector2(radius, 0),
+				point + Vector2(0, radius), point + Vector2(-radius, 0)])
+			draw_colored_polygon(diamond, Color(color, color.a * 0.18))
+			var outline: PackedVector2Array = diamond.duplicate()
+			outline.append(diamond[0])
+			draw_polyline(outline, color, 2.0, true)
+			_draw_label(label, Vector2(point.x, point.y + radius + 16.0), color)
+			return
+		# Off screen: a chevron on the edge, pointing toward the objective, with its distance inside.
+		var direction: Vector2 = marker["direction"]
+		var side := Vector2(-direction.y, direction.x)
+		var arrow := PackedVector2Array([
+			point + direction * 14.0,
+			point - direction * 6.0 + side * 9.0,
+			point - direction * 6.0 - side * 9.0])
+		draw_colored_polygon(arrow, color)
+		_draw_label(label, point - direction * 30.0, color)
+
+	## Small centred caption with a shadow so it reads over bright ground.
+	func _draw_label(text: String, centre: Vector2, color: Color) -> void:
+		var font: Font = ThemeDB.fallback_font
+		var width: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+		var origin := Vector2(centre.x - width * 0.5, centre.y + 4.0)
+		draw_string(font, origin + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0, 0, 0, 0.7))
+		draw_string(font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, color)
 
 
 class TouchPad extends Control:
@@ -167,6 +262,8 @@ func _process(delta: float) -> void:
 	_clock += delta
 	_update_pulse()
 	_update_banner(delta)
+	_tick_effects(delta)
+	_refresh_markers()
 
 
 func _notification(what: int) -> void:
@@ -242,10 +339,21 @@ func _bar(parent: Node, color: Color, height: float = 5.0) -> ProgressBar:
 func _build_game() -> void:
 	_game = _control(_root)
 	_fill(_game)
+	# Tints first, so the markers, arcs and every panel draw above them.
 	_vignette = Vignette.new()
 	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_game.add_child(_vignette)
 	_fill(_vignette)
+	_speed_vignette = Vignette.new()
+	_speed_vignette.tint = CYAN
+	_speed_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_game.add_child(_speed_vignette)
+	_fill(_speed_vignette)
+	_overlay = WorldOverlay.new()
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overlay.arcs = _arcs
+	_game.add_child(_overlay)
+	_fill(_overlay)
 	_build_vitals()
 	_build_timer()
 	_build_objectives()
@@ -258,6 +366,10 @@ func _build_game() -> void:
 	_hint.add_theme_constant_override("shadow_offset_y", 2)
 	_bottom_controls = _label(_game, "LMB CAST    RMB LOCK    E REEL    Q CUT    F WEAPON    R RELOAD    ESC PAUSE", 12, MUTED)
 	_bottom_controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# These labels float over bright porcelain and sky rather than an opaque panel.
+	for floating_label: Label in [_bottom_controls, _reticle_state, _practice_label]:
+		floating_label.add_theme_color_override("font_outline_color", UiTheme.INK)
+		floating_label.add_theme_constant_override("outline_size", 3)
 	_build_banner()
 
 
@@ -414,9 +526,9 @@ func _reflow() -> void:
 	_banner.size = Vector2(banner_width, 0)
 	_banner.position = Vector2(mid_x - banner_width * 0.5, top + 110.0)
 
-	# Touch controls: stick bottom-left, buttons bottom-right, pause top-right.
-	_stick.position = Vector2(left + 14.0, bottom - 180.0)
-	_stick.size = Vector2(158, 158)
+	# Touch controls: stick bottom-left, buttons bottom-right, pause top-right. Left-handed mirrors
+	# the thumb controls to the other side; the pause pad stays top-right because the vitals sit top-left.
+	_place_control(_stick, Vector2(left + 93.0, bottom - 101.0), 158.0)
 	_place_pad("cast", Vector2(right - 66.0, bottom - 133.0), 112.0)
 	_place_pad("reel", Vector2(right - 188.0, bottom - 64.0), 94.0)
 	_place_pad("lock", Vector2(right - 180.0, bottom - 180.0), 82.0)
@@ -424,14 +536,24 @@ func _reflow() -> void:
 	_place_pad("weapon", Vector2(right - 276.0, bottom - 170.0), 70.0)
 	_place_pad("reload", Vector2(right - 268.0, bottom - 264.0), 64.0)
 	_place_pad("jump", Vector2(right - 294.0, bottom - 62.0), 68.0)
-	_place_pad("pause", Vector2(right - 22.0, top + 22.0), 46.0)
+	_place_pad("pause", Vector2(right - 22.0, top + 22.0), 46.0, false)
 
 
-func _place_pad(action: String, center: Vector2, diameter: float) -> void:
+func _place_pad(action: String, center: Vector2, diameter: float, mirror: bool = true) -> void:
 	var pad: TouchPad = _touch_pads[action]
-	pad.position = center - Vector2.ONE * diameter * 0.5
-	pad.size = Vector2.ONE * diameter
-	pad.queue_redraw()
+	_place_control(pad, center, diameter, mirror)
+
+
+## Places a touch control centred on center, scaled by touch_scale. Left-handed mirrors centre x
+## across the screen, so the thumb layout keeps the same spacing on the other side.
+func _place_control(control: TouchPad, center: Vector2, diameter: float, mirror: bool = true) -> void:
+	var placed: Vector2 = center
+	if mirror and touch_left_handed:
+		placed.x = _last_size.x - center.x
+	var side: float = diameter * touch_scale
+	control.position = placed - Vector2.ONE * side * 0.5
+	control.size = Vector2.ONE * side
+	control.queue_redraw()
 
 
 # --- Public API (CONTRACT 4.14) ----------------------------------------------------------------
@@ -466,9 +588,48 @@ func release_touches() -> void:
 	move_vector = Vector2.ZERO
 
 
-## Reads the profile settings the HUD uses. G7 adds the touch options here.
+## Reads the profile settings the HUD owns (CONTRACT 5.2): show_telemetry, touch_scale,
+## touch_opacity and touch_left_handed. Every touch control is re-placed at once.
 func apply_settings(settings: Dictionary) -> void:
 	show_telemetry = bool(settings.get("show_telemetry", true))
+	touch_scale = clampf(float(settings.get("touch_scale", 1.0)), TOUCH_SCALE_RANGE.x, TOUCH_SCALE_RANGE.y)
+	touch_opacity = clampf(float(settings.get("touch_opacity", 0.8)), TOUCH_OPACITY_RANGE.x, TOUCH_OPACITY_RANGE.y)
+	touch_left_handed = bool(settings.get("touch_left_handed", false))
+	if is_instance_valid(_touch):
+		_touch.modulate.a = touch_opacity
+	_reflow()
+
+
+## Gives the HUD the camera that objective markers and damage arcs are measured against.
+func set_camera(camera: Camera3D) -> void:
+	_camera = camera
+	_refresh_markers()
+
+
+## Objectives from level.get_objectives() (CONTRACT 5.8). main.gd sends them every frame while playing.
+func set_objectives(objectives: Array) -> void:
+	_objectives = objectives
+	_refresh_markers()
+
+
+## A hit from source at from_position (world space). The arc points where the hit came from,
+## relative to the camera's facing. Pass Vector3.INF when the source has no position (falls).
+func damage_from(amount: float, source: String, from_position: Vector3) -> void:
+	var bearing: float = NAN
+	if _camera_ready() and from_position.is_finite():
+		var local: Vector3 = _camera.global_transform.affine_inverse() * from_position
+		if Vector2(local.x, local.z).length_squared() > 0.0001:
+			# 0 is straight ahead, positive is to the right.
+			bearing = atan2(local.x, -local.z)
+	_arcs.append({"bearing": bearing, "time": ARC_LIFETIME, "amount": amount, "source": source})
+	while _arcs.size() > MAX_ARCS:
+		_arcs.pop_front()
+	_overlay.queue_redraw()
+
+
+## Number of damage arcs still on screen (used by the tests).
+func arc_count() -> int:
+	return _arcs.size()
 
 
 func show_banner(title: String, subtitle: String = "", duration: float = 2.5, accent: String = "amber") -> void:
@@ -504,10 +665,11 @@ func update_state(data: Dictionary) -> void:
 	_update_objectives(loot, total_loot, int(data.get("bonus", 0)), int(data.get("total_bonus", 0)), inside, extract_ready, clampf(float(data.get("extraction", 0.0)), 0.0, 1.0))
 	_update_weapon(data, sidearm, charge, reel, tension, tension_norm)
 	_update_reticle(data, charge, reel, tension, tension_norm, sidearm)
+	_update_vignettes(clampf(float(data.get("danger", 0.0)), 0.0, 1.0), speed)
 	_hint.text = str(data.get("hint", _hint_override))
 	_practice_label.visible = bool(data.get("practice", false))
 	if touch_enabled:
-		_update_captions(sidearm, reel)
+		_update_captions(sidearm, reel, bool(data.get("reloading", false)))
 
 
 func set_hint(text: String) -> void:
@@ -590,10 +752,17 @@ func _update_reticle(data: Dictionary, charge: float, reel: String, tension: flo
 	_reticle.charge = charge
 	_reticle.tension = tension_norm
 	_reticle.queue_redraw()
-	_vignette.danger = clampf(float(data.get("danger", 0.0)), 0.0, 1.0)
-	_vignette.queue_redraw()
 	_reticle_state.text = _state_text(data, charge, reel, tension)
 	_reticle_state.add_theme_color_override("font_color", RED if bool(data.get("alert", false)) else PAPER)
+
+
+## Danger tints the whole edge red (low health or a recent hit). Speed tints it cyan above
+## SPEED_VIGNETTE_START, so a fast run reads at a glance even with the numbers hidden.
+func _update_vignettes(danger: float, speed: float) -> void:
+	_vignette.strength = danger
+	_speed_vignette.strength = clampf((speed - SPEED_VIGNETTE_START) / (SPEED_VIGNETTE_FULL - SPEED_VIGNETTE_START), 0.0, 1.0)
+	_vignette.queue_redraw()
+	_speed_vignette.queue_redraw()
 
 
 ## Short state word under the reticle. Numbers are appended only when telemetry is on.
@@ -610,16 +779,128 @@ func _state_text(data: Dictionary, charge: float, reel: String, tension: float) 
 	return text
 
 
-func _update_captions(sidearm: bool, reel: String) -> void:
+## Touch captions follow the state: FIRE with the sidearm, FREE while the line is reeling or locked,
+## WAIT while reloading and STALL when the reel is stalled. Other captions stay fixed.
+func _update_captions(sidearm: bool, reel: String, reloading: bool) -> void:
+	var upper: String = reel.to_upper()
 	var cast_pad: TouchPad = _touch_pads["cast"]
 	var weapon_pad: TouchPad = _touch_pads["weapon"]
 	var lock_pad: TouchPad = _touch_pads["lock"]
+	var reload_pad: TouchPad = _touch_pads["reload"]
+	var reel_pad: TouchPad = _touch_pads["reel"]
 	cast_pad.caption = "FIRE" if sidearm else "CAST"
 	weapon_pad.caption = "ROD" if sidearm else "GUN"
-	lock_pad.caption = "FREE" if "LOCK" in reel.to_upper() or "REEL" in reel.to_upper() else "LOCK"
-	cast_pad.queue_redraw()
-	weapon_pad.queue_redraw()
-	lock_pad.queue_redraw()
+	lock_pad.caption = "FREE" if "LOCK" in upper or "REEL" in upper else "LOCK"
+	reload_pad.caption = "WAIT" if reloading else "LOAD"
+	reel_pad.caption = "STALL" if "STALL" in upper else "REEL"
+	for pad: TouchPad in [cast_pad, weapon_pad, lock_pad, reload_pad, reel_pad]:
+		pad.queue_redraw()
+
+
+# --- Objective markers and damage arcs ---------------------------------------------------------
+
+func _camera_ready() -> bool:
+	return is_instance_valid(_camera) and _camera.is_inside_tree()
+
+
+## Rectangle where markers and edge arrows may sit: the screen minus the margin and device insets.
+func marker_bounds() -> Rect2:
+	var view: Vector2 = get_viewport().get_visible_rect().size
+	var insets: Vector4 = _device_insets(view)
+	var start := Vector2(maxf(MARKER_EDGE, insets.x + 12.0), maxf(MARKER_EDGE, insets.y + 12.0))
+	var finish := view - Vector2(maxf(MARKER_EDGE, insets.z + 12.0), maxf(MARKER_EDGE, insets.w + 12.0))
+	return Rect2(start, finish - start)
+
+
+## Where a world point appears. On screen: its canvas point. Off screen (behind the camera or
+## outside the view): the point where an arrow sits on the marker bounds edge, and the unit
+## direction the arrow points. Behind the camera, the direction is the side the point lies on.
+func project_marker(world: Vector3) -> Dictionary:
+	var bounds: Rect2 = marker_bounds()
+	if not _camera_ready():
+		return {"on_screen": false, "point": bounds.get_center(), "direction": Vector2.DOWN}
+	if not _camera.is_position_behind(world):
+		var point: Vector2 = _camera.unproject_position(world)
+		if bounds.has_point(point):
+			return {"on_screen": true, "point": point, "direction": Vector2.ZERO}
+		return _edge_result(point - bounds.get_center(), bounds)
+	# Behind: the projection would mirror, so take the side from the camera-local offset instead.
+	var local: Vector3 = _camera.global_transform.affine_inverse() * world
+	var toward := Vector2(local.x, -local.y)
+	if toward.length_squared() < 0.000001:
+		toward = Vector2.DOWN
+	return _edge_result(toward, bounds)
+
+
+## Clamps a ray from the bounds centre to the bounds edge, and returns the arrow placement.
+func _edge_result(toward: Vector2, bounds: Rect2) -> Dictionary:
+	var direction: Vector2 = toward.normalized()
+	var centre: Vector2 = bounds.get_center()
+	var half: Vector2 = bounds.size * 0.5
+	var along_x: float = half.x / absf(direction.x) if absf(direction.x) > 0.0001 else INF
+	var along_y: float = half.y / absf(direction.y) if absf(direction.y) > 0.0001 else INF
+	return {"on_screen": false, "point": centre + direction * minf(along_x, along_y), "direction": direction}
+
+
+## Rebuilds the marker list from the objectives and the camera, then asks the overlay to redraw.
+## Called every frame while active (the camera moves) and whenever objectives or camera change.
+func _refresh_markers() -> void:
+	if not is_instance_valid(_overlay):
+		return
+	var entries: Array = []
+	if _active and _camera_ready() and not _objectives.is_empty():
+		var next_index: int = _next_objective()
+		for i in range(_objectives.size()):
+			entries.append(_marker_entry(_objectives[i], i == next_index))
+	_overlay.markers = entries
+	_overlay.queue_redraw()
+
+
+func _marker_entry(objective: Dictionary, is_next: bool) -> Dictionary:
+	var world: Vector3 = objective.get("position", Vector3.ZERO)
+	var entry: Dictionary = project_marker(world)
+	entry["color"] = _kind_color(str(objective.get("kind", "case")))
+	entry["active"] = bool(objective.get("active", true))
+	entry["next"] = is_next
+	entry["distance"] = _camera.global_position.distance_to(world)
+	return entry
+
+
+## Index of the nearest active objective: the one the player should head for next, or -1.
+func _next_objective() -> int:
+	var best := -1
+	var best_distance := INF
+	for i in range(_objectives.size()):
+		var objective: Dictionary = _objectives[i]
+		if not bool(objective.get("active", true)):
+			continue
+		var world: Vector3 = objective.get("position", Vector3.ZERO)
+		var distance: float = _camera.global_position.distance_to(world)
+		if distance < best_distance:
+			best_distance = distance
+			best = i
+	return best
+
+
+func _kind_color(kind: String) -> Color:
+	match kind:
+		"bonus":
+			return AMBER
+		"extract":
+			return EXTRACT_COLOR
+	return CYAN
+
+
+## Ages the damage arcs and drops the ones that have run out (ARC_LIFETIME seconds each).
+func _tick_effects(delta: float) -> void:
+	var index: int = _arcs.size() - 1
+	while index >= 0:
+		var arc: Dictionary = _arcs[index]
+		arc["time"] = float(arc["time"]) - delta
+		if float(arc["time"]) <= 0.0:
+			_arcs.remove_at(index)
+		index -= 1
+	_overlay.queue_redraw()
 
 
 # --- Per-frame effects -------------------------------------------------------------------------
@@ -695,7 +976,9 @@ func _begin_touch(index: int, position: Vector2) -> void:
 		if position.distance_to(pad.global_position + pad.size * 0.5) <= pad.size.x * 0.5 and not action in _touch_roles.values():
 			role = action
 			break
-	if role == "look" and position.x < _last_size.x * 0.4 and position.y > _last_size.y * 0.4 and not "move" in _touch_roles.values():
+	# The stick takes the thumb side: left-hand for the usual layout, right-hand when mirrored.
+	var in_move_zone: bool = (position.x > _last_size.x * 0.6) if touch_left_handed else (position.x < _last_size.x * 0.4)
+	if role == "look" and in_move_zone and position.y > _last_size.y * 0.4 and not "move" in _touch_roles.values():
 		role = "move"
 	_touch_roles[index] = role
 	if role == "move":

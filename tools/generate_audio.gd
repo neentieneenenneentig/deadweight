@@ -5,6 +5,8 @@ extends SceneTree
 ##   <godot> --headless --path . --script res://tools/generate_audio.gd
 ## Check that every generated file loads (run after an --import pass):
 ##   <godot> --headless --path . --script res://tools/generate_audio.gd -- --check
+## Music (task A3) is a separate section: -- --music renders audio/music (tracks and stingers)
+## and prints its analysis. --check also verifies the music files.
 ##
 ## Each sound is a spec: layers (oscillators or noise, each with an envelope and an
 ## optional filter and LFO) followed by a global filter, saturation, a feedback delay
@@ -52,12 +54,28 @@ const LOOPS := [
 	["wind", "power"], ["reel", "power"], ["tension", "power"], ["drone_hum", "linear"],
 ]
 
+## Music (task A3, CONTRACT 4.17): a 16-bar loop per zone and three stingers, 32 kHz stereo.
+## Tracks are [id, tempo]; a loop is BARS bars of 4/4 at that tempo. Stingers are [id, seconds].
+const MUSIC_DIR := "res://audio/music"
+const MUSIC_RATE := 32000
+const BARS := 16
+const MUSIC_TRACKS := [["menu", 84.0], ["floodworks", 104.0], ["foundry", 80.0], ["spillway", 92.0]]
+const MUSIC_STINGERS := [["victory", 3.0], ["defeat", 3.0], ["medal", 2.5]]
+const MUSIC_RMS_DB := -20.0     # one loudness target for tracks and stingers
+const NOISE_LP := 0             # noise filter modes used by _noise()
+const NOISE_HP := 1
+const NOISE_BP := 2
+
 
 func _init() -> void:
 	var user_args: PackedStringArray = OS.get_cmdline_user_args()
 	var code: int = 0
 	if user_args.has("--check"):
 		code = _check()
+		if _check_music() > 0:
+			code = 1
+	elif user_args.has("--music"):
+		code = _generate_music()
 	else:
 		code = _generate()
 	quit(code)
@@ -973,7 +991,7 @@ func _seed_for(text: String) -> int:
 	return hash_value
 
 
-func _import_text(wav_path: String, loop_end: int) -> String:
+func _import_text(wav_path: String, loop_end: int, rate: int = RATE) -> String:
 	var loop_mode: int = 2 if loop_end > 0 else 1  # 2 = forward, 1 = disabled
 	var lines: PackedStringArray = PackedStringArray([
 		"[remap]", "", "importer=\"wave\"", "type=\"AudioStreamWAV\"", "",
@@ -988,24 +1006,29 @@ func _import_text(wav_path: String, loop_end: int) -> String:
 		"force/8_bit=false",
 		"force/mono=false",
 		"force/max_rate=false",
-		"force/max_rate_hz=44100",
+		"force/max_rate_hz=%d" % rate,
 		"",
 	])
 	return "\n".join(lines)
 
 
-## RIFF/WAVE mono 16-bit at RATE. When loop_end > 0 an smpl chunk marks the loop.
+## RIFF/WAVE mono 16-bit at RATE (the SFX format). When loop_end > 0 an smpl chunk marks the loop.
 func _wav_bytes(samples: PackedInt32Array, loop_end: int) -> PackedByteArray:
+	return _wav_file(samples, 1, RATE, loop_end)
+
+
+## RIFF/WAVE 16-bit PCM with `channels` interleaved channels at `rate`. loop_end is in frames.
+func _wav_file(samples: PackedInt32Array, channels: int, rate: int, loop_end: int) -> PackedByteArray:
 	var body := PackedByteArray()
 	body.append_array("WAVE".to_ascii_buffer())
 	body.append_array("fmt ".to_ascii_buffer())
 	body.append_array(_u32(16))
-	body.append_array(_u16(1))          # PCM
-	body.append_array(_u16(1))          # mono
-	body.append_array(_u32(RATE))
-	body.append_array(_u32(RATE * 2))   # byte rate
-	body.append_array(_u16(2))          # block align
-	body.append_array(_u16(16))         # bits per sample
+	body.append_array(_u16(1))                     # PCM
+	body.append_array(_u16(channels))
+	body.append_array(_u32(rate))
+	body.append_array(_u32(rate * channels * 2))   # byte rate
+	body.append_array(_u16(channels * 2))          # block align
+	body.append_array(_u16(16))                    # bits per sample
 	if loop_end > 0:
 		body.append_array("smpl".to_ascii_buffer())
 		body.append_array(_u32(60))
@@ -1059,3 +1082,480 @@ func _write_bytes(path: String, data: PackedByteArray) -> void:
 		return
 	file.store_buffer(data)
 	file.close()
+
+
+# ---------------------------------------------------------------------------
+# Music (task A3). Every track is a list of notes placed on a beat grid and summed into
+# stereo buffers. A loop wraps: a note that runs past the loop end continues at the start,
+# so the seam is the same waveform carrying on and needs no crossfade. Stingers are linear
+# and fade at both ends. Each note is its own contiguous stream, so pitch and envelope stay
+# continuous. Notes write into the _l and _r members (member arrays change in place).
+# ---------------------------------------------------------------------------
+
+var _l := PackedFloat32Array()
+var _r := PackedFloat32Array()
+var _wrap: bool = true          # true for loops (wrap at the end), false for stingers
+var _beat: float = 0.0          # frames per beat (tracks only)
+var _spb: float = 0.5           # seconds per beat (tracks only)
+var _mrng := RandomNumberGenerator.new()
+
+
+## Renders --music: four loops, then three stingers, then the shared analysis table.
+func _generate_music() -> int:
+	DirAccess.make_dir_recursive_absolute(MUSIC_DIR)
+	var rows: Array = []
+	for row in MUSIC_TRACKS:
+		rows.append(_build_track(String(row[0]), float(row[1])))
+	for row in MUSIC_STINGERS:
+		rows.append(_build_stinger(String(row[0]), float(row[1])))
+	var code: int = _report(rows)
+	_print_music_size()
+	return code
+
+
+## Verifies every music file loads with the expected format, loop flag and length.
+func _check_music() -> int:
+	var failures: int = 0
+	for row in MUSIC_TRACKS:
+		failures += _check_music_file(String(row[0]), _track_frames(float(row[1])), true)
+	for row in MUSIC_STINGERS:
+		failures += _check_music_file(String(row[0]), _sec(float(row[1])), false)
+	print("CHECK music: %d files, %d failures" % [MUSIC_TRACKS.size() + MUSIC_STINGERS.size(), failures])
+	return failures
+
+
+func _check_music_file(id: String, frames: int, loop: bool) -> int:
+	var path: String = "%s/%s.wav" % [MUSIC_DIR, id]
+	var wav: AudioStreamWAV = load(path) as AudioStreamWAV
+	if wav == null:
+		print("FAIL load %s" % path)
+		return 1
+	var failures: int = 0
+	var expect_loop: int = AudioStreamWAV.LOOP_FORWARD if loop else AudioStreamWAV.LOOP_DISABLED
+	if wav.mix_rate != MUSIC_RATE or not wav.stereo or wav.format != AudioStreamWAV.FORMAT_16_BITS:
+		print("FAIL format %s" % path)
+		failures += 1
+	if wav.loop_mode != expect_loop:
+		print("FAIL loop_mode %s (got %d)" % [path, wav.loop_mode])
+		failures += 1
+	if absf(wav.get_length() * float(MUSIC_RATE) - float(frames)) > 0.5:
+		print("FAIL length %s (got %.4f s, want %.4f s)" % [path, wav.get_length(), float(frames) / float(MUSIC_RATE)])
+		failures += 1
+	if not FileAccess.file_exists(path + ".import"):
+		print("FAIL missing .import %s" % path)
+		failures += 1
+	return failures
+
+
+## Frames in a loop: BARS bars of four beats at the tempo. Shared with audio_test.gd.
+func _track_frames(bpm: float) -> int:
+	return roundi(float(BARS * 4) * 60.0 * float(MUSIC_RATE) / bpm)
+
+
+func _sec(seconds: float) -> int:
+	return roundi(seconds * float(MUSIC_RATE))
+
+
+## Sets up the buffers for one render. Tracks use beats (bpm); stingers use seconds only.
+func _begin(frames: int, bpm: float, wrap: bool, id: String) -> void:
+	_l = PackedFloat32Array()
+	_l.resize(frames)
+	_r = PackedFloat32Array()
+	_r.resize(frames)
+	_wrap = wrap
+	_beat = float(frames) / float(BARS * 4)
+	_spb = 60.0 / bpm
+	_mrng.seed = _seed_for("music:" + id)
+
+
+func _build_track(id: String, bpm: float) -> Dictionary:
+	var frames: int = _track_frames(bpm)
+	_begin(frames, bpm, true, id)
+	match id:
+		"menu":
+			_score_menu()
+		"floodworks":
+			_score_floodworks()
+		"foundry":
+			_score_foundry()
+		"spillway":
+			_score_spillway()
+		_:
+			push_error("generate_audio: no score for track %s" % id)
+	# The foundry is driven a little so it reads heavy; the others stay clean.
+	var drive: float = 1.5 if id == "foundry" else 0.0
+	var samples: PackedInt32Array = _finish_stereo(_l, _r, false, MUSIC_RMS_DB, drive)
+	var path: String = "%s/%s.wav" % [MUSIC_DIR, id]
+	_write_bytes(path, _wav_file(samples, 2, MUSIC_RATE, frames))
+	_write_bytes(path + ".import", _import_text(path, frames, MUSIC_RATE).to_utf8_buffer())
+	return _music_row(id, "track", samples, frames, true)
+
+
+func _build_stinger(id: String, seconds: float) -> Dictionary:
+	var frames: int = _sec(seconds)
+	_begin(frames, 120.0, false, id)
+	match id:
+		"victory":
+			_sting_victory()
+		"defeat":
+			_sting_defeat()
+		"medal":
+			_sting_medal()
+		_:
+			push_error("generate_audio: no stinger %s" % id)
+	var samples: PackedInt32Array = _finish_stereo(_l, _r, true, MUSIC_RMS_DB, 0.0)
+	var path: String = "%s/%s.wav" % [MUSIC_DIR, id]
+	_write_bytes(path, _wav_file(samples, 2, MUSIC_RATE, 0))
+	_write_bytes(path + ".import", _import_text(path, 0, MUSIC_RATE).to_utf8_buffer())
+	return _music_row(id, "stinger", samples, frames, false)
+
+
+func _music_row(id: String, cat: String, samples: PackedInt32Array, frames: int, loop: bool) -> Dictionary:
+	var row: Dictionary = _stats(samples)
+	row["file"] = id
+	row["cat"] = cat
+	row["loop"] = loop
+	row["sec"] = float(frames) / float(MUSIC_RATE)
+	row["seam"] = _seam_stereo(samples) if loop else {}
+	return row
+
+
+func _print_music_size() -> void:
+	var total: int = 0
+	var dir: DirAccess = DirAccess.open(MUSIC_DIR)
+	if dir == null:
+		return
+	for file_name in dir.get_files():
+		var file: FileAccess = FileAccess.open("%s/%s" % [MUSIC_DIR, file_name], FileAccess.READ)
+		if file != null:
+			total += int(file.get_length())
+			file.close()
+	print("audio/music total: %d bytes (%.2f MB)" % [total, float(total) / 1000000.0])
+
+
+# --- Score: tracks ------------------------------------------------------------------------
+
+## Menu: A minor, calm. Slow pads, a bell arpeggio on the beat, soft bass and shaker.
+func _score_menu() -> void:
+	var chords: Array = [[57, 60, 64], [53, 57, 60], [60, 64, 67], [55, 59, 62]]  # Am F C G
+	for c in range(4):
+		var chord: Array = chords[c]
+		var start: float = float(c * 16)
+		for k in range(3):
+			var midi: float = float(chord[k])
+			_tone(_bt(start), _bl(16.5), _hz(midi), 0.035, -0.6, 0.8, 0.0, 1.2, 2)
+			_tone(_bt(start), _bl(16.5), _hz(midi) * 1.004, 0.035, 0.6, 0.8, 0.0, 1.2, 2)
+		for half in range(8):
+			_tone(_bt(start + 2.0 * half), _bl(2.0), _hz(float(chord[0]) - 12.0), 0.10, 0.0, 0.01, 0.8, 0.15, 3)
+	for b in range(64):
+		var chord: Array = chords[b / 16]
+		var tones: Array = [chord[0] + 12, chord[1] + 12, chord[2] + 12, chord[0] + 24]
+		var pan: float = -0.45 if b % 2 == 0 else 0.45
+		_bell(_bt(b), _bl(0.9), _hz(float(tones[b % 4])), 0.08, pan)
+		_noise(_bt(b + 0.5), _bl(0.4), 0.02, pan * -1.0, 0.001, 0.02, NOISE_HP, 0.0)
+
+
+## Floodworks: E minor at 104. A steady pulse: four-on-the-floor, an eighth-note bass
+## ostinato, offbeat hats, a snare on 2 and 4, and a bright arpeggio.
+func _score_floodworks() -> void:
+	var chords: Array = [[52, 55, 59], [48, 52, 55], [55, 59, 62], [50, 54, 57]]  # Em C G D
+	var pattern: Array = [0, 0, 12, 0, 7, 0, 12, 0]  # eighth-note offsets from the root, per bar
+	for c in range(4):
+		var chord: Array = chords[c]
+		var start: float = float(c * 16)
+		for k in range(3):
+			var midi: float = float(chord[k])
+			_tone(_bt(start), _bl(16.5), _hz(midi), 0.03, -0.6, 0.5, 0.0, 1.0, 3)
+			_tone(_bt(start), _bl(16.5), _hz(midi) * 1.004, 0.03, 0.6, 0.5, 0.0, 1.0, 3)
+	for b in range(64):
+		var chord: Array = chords[b / 16]
+		var root: float = float(chord[0]) - 12.0
+		for e in range(2):
+			var step: float = float(pattern[(b % 4) * 2 + e])
+			_tone(_bt(b + 0.5 * e), _bl(0.45), _hz(root + step), 0.12, 0.0, 0.003, 0.12, 0.02, 6)
+		_kick(_bt(b), _bl(0.9), 120.0, 42.0, 0.035, 0.16, 0.5)
+		if b % 2 == 1:
+			_noise(_bt(b), _bl(0.4), 0.09, 0.0, 0.001, 0.07, NOISE_HP, 0.0)
+			_tone(_bt(b), _bl(0.2), 180.0, 0.10, 0.0, 0.001, 0.04, 0.02, 1)
+		_noise(_bt(b + 0.5), _bl(0.2), 0.035, 0.4 if b % 2 == 0 else -0.4, 0.001, 0.02, NOISE_HP, 0.0)
+		_bell(_bt(b), _bl(0.5), _hz(float(chord[b % 3]) + 24.0), 0.05, -0.5 if b % 2 == 0 else 0.5)
+
+
+## Foundry: C minor at 80, heavy and low. A sub drone, saw bass, a hard kick and snare,
+## metallic clanks on the offbeats, and a warm pad. Driven a little in the mix.
+func _score_foundry() -> void:
+	var chords: Array = [[48, 51, 55], [53, 56, 60], [56, 60, 63], [55, 58, 62]]  # Cm Fm Ab Gm
+	for c in range(4):
+		var chord: Array = chords[c]
+		var start: float = float(c * 16)
+		_tone(_bt(start), _bl(16.5), _hz(float(chord[0]) - 24.0), 0.22, 0.0, 0.5, 0.0, 0.8, 1)
+		for k in range(3):
+			_tone(_bt(start), _bl(16.5), _hz(float(chord[k])), 0.025, -0.5, 0.8, 0.0, 1.5, 4)
+	var bass_pattern: Array = [0.0, 0.0, 7.0, 12.0]
+	for b in range(64):
+		var chord: Array = chords[b / 16]
+		var pitch: float = float(chord[0]) - 12.0 + float(bass_pattern[b % 4])
+		_tone(_bt(b), _bl(0.9), _hz(pitch), 0.18, 0.0, 0.004, 0.25, 0.05, 8)
+		if b % 2 == 0:
+			_kick(_bt(b), _bl(1.0), 90.0, 36.0, 0.06, 0.25, 0.8)
+		else:
+			_noise(_bt(b), _bl(0.5), 0.25, 0.0, 0.001, 0.12, NOISE_LP, 0.25)
+			_tone(_bt(b), _bl(0.3), 165.0, 0.15, 0.0, 0.001, 0.07, 0.02, 1)
+		_noise(_bt(b + 0.5), _bl(0.25), 0.09, -0.5 if b % 8 < 4 else 0.5, 0.001, 0.035, NOISE_BP, 0.2)
+
+
+## Spillway: D major at 92. Airy and wide: detuned pads panned hard left and right, a
+## filtered noise air layer, glassy bells on the eighths, soft kick and rim, a low sine bass.
+func _score_spillway() -> void:
+	var chords: Array = [[62, 66, 69], [59, 62, 66], [55, 59, 62], [57, 61, 64]]  # D Bm G A
+	for c in range(4):
+		var chord: Array = chords[c]
+		var start: float = float(c * 16)
+		for k in range(3):
+			var hz: float = _hz(float(chord[k]) + 12.0)
+			_tone(_bt(start), _bl(16.5), hz, 0.02, -0.85, 1.5, 0.0, 2.0, 1)
+			_tone(_bt(start), _bl(16.5), hz * 1.003, 0.02, 0.85, 1.5, 0.0, 2.0, 1)
+		for bar in range(4):
+			_tone(_bt(start + 4.0 * bar), _bl(4.0), _hz(float(chord[0]) - 12.0), 0.09, 0.0, 0.2, 0.0, 0.8, 1)
+		_noise(_bt(start), _bl(16.5), 0.025, -0.7, 2.0, 1000.0, NOISE_LP, 0.12)
+		_noise(_bt(start), _bl(16.5), 0.025, 0.7, 2.0, 1000.0, NOISE_LP, 0.12)
+	for b in range(64):
+		var chord: Array = chords[b / 16]
+		var tones: Array = [chord[0] + 24, chord[1] + 24, chord[2] + 24, chord[1] + 24]
+		for half in range(2):
+			var midi: float = float(tones[(b * 2 + half) % 4])
+			_bell(_bt(b + 0.5 * half), _bl(0.5), _hz(midi), 0.05, 0.8 if half == 0 else -0.8)
+		if b % 2 == 0:
+			_kick(_bt(b), _bl(0.7), 80.0, 45.0, 0.05, 0.12, 0.3)
+		else:
+			_noise(_bt(b), _bl(0.2), 0.04, 0.0, 0.001, 0.01, NOISE_HP, 0.0)
+			_tone(_bt(b), _bl(0.1), 1200.0, 0.03, -0.5 if b % 4 == 1 else 0.5, 0.001, 0.01, 0.01, 1)
+		_noise(_bt(b + 0.5), _bl(0.2), 0.012, 0.9 if b % 2 == 0 else -0.9, 0.001, 0.02, NOISE_HP, 0.0)
+
+
+# --- Score: stingers (seconds, no wrap) ---------------------------------------------------
+
+func _sting_victory() -> void:
+	var notes: Array = [72, 76, 79, 84]
+	for k in range(4):
+		_tone(_sec(0.18 * float(k)), 0.6, _hz(float(notes[k])), 0.2, 0.0, 0.003, 0.25, 0.1, 3)
+	var lift: int = _sec(0.9)
+	for midi in [60, 64, 67, 72]:
+		_tone(lift, 2.1, _hz(float(midi)), 0.07, 0.0, 0.05, 0.0, 0.6, 2)
+	_kick(lift, 0.5, 80.0, 40.0, 0.06, 0.2, 0.5)
+	_bell(lift, 1.0, _hz(84.0), 0.1, 0.0)
+
+
+func _sting_defeat() -> void:
+	_tone(_sec(0.0), 0.55, _hz(69.0), 0.2, -0.2, 0.01, 0.35, 0.15, 3)
+	_tone(_sec(0.55), 0.5, _hz(65.0), 0.2, 0.0, 0.01, 0.35, 0.15, 3)
+	_tone(_sec(1.1), 0.9, _hz(62.0), 0.2, 0.2, 0.01, 0.6, 0.3, 3)
+	_tone(_sec(1.4), 1.6, _hz(38.0), 0.2, 0.0, 0.3, 0.0, 0.8, 4)
+	_noise(_sec(1.0), 2.0, 0.03, 0.0, 0.3, 1.0, NOISE_LP, 0.05)
+
+
+func _sting_medal() -> void:
+	var notes: Array = [79, 84, 88, 91]
+	for k in range(4):
+		_bell(_sec(0.12 * float(k)), 1.2, _hz(float(notes[k])), 0.14, 0.6 if k % 2 == 0 else -0.6)
+	for midi in [72, 76, 79]:
+		_tone(_sec(0.6), 1.9, _hz(float(midi)), 0.05, 0.0, 0.1, 0.0, 0.8, 2)
+
+
+# --- Voices: each writes into _l and _r, with a pan from -1 (left) to 1 (right) -----------
+
+func _bt(beat: float) -> int:
+	return roundi(beat * _beat)
+
+
+func _bl(beats: float) -> float:
+	return beats * _spb
+
+
+func _hz(midi: float) -> float:
+	return 440.0 * pow(2.0, (midi - 69.0) / 12.0)
+
+
+## Gains for a pan position with equal power: centre is about -3 dB on each side.
+func _pan_gains(pan: float) -> Vector2:
+	var angle: float = (clampf(pan, -1.0, 1.0) + 1.0) * PI * 0.25
+	return Vector2(cos(angle), sin(angle))
+
+
+## Envelope at time t (seconds) in a note lasting `length`: linear attack, exponential decay
+## with time constant tau (0 = sustain), linear release over the last `release` seconds.
+func _shape_at(t: float, length: float, attack: float, tau: float, release: float) -> float:
+	var level: float = 1.0
+	if attack > 0.0 and t < attack:
+		level = t / attack
+	if tau > 0.0:
+		level *= exp(-t / tau)
+	if release > 0.0 and t > length - release:
+		level *= clampf((length - t) / release, 0.0, 1.0)
+	return level
+
+
+## Additive tone: sine partials 1/k up to `harmonics`, so a low count gives a sine and a high
+## count gives a saw-like edge. Amplitude is normalised by the partial energy.
+func _tone(start: int, seconds: float, hz: float, amp: float, pan: float, attack: float, tau: float, release: float, harmonics: int) -> void:
+	var frames: int = int(seconds * float(MUSIC_RATE))
+	var count: int = _l.size()
+	var energy: float = 0.0
+	for k in range(1, harmonics + 1):
+		energy += 1.0 / float(k * k)
+	var scale: float = amp / sqrt(energy)
+	var gains: Vector2 = _pan_gains(pan)
+	var step: float = TAU * hz / float(MUSIC_RATE)
+	for i in range(frames):
+		var at: int = start + i
+		if _wrap:
+			at = posmod(at, count)
+		elif at >= count:
+			break
+		var phase: float = step * float(i)
+		var value: float = 0.0
+		for k in range(1, harmonics + 1):
+			value += sin(phase * float(k)) / float(k)
+		value *= scale * _shape_at(float(i) / float(MUSIC_RATE), seconds, attack, tau, release)
+		_l[at] += value * gains.x
+		_r[at] += value * gains.y
+
+
+## A bell: the fundamental with a fast-decaying inharmonic partial at 2.76 times the pitch.
+func _bell(start: int, seconds: float, hz: float, amp: float, pan: float) -> void:
+	_tone(start, seconds, hz, amp, pan, 0.004, 0.5, 0.1, 1)
+	_tone(start, seconds * 0.6, hz * 2.76, amp * 0.2, pan, 0.002, 0.12, 0.05, 1)
+
+
+## Pitch-dropping sine for kicks: the pitch falls from f_from to f_to with time constant
+## tau_pitch, and the level decays with tau_amp. Centre panned.
+func _kick(start: int, seconds: float, f_from: float, f_to: float, tau_pitch: float, tau_amp: float, amp: float) -> void:
+	var frames: int = int(seconds * float(MUSIC_RATE))
+	var count: int = _l.size()
+	var phase: float = 0.0
+	for i in range(frames):
+		var at: int = start + i
+		if _wrap:
+			at = posmod(at, count)
+		elif at >= count:
+			break
+		var t: float = float(i) / float(MUSIC_RATE)
+		phase += TAU * (f_to + (f_from - f_to) * exp(-t / tau_pitch)) / float(MUSIC_RATE)
+		var value: float = sin(phase) * amp * exp(-t / tau_amp) * minf(1.0, t / 0.002)
+		_l[at] += value
+		_r[at] += value
+
+
+## Filtered noise hit. mode NOISE_LP is a one-pole low-pass, NOISE_HP a first difference
+## (high-pass), NOISE_BP a low-pass of that difference. coef sets the low-pass amount.
+func _noise(start: int, seconds: float, amp: float, pan: float, attack: float, tau: float, mode: int, coef: float) -> void:
+	var frames: int = int(seconds * float(MUSIC_RATE))
+	var count: int = _l.size()
+	var gains: Vector2 = _pan_gains(pan)
+	var prev: float = 0.0
+	var state: float = 0.0
+	for i in range(frames):
+		var at: int = start + i
+		if _wrap:
+			at = posmod(at, count)
+		elif at >= count:
+			break
+		var x: float = _mrng.randf_range(-1.0, 1.0)
+		var y: float = x
+		if mode == NOISE_LP:
+			state += coef * (x - state)
+			y = state
+		elif mode == NOISE_HP:
+			y = x - prev
+			prev = x
+		else:
+			var diff: float = x - prev
+			prev = x
+			state += coef * (diff - state)
+			y = state
+		var value: float = y * amp * _shape_at(float(i) / float(MUSIC_RATE), seconds, attack, tau, 0.02)
+		_l[at] += value * gains.x
+		_r[at] += value * gains.y
+
+
+# --- Finishing ----------------------------------------------------------------------------
+
+## Removes the mean, optionally drives the signal, fades the edges (stingers), then applies one
+## shared gain to both channels so the stereo balance holds. Peak is held at PEAK_LIMIT.
+## Returns interleaved 16-bit samples.
+func _finish_stereo(left: PackedFloat32Array, right: PackedFloat32Array, edges: bool, target_db: float, drive: float) -> PackedInt32Array:
+	var l: PackedFloat32Array = _centered(left)
+	var r: PackedFloat32Array = _centered(right)
+	if drive > 0.0:
+		l = _driven(l, drive)
+		r = _driven(r, drive)
+	if edges:
+		l = _faded_edges(l)
+		r = _faded_edges(r)
+	var n: int = l.size()
+	var mix := PackedFloat32Array()
+	mix.resize(n * 2)
+	var peak: float = 0.0
+	for i in range(n):
+		mix[2 * i] = l[i]
+		mix[2 * i + 1] = r[i]
+		peak = maxf(peak, maxf(absf(l[i]), absf(r[i])))
+	var rms: float = _gated_rms(mix)
+	var gain: float = pow(10.0, target_db / 20.0) / maxf(rms, 1e-9)
+	if peak * gain > PEAK_LIMIT:
+		gain = PEAK_LIMIT / maxf(peak, 1e-9)
+	var out := PackedInt32Array()
+	out.resize(n * 2)
+	for i in range(n * 2):
+		out[i] = clampi(roundi(mix[i] * gain * 32767.0), -32767, 32767)
+	return out
+
+
+func _centered(buf: PackedFloat32Array) -> PackedFloat32Array:
+	var mean: float = 0.0
+	for v in buf:
+		mean += v
+	mean /= float(maxi(buf.size(), 1))
+	var out: PackedFloat32Array = buf.duplicate()
+	for i in range(out.size()):
+		out[i] -= mean
+	return out
+
+
+func _driven(buf: PackedFloat32Array, amount: float) -> PackedFloat32Array:
+	var out: PackedFloat32Array = buf.duplicate()
+	var norm: float = tanh(amount)
+	for i in range(out.size()):
+		out[i] = tanh(amount * out[i]) / norm
+	return out
+
+
+func _faded_edges(buf: PackedFloat32Array) -> PackedFloat32Array:
+	var out: PackedFloat32Array = buf.duplicate()
+	var n: int = out.size()
+	var fade_in: int = mini(44, n)
+	for i in range(fade_in):
+		out[i] *= float(i) / float(fade_in)
+	var fade_out: int = mini(882, n)
+	for k in range(fade_out):
+		out[n - 1 - k] *= float(k) / float(fade_out)
+	return out
+
+
+## Seam metrics for a stereo loop: the worse of the two channels, same rules as _seam.
+func _seam_stereo(samples: PackedInt32Array) -> Dictionary:
+	var frames: int = samples.size() / 2
+	var left := PackedInt32Array()
+	var right := PackedInt32Array()
+	left.resize(frames)
+	right.resize(frames)
+	for i in range(frames):
+		left[i] = samples[2 * i]
+		right[i] = samples[2 * i + 1]
+	var a: Dictionary = _seam(left)
+	var b: Dictionary = _seam(right)
+	return {
+		"jump": maxi(int(a["jump"]), int(b["jump"])),
+		"ratio_step": maxf(float(a["ratio_step"]), float(b["ratio_step"])),
+		"ratio_d2": maxf(float(a["ratio_d2"]), float(b["ratio_d2"])),
+	}

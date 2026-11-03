@@ -1,12 +1,17 @@
 extends CharacterBody3D
 
 ## Enemy kinds (CONTRACT 4.13): the hound is a ground pursuer that follows the level navmesh; the
-## sentry is a fixed turret with a telegraphed shot. The hound's states:
+## sentry is a fixed tripod turret with a telegraphed shot; the drone hovers 4-10 m above its anchor
+## and fires slow orbs that the player can dodge. The hound's states:
 ##   PATROL  circles its patrol centre (its spawn point, or where it gave up a chase)
 ##   ALERT   a short stop after first sight, so the player gets a tell
 ##   CHASE   follows the navmesh path to the player while it remembers them
 ##   ATTACK  the bite, then a short recovery
 ##   SEARCH  goes to the last seen spot, looks around, then returns to PATROL
+## The drone's states are simpler (see _tick_drone): patrol, close to a standoff distance, charge,
+## fire one orb, cool down.
+
+const FX = preload("res://scripts/fx.gd")
 
 signal fired(origin: Vector3, end: Vector3)
 signal alerted(text: String)
@@ -17,6 +22,7 @@ enum State { PATROL, ALERT, CHASE, ATTACK, SEARCH }
 const PATH_REFRESH := 0.4            # seconds between navmesh path queries
 const SIGHT_RANGE_HOUND := 37.0
 const SIGHT_RANGE_SENTRY := 46.0
+const SIGHT_RANGE_DRONE := 40.0
 const TRACK_MEMORY := 8.0            # seconds a hound keeps chasing after it last saw the player
 const BITE_RANGE := 1.9              # metres, 3D
 const BITE_DAMAGE := 12.0            # before damage_scale (CONTRACT 5.3)
@@ -36,6 +42,29 @@ const KNOCKBACK_SPEED := 110.0
 const KNOCKBACK_LIFT := 45.0
 const GRAVITY := 18.0
 const WAYPOINT_REACHED := 0.7        # metres: a route point counts as reached inside this radius
+
+# Drone (DESIGN: floats 4-10 m up, patrols, closes to about 12 m, telegraphs, fires a slow orb).
+const DRONE_HEALTH := 45.0
+const DRONE_ALT_MIN := 4.0           # metres above the anchor
+const DRONE_ALT_MAX := 10.0
+const DRONE_ALT_MID := 7.0
+const DRONE_ALT_SWING := 3.0         # the hover height drifts this far either side of the middle
+const DRONE_SPEED := 6.0             # m/s
+const DRONE_ACCEL := 12.0            # m/s^2, how quickly the drone changes velocity
+const DRONE_PATROL_RADIUS := 6.0
+const DRONE_PATROL_TURN := 0.3       # radians per second around the patrol circle
+const DRONE_STANDOFF := 12.0         # metres (3D) from the player's aim point
+const DRONE_FIRE_SLACK := 2.0        # a charge may start this far beyond the standoff distance
+const DRONE_CHARGE := 0.9            # seconds of telegraph before the orb leaves
+const DRONE_COMMIT := 0.3            # the last seconds of the charge freeze the aim, so a late dodge works
+const DRONE_FIRE_COOLDOWN := 2.2
+const DRONE_ORB_SPEED := 22.0        # m/s, slow enough to see and to dodge
+const DRONE_ORB_RANGE := 40.0        # metres an orb travels before it burns out
+const DRONE_ORB_DAMAGE := 14.0       # before damage_scale (CONTRACT 5.3)
+const DRONE_ORB_MASK := 1 | 2        # the orb stops on world geometry and on the player
+const DRONE_BLAST_RADIUS := 3.0
+const DRONE_BLAST_DAMAGE := 25.0     # before damage_scale; only a player inside the radius takes it
+const DRONE_ROTOR_SPIN := 40.0       # rad/s, visual only
 
 var target: Node3D
 var kind: String = "hound"
@@ -74,6 +103,13 @@ var _knees: Array[Node3D] = []
 var _leg_phase: Array[float] = []    # diagonal pairs share a phase, so the gait reads as a trot
 var _gait: float = 0.0
 var _head: Node3D
+# Sentry state: the turret head is the only part that turns.
+var _turret: Node3D
+# Drone state.
+var _drone_charge: float = 0.0       # seconds left in the charge; 0 when not charging
+var _orb_cooldown: float = 0.0
+var _orbs: Array[Dictionary] = []    # orbs in flight: {node, direction, travelled}
+var _rotors: Array[Node3D] = []
 
 
 func setup(player: Node3D, enemy_kind: String, location: Vector3, params: Dictionary = {}) -> void:
@@ -82,10 +118,19 @@ func setup(player: Node3D, enemy_kind: String, location: Vector3, params: Dictio
 	position = location
 	_last_seen = location
 	_patrol_center = location
-	max_health = 70.0 if kind == "hound" else 105.0
+	match kind:
+		"hound":
+			max_health = 70.0
+		"drone":
+			max_health = DRONE_HEALTH
+		_:
+			max_health = 105.0
 	health = float(params.get("health", max_health))
 	collision_layer = 8
 	collision_mask = 1
+	if kind == "drone":
+		# A flying body: no floor snapping and no gravity, so its velocity is the only motion.
+		motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
 	add_to_group("enemies")
 	_build_body()
 
@@ -95,63 +140,68 @@ func set_active(value: bool) -> void:
 	if not value:
 		velocity = Vector3.ZERO
 		_aim_time = 0.0
+		_drone_charge = 0.0
 		if is_instance_valid(_telegraph):
 			_telegraph.visible = false
 
 
-## True while the hound is alerted, chasing or biting. Feeds level threat_level().
+## True while the hound is alerted, chasing or biting, and while the drone can see the player.
+## Feeds level threat_level().
 func is_tracking() -> bool:
-	return not _dead and (_state == State.ALERT or _state == State.CHASE or _state == State.ATTACK)
+	if _dead:
+		return false
+	if kind == "drone":
+		return _visible_target
+	return _state == State.ALERT or _state == State.CHASE or _state == State.ATTACK
 
 
 func _build_body() -> void:
 	var collision := CollisionShape3D.new()
-	var shape := CapsuleShape3D.new()
-	shape.radius = 0.46 if kind == "hound" else 0.65
-	shape.height = 1.15 if kind == "hound" else 2.3
-	collision.shape = shape
-	collision.position.y = 0.62 if kind == "hound" else 1.15
+	if kind == "drone":
+		var ball := SphereShape3D.new()
+		ball.radius = 0.45
+		collision.shape = ball
+	else:
+		var shape := CapsuleShape3D.new()
+		shape.radius = 0.46 if kind == "hound" else 0.65
+		shape.height = 1.15 if kind == "hound" else 2.3
+		collision.shape = shape
+		collision.position.y = 0.62 if kind == "hound" else 1.15
 	add_child(collision)
 	_visual = Node3D.new()
 	add_child(_visual)
-	_body_material = _material(Color("252f33"))
-	var armor := _material(Color("53605b"))
-	var joints := _material(Color("101b20"))
+	_body_material = _material(Color("e8ddc7"))
+	_body_material.albedo_texture = preload("res://assets/dreamscape/porcelain.png")
+	_body_material.roughness = 0.3
+	var armor := _material(Color("b78b9f"))
+	var joints := _material(Color("51435e"))
 	_eye_material = _material(Color("f7533c"), true)
-	if kind == "hound":
-		_build_hound(armor, joints)
-	else:
-		_mesh_box(Vector3(0, 0.23, 0), Vector3(1.45, 0.3, 1.45), joints)
-		_mesh_box(Vector3(0, 0.95, 0), Vector3(0.3, 1.25, 0.3), armor)
-		_mesh_box(Vector3(0, 1.62, 0), Vector3(1.13, 0.72, 0.8), _body_material)
-		_mesh_box(Vector3(0, 1.65, -0.78), Vector3(0.24, 0.24, 1.25), joints)
-		_mesh_box(Vector3(0, 1.91, -0.42), Vector3(0.72, 0.09, 0.06), _eye_material)
-		_mesh_box(Vector3(-0.72, 1.5, 0.1), Vector3(0.28, 0.68, 0.48), armor)
-		_mesh_box(Vector3(0.72, 1.5, 0.1), Vector3(0.28, 0.68, 0.48), armor)
-		var line_mesh := CylinderMesh.new()
-		line_mesh.top_radius = 0.018
-		line_mesh.bottom_radius = 0.018
-		line_mesh.height = 1.0
-		line_mesh.radial_segments = 4
-		_telegraph = MeshInstance3D.new()
-		_telegraph.mesh = line_mesh
-		_telegraph.material_override = _material(Color(1.0, 0.17, 0.09, 0.6), true)
-		_telegraph.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_telegraph.visible = false
-		add_child(_telegraph)
+	match kind:
+		"hound":
+			_build_hound(armor, joints)
+		"drone":
+			_build_drone(armor, joints)
+		_:
+			_build_sentry(armor, joints)
 
 
-## A low hound with a spine plate, a tail, a head with a glowing eye and four two-segment legs.
-## One box per part (14 mesh instances in all), so the draw-call cost stays low.
+## A porcelain tea hound: handle, lid, spout and four jointed legs. Its red eye and
+## original animation pivots preserve the attack tells. Still 14 mesh instances.
 func _build_hound(armor: StandardMaterial3D, joints: StandardMaterial3D) -> void:
-	_mesh_box(Vector3(0, 0.72, 0), Vector3(0.72, 0.5, 1.5), _body_material)
-	_mesh_box(Vector3(0, 1.0, -0.1), Vector3(0.5, 0.14, 1.1), armor)
-	var tail := _mesh_box(Vector3(0, 0.9, 0.95), Vector3(0.12, 0.12, 0.8), joints)
-	tail.rotation.x = -0.5
+	_dream_oval(_visual, Vector3(0, 0.72, 0), Vector3(0.88, 0.65, 1.35), _body_material)
+	_dream_oval(_visual, Vector3(0, 1.05, -0.1), Vector3(0.62, 0.16, 0.7), armor)
+	var handle := TorusMesh.new()
+	handle.inner_radius = 0.21
+	handle.outer_radius = 0.31
+	handle.rings = 16
+	handle.ring_segments = 6
+	var tail := _mesh_box(Vector3(0, 0.82, 0.76), Vector3.ONE, joints)
+	tail.mesh = handle
+	tail.rotation.z = PI * 0.5
 	_head = Node3D.new()
 	_head.position = Vector3(0, 0.95, -0.85)
 	_visual.add_child(_head)
-	_mesh_box_in(_head, Vector3(0, 0, -0.1), Vector3(0.42, 0.36, 0.5), _body_material)
+	_dream_oval(_head, Vector3(0, 0, -0.1), Vector3(0.42, 0.36, 0.5), _body_material)
 	_mesh_box_in(_head, Vector3(0, -0.14, -0.34), Vector3(0.3, 0.1, 0.42), joints)
 	_mesh_box_in(_head, Vector3(0, 0.05, -0.37), Vector3(0.34, 0.07, 0.03), _eye_material)
 	for side in [-1.0, 1.0]:
@@ -174,34 +224,168 @@ func _add_leg(side: float, front: float, joints: StandardMaterial3D) -> void:
 	_leg_phase.append(0.0 if side * front < 0.0 else PI)
 
 
+## A tripod turret: three splayed legs meet at a column, and the head on top turns to aim. The legs
+## and column never move; only the head pivot (_turret) yaws.
+func _build_sentry(armor: StandardMaterial3D, joints: StandardMaterial3D) -> void:
+	var apex := Vector3(0, 1.25, 0)
+	for i in range(3):
+		var angle: float = float(i) * TAU / 3.0
+		var foot := Vector3(cos(angle) * 0.95, 0.03, sin(angle) * 0.95)
+		_strut(_visual, apex, foot, 0.09, joints)
+		_mesh_box(foot, Vector3(0.24, 0.06, 0.24), joints)   # foot pad, bottom on the floor
+	_mesh_box(Vector3(0, 0.7, 0), Vector3(0.22, 1.4, 0.22), armor)   # column, top hidden in the head
+	_turret = Node3D.new()
+	_turret.position = Vector3(0, 1.62, 0)
+	_visual.add_child(_turret)
+	_dream_oval(_turret, Vector3.ZERO, Vector3(1.13, 1.0, 0.65), _body_material)
+	_mesh_box_in(_turret, Vector3(0, 0.03, -0.78), Vector3(0.24, 0.24, 1.25), joints)   # barrel, front is -Z
+	_mesh_box_in(_turret, Vector3(0, 0.29, -0.42), Vector3(0.72, 0.09, 0.06), _eye_material)
+	_dream_oval(_turret, Vector3(-0.5, 0.47, 0.1), Vector3(0.44, 0.22, 0.42), armor)
+	_dream_oval(_turret, Vector3(0.5, 0.47, 0.1), Vector3(0.44, 0.22, 0.42), armor)
+	_mesh_box_in(_turret, Vector3(0, 0.5, 0.1), Vector3(0.4, 0.12, 0.4), joints)          # sensor housing
+	_merge_fittings(_visual, joints)
+	_build_aim_line()
+
+
+## A hovering drone: a dark body with a glowing eye on its nose, four arms and four rotors. Each rotor
+## is its own node so it can spin; the rotors are translucent discs.
+func _build_drone(armor: StandardMaterial3D, joints: StandardMaterial3D) -> void:
+	_dream_oval(_visual, Vector3.ZERO, Vector3(0.78, 0.58, 0.72), _body_material)
+	_dream_oval(_visual, Vector3(0, 0.30, 0), Vector3(0.42, 0.16, 0.42), armor)
+	_mesh_box(Vector3(0, -0.02, -0.33), Vector3(0.28, 0.16, 0.05), _eye_material)
+	var rotor_material := _material(Color(0.55, 0.62, 0.64, 0.28), true)
+	for i in range(4):
+		var angle: float = PI * 0.25 + float(i) * PI * 0.5
+		var tip := Vector3(cos(angle) * 0.82, 0.0, sin(angle) * 0.82)
+		_strut(_visual, Vector3.ZERO, tip, 0.07, joints)
+		var rotor := Node3D.new()
+		rotor.position = tip + Vector3(0, 0.13, 0)
+		_visual.add_child(rotor)
+		var disc := MeshInstance3D.new()
+		var disc_mesh := CylinderMesh.new()
+		disc_mesh.top_radius = 0.36
+		disc_mesh.bottom_radius = 0.36
+		disc_mesh.height = 0.03
+		disc_mesh.radial_segments = 12
+		disc.mesh = disc_mesh
+		disc.material_override = rotor_material
+		disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		rotor.add_child(disc)
+		_rotors.append(rotor)
+	_build_aim_line()
+
+
+## The red aim line used by the sentry's wind-up and the drone's charge. Hidden until needed.
+func _merge_fittings(parent: Node3D, material: Material) -> void:
+	# The sentry's fixed feet and struts share a material and never animate.
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for child: Node in parent.get_children():
+		if child is MeshInstance3D and child.material_override == material:
+			surface.append_from(child.mesh, 0, child.transform)
+			child.free()
+	var stand := MeshInstance3D.new()
+	stand.mesh = surface.commit()
+	stand.material_override = material
+	stand.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(stand)
+
+
+func _dream_oval(parent: Node3D, at: Vector3, size: Vector3, material: Material) -> MeshInstance3D:
+	var view := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.5
+	sphere.height = 1.0
+	sphere.radial_segments = 16
+	sphere.rings = 8
+	view.mesh = sphere
+	view.position = at
+	view.scale = size
+	view.material_override = material
+	parent.add_child(view)
+	return view
+
+
+func _build_aim_line() -> void:
+	var line_mesh := CylinderMesh.new()
+	line_mesh.top_radius = 0.018
+	line_mesh.bottom_radius = 0.018
+	line_mesh.height = 1.0
+	line_mesh.radial_segments = 4
+	_telegraph = MeshInstance3D.new()
+	_telegraph.mesh = line_mesh
+	_telegraph.material_override = _material(Color(1.0, 0.17, 0.09, 0.6), true)
+	_telegraph.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_telegraph.visible = false
+	add_child(_telegraph)
+
+
+## Stretches a thin box between two points, for tripod legs and drone arms.
+func _strut(parent: Node3D, from: Vector3, to: Vector3, thickness: float, material: Material) -> MeshInstance3D:
+	var instance := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(thickness, thickness, from.distance_to(to))
+	instance.mesh = mesh
+	instance.material_override = material
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	instance.transform = Transform3D(Basis.looking_at((to - from).normalized(), Vector3.UP), (from + to) * 0.5)
+	parent.add_child(instance)
+	return instance
+
+
 func _physics_process(delta: float) -> void:
-	if _dead or not active or not is_instance_valid(target):
+	if _dead:
+		return
+	if kind == "drone":
+		# Orbs in flight keep moving even when the drone is switched off, so none freezes in mid-air.
+		_update_orbs(delta)
+	if not active or not is_instance_valid(target):
 		return
 	_clock += delta
 	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
 	_hurt_flash = maxf(0.0, _hurt_flash - delta)
-	_body_material.albedo_color = Color("b44d37") if _hurt_flash > 0.0 else Color("252f33")
+	_body_material.albedo_color = Color("b44d37") if _hurt_flash > 0.0 else Color("e8ddc7")
 	var offset: Vector3 = target.global_position - global_position
 	var distance: float = offset.length()
 	_ray_clock -= delta
 	if _ray_clock <= 0.0:
 		_ray_clock = 0.12
-		var sight_range: float = SIGHT_RANGE_HOUND if kind == "hound" else SIGHT_RANGE_SENTRY
-		_visible_target = distance < sight_range and _can_see_player()
+		_visible_target = distance < _sight_range() and _can_see_player()
 	if _visible_target:
 		_last_seen = target.global_position
 		_memory = TRACK_MEMORY
 		if not _alert_sent:
 			_alert_sent = true
-			alerted.emit("HOUND TRACKING" if kind == "hound" else "SENTRY ACQUIRING — FIND COVER")
+			alerted.emit(_alert_text())
 	else:
 		_memory = maxf(0.0, _memory - delta)
 		if _memory <= 0.0:
 			_alert_sent = false
-	if kind == "hound":
-		_tick_hound(delta, distance)
-	else:
-		_tick_sentry(delta)
+	match kind:
+		"hound":
+			_tick_hound(delta, distance)
+		"drone":
+			_tick_drone(delta)
+		_:
+			_tick_sentry(delta)
+
+
+func _alert_text() -> String:
+	match kind:
+		"hound":
+			return "HOUND TRACKING"
+		"drone":
+			return "DRONE ACQUIRING — FIND COVER"
+	return "SENTRY ACQUIRING — FIND COVER"
+
+
+func _sight_range() -> float:
+	match kind:
+		"hound":
+			return SIGHT_RANGE_HOUND
+		"drone":
+			return SIGHT_RANGE_DRONE
+	return SIGHT_RANGE_SENTRY
 
 
 func _tick_hound(delta: float, distance: float) -> void:
@@ -458,12 +642,15 @@ func _eye_glow() -> float:
 	return 0.9
 
 
+## Sentry timing: the aim tracks the player for the wind-up, commits at 1.22 s, and the shot leaves at
+## 1.6 s. A dodge during the last part of the wind-up evades the shot.
 func _tick_sentry(delta: float) -> void:
 	if not _visible_target or _attack_cooldown > 0.0:
 		_aim_time = maxf(0.0, _aim_time - delta * 2.0)
 		_telegraph.visible = false
 		if _memory <= 0.0:
-			_visual.rotation.y = sin(_clock * 0.4) * 0.8
+			# Idle: the head sweeps slowly from side to side.
+			_turret.rotation.y = sin(_clock * 0.4) * 0.8
 		return
 	_aim_time += delta
 	var origin: Vector3 = global_position + Vector3(0, 1.68, 0)
@@ -471,11 +658,8 @@ func _tick_sentry(delta: float) -> void:
 	if _aim_time < 1.22:
 		_locked_aim = target.global_position + Vector3.UP * 0.2
 	var aim: Vector3 = _locked_aim - origin
-	_visual.rotation.y = lerp_angle(_visual.rotation.y, atan2(-aim.x, -aim.z), delta * 5.0)
-	_telegraph.visible = true
-	_telegraph.global_position = origin + aim * 0.5
-	_telegraph.quaternion = Quaternion(Vector3.UP, aim.normalized())
-	_telegraph.scale = Vector3(1, aim.length(), 1)
+	_turret.rotation.y = lerp_angle(_turret.rotation.y, atan2(-aim.x, -aim.z), delta * 5.0)
+	_show_telegraph(origin, aim)
 	_eye_material.emission_energy_multiplier = 1.0 + _aim_time * 2.0
 	if _aim_time >= 1.6:
 		_aim_time = 0.0
@@ -492,13 +676,186 @@ func _tick_sentry(delta: float) -> void:
 		fired.emit(origin, end)
 
 
+## Draws the aim line from origin along aim (the line runs from origin to origin + aim).
+func _show_telegraph(origin: Vector3, aim: Vector3) -> void:
+	_telegraph.visible = true
+	_telegraph.global_position = origin + aim * 0.5
+	_telegraph.quaternion = Quaternion(Vector3.UP, aim.normalized())
+	_telegraph.scale = Vector3(1, aim.length(), 1)
+
+
+## Drone AI: patrol at 4-10 m above the anchor until the player is in view, close to the standoff
+## distance, then charge (aim line and glowing eye), commit the aim, fire one orb and cool down.
+## Losing sight or reach mid-charge cancels the shot, so breaking line of sight is a dodge too.
+func _tick_drone(delta: float) -> void:
+	_orb_cooldown = maxf(0.0, _orb_cooldown - delta)
+	var player_aim: Vector3 = target.global_position + Vector3.UP * 0.2
+	var reach: bool = _visible_target and global_position.distance_to(player_aim) <= DRONE_STANDOFF + DRONE_FIRE_SLACK
+	if reach and (_drone_charge > 0.0 or _orb_cooldown <= 0.0):
+		_drone_engage(delta, player_aim)
+	else:
+		_drone_charge = 0.0
+		_eye_material.emission_energy_multiplier = lerpf(_eye_material.emission_energy_multiplier, 0.9, minf(1.0, delta * 6.0))
+		if _visible_target:
+			_fly_to(_drone_standoff(player_aim), delta)
+		else:
+			_patrol_angle = fmod(_patrol_angle + delta * DRONE_PATROL_TURN, TAU)
+			_fly_to(_drone_patrol_point(), delta)
+	_spin_rotors(delta)
+
+
+## Holds station while charging. The aim follows the player until the last DRONE_COMMIT seconds, then
+## freezes, so the orb goes where the player stood when the charge was nearly over.
+func _drone_engage(delta: float, player_aim: Vector3) -> void:
+	if _drone_charge <= 0.0:
+		_drone_charge = DRONE_CHARGE
+		_play("drone_charge")
+	_drone_charge -= delta
+	if _drone_charge > DRONE_COMMIT:
+		_locked_aim = player_aim
+	_fly_to(global_position, delta)
+	_face_target(delta)
+	var charged: float = clampf(1.0 - _drone_charge / DRONE_CHARGE, 0.0, 1.0)
+	_eye_material.emission_energy_multiplier = 1.0 + 2.5 * charged
+	_show_telegraph(global_position, _locked_aim - global_position)
+	if _drone_charge <= 0.0:
+		_drone_fire()
+
+
+func _drone_fire() -> void:
+	_drone_charge = 0.0
+	_orb_cooldown = DRONE_FIRE_COOLDOWN
+	_telegraph.visible = false
+	var direction: Vector3 = (_locked_aim - global_position).normalized()
+	_play("drone_shot")
+	_spawn_orb(global_position + direction * 0.6, direction)
+
+
+## Eases the drone's velocity toward a goal, capped at DRONE_SPEED, and turns it to face its motion.
+func _fly_to(goal: Vector3, delta: float) -> void:
+	var desired: Vector3 = ((goal - global_position) * 2.0).limit_length(DRONE_SPEED)
+	velocity = velocity.move_toward(desired, DRONE_ACCEL * delta)
+	var planar: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
+	if planar.length() > 0.5:
+		_face(planar.normalized(), delta)
+	move_and_slide()
+
+
+## The point the drone closes to: DRONE_STANDOFF metres from the player on the drone's own side, at a
+## hover height from the altitude band. The planar offset shrinks when the height gap is large, so the
+## 3D distance stays at the standoff.
+func _drone_standoff(player_aim: Vector3) -> Vector3:
+	var hover_y: float = _patrol_center.y + _drone_altitude()
+	var drop: float = hover_y - player_aim.y
+	var planar: float = sqrt(maxf(DRONE_STANDOFF * DRONE_STANDOFF - drop * drop, 9.0))
+	var side: Vector3 = global_position - player_aim
+	side.y = 0.0
+	side = side.normalized() if side.length_squared() > 0.01 else Vector3.BACK
+	return Vector3(player_aim.x, hover_y, player_aim.z) + side * planar
+
+
+func _drone_patrol_point() -> Vector3:
+	var ring: Vector3 = Vector3(sin(_patrol_angle), 0.0, cos(_patrol_angle)) * DRONE_PATROL_RADIUS
+	return _patrol_center + ring + Vector3.UP * _drone_altitude()
+
+
+## Hover height above the anchor, drifting between 4 and 10 m.
+func _drone_altitude() -> float:
+	return clampf(DRONE_ALT_MID + sin(_clock * 0.35) * DRONE_ALT_SWING, DRONE_ALT_MIN, DRONE_ALT_MAX)
+
+
+func _spin_rotors(delta: float) -> void:
+	for i in range(_rotors.size()):
+		var direction: float = 1.0 if i % 2 == 0 else -1.0
+		_rotors[i].rotate_y(delta * DRONE_ROTOR_SPIN * direction)
+
+
+## Creates one orb as a visible node under the level, so it survives the drone's own removal.
+func _spawn_orb(origin: Vector3, direction: Vector3) -> void:
+	var level: Node = get_parent()
+	if level == null:
+		return
+	var node := MeshInstance3D.new()
+	node.name = "DroneOrb"
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.24
+	sphere.height = 0.48
+	sphere.radial_segments = 10
+	sphere.rings = 5
+	node.mesh = sphere
+	node.material_override = FX.glow_material(Color("ff7a3d"), 2.2)
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	level.add_child(node)
+	node.global_position = origin
+	_orbs.append({"node": node, "direction": direction, "travelled": 0.0})
+
+
+## Moves every orb in flight. Each step is a ray from the orb's last spot to its next one, so an orb
+## cannot tunnel through a thin wall or past the player in one physics step.
+func _update_orbs(delta: float) -> void:
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	var step: float = DRONE_ORB_SPEED * delta
+	var index: int = _orbs.size() - 1
+	while index >= 0:
+		var orb: Dictionary = _orbs[index]
+		var node: MeshInstance3D = orb["node"]
+		var direction: Vector3 = orb["direction"]
+		var from: Vector3 = node.global_position
+		var to: Vector3 = from + direction * step
+		var hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, DRONE_ORB_MASK))
+		var done: bool = false
+		if hit.is_empty():
+			node.global_position = to
+			orb["travelled"] = float(orb["travelled"]) + step
+			done = float(orb["travelled"]) >= DRONE_ORB_RANGE
+		else:
+			done = true
+			var impact: Vector3 = hit["position"]
+			var normal: Vector3 = hit["normal"]
+			if is_instance_valid(target) and hit["collider"] == target:
+				target.call("take_damage", DRONE_ORB_DAMAGE * damage_scale, kind, global_position)
+			FX.burst(node.get_parent(), impact, normal, Color("ff7a3d"), 10, 6.0, 0.35, 0.07)
+		if done:
+			node.queue_free()
+			_orbs.remove_at(index)
+		index -= 1
+
+
+func _clear_orbs() -> void:
+	for orb: Dictionary in _orbs:
+		var node: Node = orb["node"]
+		node.queue_free()
+	_orbs.clear()
+
+
+## The drone's death blast: a fireball, a ring that marks the blast radius, and short-range damage to
+## the player only when they stand within DRONE_BLAST_RADIUS.
+func _explode() -> void:
+	var level: Node = get_parent()
+	var centre: Vector3 = global_position
+	FX.explosion(level, centre, Color("ff7a3d"), 0.8)
+	FX.ring(level, centre, Color("ffc46b"), DRONE_BLAST_RADIUS, 0.4)
+	if is_instance_valid(target) and centre.distance_to(target.global_position) <= DRONE_BLAST_RADIUS:
+		target.call("take_damage", DRONE_BLAST_DAMAGE * damage_scale, kind, centre)
+
+
 func _can_see_player() -> bool:
-	var origin: Vector3 = global_position + Vector3.UP * (0.8 if kind == "hound" else 1.68)
+	var origin: Vector3 = global_position + Vector3.UP * _sight_height()
 	var end: Vector3 = target.global_position + Vector3.UP * 0.2
 	var query := PhysicsRayQueryParameters3D.create(origin, end, 1 | 2)
 	query.exclude = [get_rid()]
 	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	return not hit.is_empty() and hit["collider"] == target
+
+
+## Height of the eye for line-of-sight rays, above the node origin.
+func _sight_height() -> float:
+	match kind:
+		"hound":
+			return 0.8
+		"drone":
+			return 0.0
+	return 1.68
 
 
 func take_damage(amount: float, source: String = "bullet") -> void:
@@ -511,22 +868,34 @@ func take_damage(amount: float, source: String = "bullet") -> void:
 		_memory = 8.0
 	if health <= 0.0:
 		# Only the first lethal hit gets here: _dead blocks every later call, so died fires once.
-		_dead = true
-		active = false
-		died.emit(kind, source)
-		_play("enemy_death")
-		collision_layer = 0
-		collision_mask = 0
-		remove_from_group("enemies")
-		if is_instance_valid(_telegraph):
-			_telegraph.visible = false
-		_eye_material.emission_enabled = false
-		_eye_material.albedo_color = Color("101a1c")
-		var tween := create_tween()
-		tween.tween_property(_visual, "rotation:z", 1.35, 0.35)
-		tween.parallel().tween_property(_visual, "position:y", -0.2, 0.35)
-		tween.tween_interval(12.0)
-		tween.tween_callback(queue_free)
+		_die(source)
+
+
+func _die(source: String) -> void:
+	_dead = true
+	active = false
+	died.emit(kind, source)
+	_play("enemy_death")
+	collision_layer = 0
+	collision_mask = 0
+	remove_from_group("enemies")
+	if is_instance_valid(_telegraph):
+		_telegraph.visible = false
+	_eye_material.emission_enabled = false
+	_eye_material.albedo_color = Color("101a1c")
+	_clear_orbs()
+	if kind == "drone":
+		_explode()
+		_visual.visible = false
+		var gone := create_tween()
+		gone.tween_interval(1.0)
+		gone.tween_callback(queue_free)
+		return
+	var tween := create_tween()
+	tween.tween_property(_visual, "rotation:z", 1.35, 0.35)
+	tween.parallel().tween_property(_visual, "position:y", -0.2, 0.35)
+	tween.tween_interval(12.0)
+	tween.tween_callback(queue_free)
 
 
 ## Positional sound through the audio node (CONTRACT 4.16). Silent when there is no audio node.
@@ -549,6 +918,8 @@ func _mesh_box_in(parent: Node3D, location: Vector3, size: Vector3, material: Ma
 	instance.mesh = mesh
 	instance.material_override = material
 	instance.position = location
+	# Main porcelain volumes cast the silhouette; tiny fittings do not need cascaded passes.
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(instance)
 	return instance
 

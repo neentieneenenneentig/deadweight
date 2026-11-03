@@ -181,14 +181,15 @@ func _build_weight() -> RigidBody3D:
 	var visual := MeshInstance3D.new()
 	var mesh := SphereMesh.new()
 	mesh.radius = 0.29
-	mesh.height = 0.58
+	mesh.height = 0.72
 	mesh.radial_segments = 12
 	mesh.rings = 6
 	visual.mesh = mesh
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color("dfa754")
-	material.metallic = 0.65
-	material.roughness = 0.4
+	material.albedo_color = Color("f0ddc0")
+	material.albedo_texture = preload("res://assets/dreamscape/porcelain.png")
+	material.metallic = 0.1
+	material.roughness = 0.28
 	visual.material_override = material
 	body.add_child(visual)
 	var belt := MeshInstance3D.new()
