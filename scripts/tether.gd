@@ -1,7 +1,7 @@
 extends Node3D
 ## A free moving weight and tension-only elastic line. All line forces are paired.
 ## Owns casting, spool, reel, recover, the anchor latch, line wrapping, smash and impact events (CONTRACT 4.9).
-## Line visuals beyond the basic ribbon come in a later task.
+## The line is a camera-facing ribbon drawn through the wrap points; its colour follows the line state (G4).
 
 const FxScript = preload("res://scripts/fx.gd")
 
@@ -46,6 +46,28 @@ const IMPACT_MIN_SPEED: float = 4.0         # m/s; slower world contacts make no
 const IMPACT_INTERVAL: float = 0.15         # s between weight_impact emits
 const WEIGHT_TIMEOUT: float = 8.0           # s a cut weight lingers before it is freed
 const MAX_LOOSE_WEIGHTS: int = 8
+# Line visuals (G4). Rendering only; none of these feed the physics.
+## The ribbon is 2.5 cm wide near the camera and never thinner than RIBBON_MIN_PIXELS on screen.
+const RIBBON_WIDTH: float = 0.025          # m
+const RIBBON_MIN_PIXELS: float = 1.5
+const LINE_SAMPLES: int = 14               # samples per line segment
+## Palette (CONTRACT 8): cyan = route/rod info (slack), amber = action (taut), red = danger (near max).
+## The pale UI tints wash out on the porcelain scene, so the line uses the saturated forms: the HUD route
+## cyan (hud.gd tension ring), the theme's AMBER_DEEP, and the theme red pushed deeper for legibility.
+const LINE_CYAN: Color = Color("67d5d2")
+const LINE_AMBER: Color = Color("cf8d3e")
+const LINE_RED: Color = Color("d42a1e")
+const TAUT_FROM_TENSION: float = 100.0     # N; matches the LOCKED / TAUT state name
+const AMBER_AT_TENSION: float = 600.0      # N; fully amber from here (a loaded line is well past this)
+const DANGER_FROM: float = 0.7             # danger fraction where the line starts to turn red
+const DANGER_FULL: float = 0.85            # danger fraction where it is fully red
+## Danger = the larger of tension / MAX_TENSION and total line / (2 * max_line), since overload cuts at 2x.
+## The speed trail reuses the line colour and fades out over TRAIL_LIFETIME.
+const TRAIL_MIN_SPEED: float = 8.0         # m/s; slower weights leave no trail
+const TRAIL_SAMPLES: int = 10
+const TRAIL_LIFETIME: float = 0.22         # s
+const TRAIL_WIDTH: float = 0.18            # m at the weight, tapering to nothing at the tail
+const TRAIL_ALPHA: float = 0.8
 
 # --- State --------------------------------------------------------------------------------------
 var player: RigidBody3D
@@ -74,6 +96,13 @@ var _assist_remaining: float = 0.0
 var _assist_direction: Vector3 = Vector3.ZERO
 var _line_view: MeshInstance3D
 var _line_material: StandardMaterial3D
+var _line_mesh: ImmediateMesh              # reused every frame
+var _trail_view: MeshInstance3D
+var _trail_material: StandardMaterial3D
+var _trail_mesh: ImmediateMesh             # reused every frame
+var _trail_points: Array[Vector3] = []     # weight positions, oldest first
+var _trail_times: Array[float] = []        # _visual_clock when each position was sampled
+var _visual_clock: float = 0.0
 var _loose_weights: Array[Dictionary] = []
 ## Wrap points in order from the player end toward the weight. The line bends at each one.
 var _wraps: Array[Vector3] = []
@@ -86,13 +115,27 @@ var _stalled: bool = false
 
 
 func _ready() -> void:
+	_line_material = _ribbon_material(false)
+	_line_mesh = ImmediateMesh.new()
 	_line_view = MeshInstance3D.new()
 	_line_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_line_material = StandardMaterial3D.new()
-	_line_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_line_material.albedo_color = Color("b5ddd5")
-	_line_material.no_depth_test = false
 	add_child(_line_view)
+	_trail_material = _ribbon_material(true)
+	_trail_mesh = ImmediateMesh.new()
+	_trail_view = MeshInstance3D.new()
+	_trail_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_trail_view)
+
+
+## Unshaded, vertex-coloured, double-sided: the cheap look that works in the Compatibility renderer.
+func _ribbon_material(fading: bool) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.vertex_color_use_as_albedo = true
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if fading:
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	return material
 
 
 func bind(body: RigidBody3D) -> void:
@@ -570,28 +613,129 @@ func _check_line_rules(total: float) -> void:
 		event_happened.emit("overload")
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_visual_clock += delta
 	if not is_instance_valid(weight) or not is_instance_valid(player):
+		_trail_points.clear()
+		_trail_times.clear()
+		_line_view.mesh = null
+		_trail_view.mesh = null
 		return
-	var rod: Node3D = player.get("rod_tip") as Node3D
-	var points: PackedVector3Array = _line_points(rod.global_position)
+	var camera: Camera3D = _active_camera()
+	var points: PackedVector3Array = _line_points(_rod_tip_position())
 	var total: float = _polyline_length(points)
+	var colour: Color = _line_colour(total)
+	_update_trail(camera, colour)
+	if camera == null:
+		_line_view.mesh = null
+		return
 	var sag_max: float = minf(maxf(0.0, line_length - total) * 0.3, 5.0)
-	var mesh := ImmediateMesh.new()
-	_line_material.albedo_color = Color("edb268") if tension > 8000.0 else Color("b5ddd5")
-	mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, _line_material)
-	# Each segment sags in proportion to its share of the line, so the rope droops between wraps too.
+	var centres: PackedVector3Array = _line_centres(points, sag_max, total)
+	var widths := PackedFloat32Array()
+	var colours := PackedColorArray()
+	for centre in centres:
+		widths.append(_ribbon_width(centre, camera, RIBBON_WIDTH))
+		colours.append(colour)
+	_emit_ribbon(_line_mesh, _line_material, centres, widths, colours, camera)
+	_line_view.mesh = _line_mesh
+
+
+## The camera the ribbon faces and sizes itself against: the viewport's current camera, else the player's.
+func _active_camera() -> Camera3D:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if camera == null and is_instance_valid(player):
+		camera = player.get("camera") as Camera3D
+	return camera
+
+
+## Line colour by state. Slack is cyan; it blends to amber as tension rises past TAUT_FROM_TENSION;
+## it blends to red as the danger fraction nears 1 (tension at MAX_TENSION, or the line near overload).
+func _line_colour(total: float) -> Color:
+	var taut: float = smoothstep(TAUT_FROM_TENSION, AMBER_AT_TENSION, tension)
+	var colour: Color = LINE_CYAN.lerp(LINE_AMBER, taut)
+	var danger: float = smoothstep(DANGER_FROM, DANGER_FULL, _danger_fraction(total))
+	return colour.lerp(LINE_RED, danger)
+
+
+func _danger_fraction(total: float) -> float:
+	return maxf(tension / MAX_TENSION, total / (max_line * 2.0))
+
+
+## Full width in metres at a point: RIBBON_WIDTH, widened so it covers RIBBON_MIN_PIXELS on screen.
+## Camera3D.fov is vertical, which is Godot's default keep-height setting.
+func _ribbon_width(point: Vector3, camera: Camera3D, base_width: float) -> float:
+	var distance: float = maxf(0.05, camera.global_position.distance_to(point))
+	var viewport_height: float = maxf(1.0, float(get_viewport().size.y))
+	var metres_per_pixel: float = 2.0 * distance * tan(deg_to_rad(camera.fov) * 0.5) / viewport_height
+	return maxf(base_width, RIBBON_MIN_PIXELS * metres_per_pixel)
+
+
+## The line's centre path: each segment sags in proportion to its share of the line, so the rope
+## droops between wraps too. Ends with the weight-side point.
+func _line_centres(points: PackedVector3Array, sag_max: float, total: float) -> PackedVector3Array:
+	var centres := PackedVector3Array()
 	for s in range(points.size() - 1):
 		var a: Vector3 = points[s]
 		var b: Vector3 = points[s + 1]
 		var sag: float = sag_max * a.distance_to(b) / maxf(total, 0.001)
-		for i in range(17):
-			var ratio: float = float(i) / 16.0
+		for i in range(LINE_SAMPLES):
+			var ratio: float = float(i) / float(LINE_SAMPLES)
 			var point: Vector3 = a.lerp(b, ratio)
 			point.y -= sin(ratio * PI) * sag
-			mesh.surface_add_vertex(to_local(point))
+			centres.append(point)
+	centres.append(points[points.size() - 1])
+	return centres
+
+
+## Rebuilds one camera-facing triangle strip along the centres (world space). Each centre's
+## side vector is the path tangent crossed with the view direction, so the ribbon always faces the camera.
+func _emit_ribbon(mesh: ImmediateMesh, material: Material, centres: PackedVector3Array, widths: PackedFloat32Array, colours: PackedColorArray, camera: Camera3D) -> void:
+	mesh.clear_surfaces()
+	if centres.size() < 2:
+		return
+	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP, material)
+	var last: int = centres.size() - 1
+	for i in range(centres.size()):
+		var tangent: Vector3 = centres[mini(i + 1, last)] - centres[maxi(i - 1, 0)]
+		var side: Vector3 = tangent.cross(camera.global_position - centres[i])
+		if side.length_squared() < 1e-8:
+			side = camera.global_basis.x
+		side = side.normalized() * widths[i] * 0.5
+		mesh.surface_set_color(colours[i])
+		mesh.surface_add_vertex(to_local(centres[i] - side))
+		mesh.surface_add_vertex(to_local(centres[i] + side))
 	mesh.surface_end()
-	_line_view.mesh = mesh
+
+
+## Samples the weight while it moves fast and draws a short ribbon behind it that fades to nothing.
+## The trail is cleared as soon as the weight slows or is gone.
+func _update_trail(camera: Camera3D, colour: Color) -> void:
+	if weight.linear_velocity.length() < TRAIL_MIN_SPEED:
+		_trail_points.clear()
+		_trail_times.clear()
+		_trail_view.mesh = null
+		return
+	_trail_points.append(weight.global_position)
+	_trail_times.append(_visual_clock)
+	while _trail_points.size() > TRAIL_SAMPLES or _visual_clock - _trail_times[0] > TRAIL_LIFETIME:
+		_trail_points.pop_front()
+		_trail_times.pop_front()
+	if _trail_points.size() < 2 or camera == null:
+		_trail_view.mesh = null
+		return
+	var centres := PackedVector3Array()
+	var widths := PackedFloat32Array()
+	var colours := PackedColorArray()
+	var newest: int = _trail_points.size() - 1
+	# Head (newest) first, so the strip runs from the weight back along its path.
+	for i in range(newest, -1, -1):
+		var age: float = float(newest - i) / float(maxi(1, newest))
+		var fade: float = 1.0 - age
+		centres.append(_trail_points[i])
+		widths.append(_ribbon_width(_trail_points[i], camera, TRAIL_WIDTH * fade))
+		colours.append(Color(colour, TRAIL_ALPHA * fade))
+	_emit_ribbon(_trail_mesh, _trail_material, centres, widths, colours, camera)
+	_trail_view.mesh = _trail_mesh
 
 
 func state_name() -> String:
