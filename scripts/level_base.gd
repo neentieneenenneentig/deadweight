@@ -59,6 +59,7 @@ const NAV_AGENT_RADIUS := 0.4
 const NAV_AGENT_HEIGHT := 1.8
 const NAV_MAX_CLIMB := 0.25
 const NAV_MAX_SLOPE := 38.0                          # degrees
+const HAZARD_CARVE_MARGIN := 0.3                     # metres the hazard carve reaches below its box (floor spans)
 
 const GLOW_KEYS := ["cyan", "amber", "red", "orange", "white"]
 const NO_SHADOW_KEYS := ["cyan", "amber", "red", "orange", "white", "water", "glass"]
@@ -564,7 +565,7 @@ func is_safe_ground(position: Vector3) -> bool:
 
 
 ## Bakes the walking navmesh from every solid collider on layer 1 (the same shapes that stop the
-## player), using the CONTRACT 4.11 agent settings. synchronous = true bakes before returning, so
+## player) minus the hazard volumes, using the CONTRACT 4.11 agent settings. synchronous = true bakes before returning, so
 ## navigation_ready is true on return; false bakes on a worker thread and sets navigation_ready
 ## when the new mesh is live. Call after build(); the level must be in the scene tree.
 func bake_navigation(synchronous: bool = true) -> void:
@@ -573,6 +574,8 @@ func bake_navigation(synchronous: bool = true) -> void:
 	var geometry := NavigationMeshSourceGeometryData3D.new()
 	# Parsing reads the scene tree, so it always runs here on the main thread; only the bake is threaded.
 	NavigationServer3D.parse_source_geometry_data(mesh, geometry, self)
+	# Both bake paths read this geometry, so the hazard carve applies to sync and threaded bakes alike.
+	_add_hazard_obstructions(geometry)
 	if synchronous:
 		_pending_nav_mesh = null                     # supersedes a threaded bake that is still running
 		NavigationServer3D.bake_from_source_geometry_data(mesh, geometry)
@@ -580,6 +583,22 @@ func bake_navigation(synchronous: bool = true) -> void:
 	else:
 		_pending_nav_mesh = mesh
 		NavigationServer3D.bake_from_source_geometry_data_async(mesh, geometry, _on_navigation_baked.bind(mesh))
+
+
+## Hazard volumes (heat, electric, deep water) are not walkable: each record carves its footprint
+## out of the navmesh, so nav paths and hounds route around them. Shallow water has no record and
+## stays walkable. The carve starts HAZARD_CARVE_MARGIN below the box to catch the floor spans under it.
+func _add_hazard_obstructions(geometry: NavigationMeshSourceGeometryData3D) -> void:
+	for record: Dictionary in _hazards:
+		var box: AABB = record["box"]
+		var bottom: float = box.position.y - HAZARD_CARVE_MARGIN
+		var outline := PackedVector3Array([
+			Vector3(box.position.x, bottom, box.position.z),
+			Vector3(box.end.x, bottom, box.position.z),
+			Vector3(box.end.x, bottom, box.end.z),
+			Vector3(box.position.x, bottom, box.end.z),
+		])
+		geometry.add_projected_obstruction(outline, bottom, box.size.y + HAZARD_CARVE_MARGIN, true)
 
 
 ## Walkable path from from to to on the level's navmesh, as world points (the first point is the

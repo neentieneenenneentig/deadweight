@@ -1,7 +1,8 @@
 extends SceneTree
 ## Level validation suite (F9). For every catalog level that has a script (or the one named by
 ## --only=<id>) it builds the level, checks its INFO (CONTRACT 5.6), placement and budgets, bakes the
-## navmesh (CONTRACT 4.11) and checks that walkable paths reach every case and the extraction.
+## navmesh (CONTRACT 4.11) and checks that walkable paths reach every case and the extraction without
+## crossing hazard volumes. Bonus caches must be off-foot (rod-only): a walkable one is a WARN, not a failure.
 ## It also prints the route length, suggested par times, draw calls, triangles and bake time.
 ## Usage: godot --headless --fixed-fps 90 --path . --script res://tests/levels_test.gd
 ## Options after "--": --only=<id>. A named level with no script is a FAIL; unnamed ones are skipped.
@@ -10,6 +11,7 @@ const Catalog = preload("res://scripts/level_catalog.gd")
 const LevelBase = preload("res://scripts/level_base.gd")
 
 const PATH_TOLERANCE := 1.6          # a nav path must end this close to its target (metres)
+const BONUS_OFF_FOOT := 1.5          # a bonus cache is off-foot when no walkable path ends this close (m, horizontal and vertical)
 const MAX_BAKE_MS := 2000.0          # acceptance: the synchronous navmesh bake takes under 2 s
 const ASYNC_TIMEOUT_MS := 20000      # the threaded bake gets this long before it counts as stuck
 const MAX_LABELS := 60
@@ -119,7 +121,8 @@ func _build_and_check(id: String, level: Node3D, dummy: Node3D, info: Dictionary
 	# Physics frames let the colliders reach the physics space before any shape or ray query.
 	await _frames(2)
 	_check(str(level.get("level_id")) == id, "%s: level knows its id" % id)
-	var cases: Array[Vector3] = _case_floor_points(level.call("get_objectives"))
+	var objectives: Array = level.call("get_objectives")
+	var cases: Array[Vector3] = _case_floor_points(objectives)
 	var spawn: Vector3 = level.get("spawn_position")
 	var extraction: Vector3 = level.get("extraction_position")
 	_check_counts(id, level, info, cases)
@@ -135,6 +138,7 @@ func _build_and_check(id: String, level: Node3D, dummy: Node3D, info: Dictionary
 	# The navigation map syncs on a physics frame, so queries wait for one.
 	await _frames(1)
 	var route: float = _check_navigation(id, level, spawn, cases, extraction)
+	_check_bonus(id, level, spawn, objectives)
 
 	var draw_calls: int = await _measure_draw_calls(holder, spawn, float(level.get("spawn_yaw")))
 	var async_ms: int = await _check_threaded_bake(id, level, spawn, extraction)
@@ -196,13 +200,47 @@ func _check_navigation(id: String, level: Node3D, spawn: Vector3, cases: Array[V
 	return route
 
 
-## A nav path from `from` must end within PATH_TOLERANCE of `to`.
+## A nav path from `from` must end within PATH_TOLERANCE of `to`. Hazard volumes are not walkable, so a
+## failure says whether the target itself sits in a hazard or the only way there crosses hazard ground.
 func _check_path(id: String, level: Node3D, from: Vector3, to: Vector3, label: String) -> void:
 	var path: PackedVector3Array = level.call("get_nav_path", from, to)
 	var gap: float = INF
 	if not path.is_empty():
 		gap = path[path.size() - 1].distance_to(to)
-	_check(gap <= PATH_TOLERANCE, "%s: nav path from spawn reaches %s (ends %.2f m away, limit %.1f)" % [id, label, gap, PATH_TOLERANCE])
+	if gap <= PATH_TOLERANCE:
+		_check(true, "%s: nav path from spawn reaches %s" % [id, label])
+		return
+	var cause: String = "the only way there crosses hazard ground"
+	if bool(level.call("is_hazard_at", to)):
+		cause = "the point itself is inside a hazard volume"
+	_check(false, "%s: no walkable route from spawn to %s at (%.1f, %.1f, %.1f) avoiding hazards (nearest walkable point %.2f m away, limit %.1f): %s" % [
+		id, label, to.x, to.y, to.z, gap, PATH_TOLERANCE, cause])
+
+
+## Bonus caches are rod-only (DESIGN): no walkable path from the spawn may end within BONUS_OFF_FOOT
+## of one, horizontally or vertically. A walkable cache prints a WARN and is counted, not failed, so the
+## lead can decide per level. Prints one summary line per level.
+func _check_bonus(id: String, level: Node3D, spawn: Vector3, objectives: Array) -> void:
+	var total: int = 0
+	var walkable: int = 0
+	for objective: Dictionary in objectives:
+		if objective.get("kind", "") != "bonus":
+			continue
+		total += 1
+		var floor_point: Vector3 = (objective["position"] as Vector3) - Vector3.UP * 0.9
+		var cache_name: String = str(objective["label"]).trim_prefix("CACHE ")
+		var path: PackedVector3Array = level.call("get_nav_path", spawn, floor_point)
+		if path.is_empty():
+			print("    %s: no walkable path from spawn" % cache_name)
+			continue
+		var end: Vector3 = path[path.size() - 1]
+		var horizontal: float = Vector2(end.x - floor_point.x, end.z - floor_point.z).length()
+		var vertical: float = absf(end.y - floor_point.y)
+		print("    %s: nearest walkable point %.1f m across, %.1f m up or down" % [cache_name, horizontal, vertical])
+		if horizontal <= BONUS_OFF_FOOT and vertical <= BONUS_OFF_FOOT:
+			walkable += 1
+			print("WARN: %s: bonus %s is walkable" % [id, cache_name])
+	print("  bonus caches: %d, off-foot %d, walkable %d (warnings only)" % [total, total - walkable, walkable])
 
 
 ## Draw calls from a camera at the spawn looking along the spawn yaw. Headless runs have no GPU, so

@@ -11,7 +11,7 @@ const INFO := {
 	"zone": "foundry",
 	"number": 6,
 	"blurb": "A round furnace hall around a teapot that is too hot to pour. Two rings, a ceiling of anchors, and the last sentries.",
-	"par_silver": 90.0,
+	"par_silver": 95.0,
 	"par_gold": 55.0,
 	"cases": 5,
 	"bonus": 2,
