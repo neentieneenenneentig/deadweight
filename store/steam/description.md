@@ -7,10 +7,10 @@ every line against the release candidate (task Q2) before you submit the page fo
 
 DEADWEIGHT
 
-## Short description (Steam limit 300 characters; this one is 223)
+## Short description (Steam limit 300 characters; this one is 256)
 
 ```
-Your legs are slow and the ground is hostile. Your one real tool is a fishing rod that casts impossibly heavy weights. Lock the line, get dragged into the sky, outfly robot hounds and sentries, grab the salvage and extract.
+Your legs are slow and the ground is hostile. Your one real tool is a fishing rod that casts impossibly heavy weights. Lock the line, get dragged into the sky, outfly porcelain tea hounds and clockwork sentries, and extract beneath a painted afternoon sky.
 ```
 
 ## About This Game
@@ -21,16 +21,20 @@ DEADWEIGHT is a first-person movement game about a fishing rod that throws weigh
 
 The line is physical and honest: it only pulls when it is taut, you keep every bit of speed you earn, and a cast kicks you back. Learn how the weight swings and you will cross whole sectors without touching the floor.
 
+[h2]The Department of Unfinished Gravity[/h2]
+An official public works department keeps building under a painted afternoon sky, long after anyone remembers what the works were for. Giant empty chairs stand where offices used to be. Doors open onto nothing. The notices on the walls are deadpan and very polite. The department still keeps its staff: porcelain tea hounds, alarm-clock sentries and ceramic drones, all on duty, all faintly absurd.
+
 [h2]Raid, then get out[/h2]
-Abandoned floodworks and foundries are full of salvage cases and the robots that guard them. Hounds own the ground, sentries own the sightlines, drones own the air between. Grab every case, reach the extraction pad and hold it while the clock runs down. Die, and the run's salvage is gone.
+The department's halls are full of salvage cases, and its staff will defend every one. Hounds own the ground, sentries own the sightlines, drones own the air between. Grab every case, reach the extraction pad and hold it while the clock runs down. Die, and the run's salvage is gone.
 
 [h2]Features[/h2]
 [list]
 [*] Rope physics you can master: tension-only line, inherited momentum, casting recoil, free spool, lock, reel and cut.
 [*] Short, replayable raids of one to four minutes, with bronze, silver and gold medal times on every level.
-[*] A campaign of hand-built levels across two industrial zones, plus a tutorial and a practice range.
-[*] Swing a weight into a robot fast enough and it counts as a kill. A sidearm covers the rest.
+[*] A campaign of hand-built levels across the department's zones, plus a tutorial and a practice range.
+[*] Swing a weight into a sentry, hound or drone fast enough and it shatters. A sidearm covers the rest.
 [*] Spend salvage in the workshop on six upgrade tracks: spool length, reel motor, sinker mass, plating, quickdraw and sidearm.
+[*] A painted sky, porcelain architecture and a quiet, solemn tone with a faintly comic edge.
 [*] Mouse and keyboard or full gamepad support, built to play well on Steam Deck.
 [*] Fully offline. No accounts, ads, microtransactions or data collection.
 [/list]
@@ -53,8 +57,12 @@ a Vulkan-capable GPU with a current Mesa or NVIDIA driver, otherwise as Windows.
 
 ## Tags (pick up to 20 in Steamworks; the first five carry the most weight)
 
-Action, Physics, First-Person, Fast-Paced, Indie, Singleplayer, Robots, Parkour, 3D Platformer,
-Arcade, Short, Sci-fi, Controller, Stylized, Score Attack.
+Action, Physics, First-Person, Fast-Paced, Indie, Singleplayer, Surreal, Parkour, 3D Platformer,
+Arcade, Short, Stylized, Atmospheric, Controller, Score Attack.
+
+Fifteen tags, within Steam's limit of twenty. The old machine-setting tags (the creature-type tag and
+Sci-fi) are dropped, since the setting is no longer science fiction. The owner may still choose a
+different five for the top slots.
 
 ## Price
 
@@ -70,4 +78,16 @@ price; accept them unless you have a reason not to.
 ## Content survey (Steamworks "Mature Content" questions)
 
 No mature content: no blood, gore, sexual content, strong language or gambling. Violence is
-limited to the player shooting and smashing non-human robots.
+limited to fantasy violence against non-human porcelain and clockwork automatons (tea hounds,
+sentries and drones). They shatter. There is no blood, and no humans or animals are harmed.
+
+## AI content disclosure (Steamworks Content Survey draft, PLAN O11)
+
+Paste this into the Content Survey's AI-generated content section. The owner fills it in and
+reviews it before submitting the page (see RELEASE_CHECKLIST.md, Steam step 9).
+
+```
+Pre-generated content: Yes. Three image textures in the game were created with an AI image-generation tool during development and reviewed by the developer: a painted afternoon sky panorama, a porcelain surface texture, and a painting of a vacant chair shown as a mural inside the game. The prompts used are kept by the developer. No other AI-generated images are used.
+
+Live-generated content: No. The game does not generate any AI content at runtime. Its 3D models, animation and audio are created by the developer's own code, and no third-party assets are bundled.
+```

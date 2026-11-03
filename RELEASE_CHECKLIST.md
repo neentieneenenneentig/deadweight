@@ -80,6 +80,8 @@ the builds already do.
        days), set the price, and request a Steam Deck compatibility review.
 8. [ ] **OWNER** Release: Steam never releases a game by itself; press the release button
        ([release process](https://partner.steamgames.com/doc/store/releasing)).
+9. [ ] **OWNER** Content Survey: fill in the AI-generated content disclosure from the draft in
+       `store/steam/description.md` (PLAN O11).
 
 ## Every release candidate (task Q2)
 

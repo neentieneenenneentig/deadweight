@@ -22,22 +22,22 @@ DEADWEIGHT
 
 ## Short description [80]
 
-Model A (75):
+Model A (74):
 
 ```
-Cast impossibly heavy weights, catch the line and fly. Try it free, no ads.
+Cast impossibly heavy weights, lock the line and fly. Try it free, no ads.
 ```
 
-Model B (71):
+Model B (70):
 
 ```
-Cast impossibly heavy weights, catch the line and fly. Offline, no ads.
+Cast impossibly heavy weights, lock the line and fly. Offline, no ads.
 ```
 
 ## Full description [4000]
 
-Paste the body, a blank line, then the closing for your model: 1,303 characters with closing A,
-1,248 with closing B.
+Paste the body, a blank line, then the closing for your model: 1,436 characters with closing A,
+1,381 with closing B.
 
 ```
 Your legs are slow and the ground is hostile. Your one real tool is a fishing rod that casts impossibly heavy weights.
@@ -45,13 +45,16 @@ Your legs are slow and the ground is hostile. Your one real tool is a fishing ro
 Cast a weight, lock the spool, and it drags you off your feet and into the sky. Reel in to climb, cut loose to keep your speed, recast in mid-air before you hit the ground. The line is physical and honest: it only pulls when it is taut, you keep every bit of momentum you earn, and every cast kicks you back.
 
 RAID, THEN GET OUT
-Abandoned floodworks and foundries are full of salvage cases and the robots that guard them. Hounds own the ground, sentries own the sightlines, drones own the air. Grab every case, reach the extraction pad and hold it while the clock runs down.
+The department's halls are full of salvage cases, and its staff will defend every one: porcelain tea hounds, alarm-clock sentries and ceramic drones. Grab every case, reach the extraction pad and hold it while the clock runs down.
+
+THE DEPARTMENT OF UNFINISHED GRAVITY
+Giant empty chairs, doors that open onto nothing and deadpan notices, all under a painted afternoon sky. Quiet, solemn and faintly comic.
 
 FEATURES
 • Rope physics you can master: free spool, lock, reel, cut and recast
 • Short raids of one to four minutes with bronze, silver and gold medal times
-• Hand-built levels across two industrial zones, a tutorial and a practice range
-• Smash robots with a swinging weight, or finish them with your sidearm
+• Hand-built levels, a tutorial and a practice range
+• Smash guards with a swinging weight, or finish them with your sidearm
 • Six workshop upgrade tracks to spend your salvage on
 • Touch controls designed for phones, plus full gamepad support
 • Plays completely offline. No ads, no accounts, no data collection

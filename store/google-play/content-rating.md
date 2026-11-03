@@ -9,9 +9,9 @@ Answer from what the build contains. The guidance below matches the v1.0 design.
 | Topic | What the game contains | Answer |
 | --- | --- | --- |
 | Category | A game | Game (not "Reference, news or educational", not "Social") |
-| Violence | The player shoots and smashes **robots** (hounds, sentries, drones). Robots break apart; no humans or animals are hurt. | Yes: fantasy violence against non-human, robotic characters |
-| Blood and gore | None | No |
-| Fear / horror | Industrial ruins and hostile robots; no horror imagery or jump scares | No |
+| Violence | The player smashes **porcelain tea hounds, clockwork sentries and ceramic drones**. They shatter; no humans or animals are hurt. | Yes: fantasy violence against non-human porcelain and clockwork automatons |
+| Blood and gore | None. Automatons shatter without blood. | No |
+| Fear / horror | An absurdist, quiet department of vacant chairs and doors to nowhere, with hostile automatons; no horror imagery or jump scares | No |
 | Sexuality, nudity | None | No |
 | Language | None | No |
 | Controlled substances | None | No |
