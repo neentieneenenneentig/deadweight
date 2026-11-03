@@ -68,20 +68,26 @@ const JOBS: Array[Dictionary] = [
 ##   before the capture; power 0..1 charge; lift: metres added to the aim to clear gravity's drop;
 ##   track: keep the plate in view once latched; min_speed: capture early at this speed with taut line;
 ##   latch: false casts at a target and captures the line in flight.
+##   look: "velocity" looks along the horizontal swing, pitched up by look_up degrees (default 15), so the
+##   line runs from the rod up through the frame and the level shows below; "hound" follows the nearest
+##   hound; anything else follows aim. track applies the look once latched, or from the cast for latch false.
+##   near: capture once the nearest hound is this close (m), for a chase; 0 for none.
+##   practice: true starts the level with --practice (no enemies), so a bite cannot knock the swing off course.
+## Casts start 15 to 25 m from their plate, so the line is long in frame. Plates are listed by --probe.
 const LIVE_SHOTS: Dictionary = {
-	"hud_01_pump_row_hound_chase": {"level": "l02", "from": Vector3(-4, 1, -6), "aim": Vector3(7, 0.5, -18), "latch": false, "power": 0.3, "frames": 40},
+	"hud_01_pump_row_hound_chase": {"level": "l02", "from": Vector3(-4, 1, -6), "aim": Vector3(-10, 5, -30), "latch": false, "power": 0.3, "track": true, "look": "hound", "near": 7.0, "frames": 300},
 	"hud_02_sluice_gate_sentry_beam": {"level": "l01", "from": Vector3(-8, 1, -30), "aim": Vector3(-22, 3.6, -46), "latch": false, "power": 0.3, "frames": 40},
-	"hud_03_pump_row_swing": {"level": "l02", "from": Vector3(0, 1, -26), "aim": Vector3(-5, 8.64, -37), "power": 0.2, "lift": 2.2, "reel_frames": 40, "swing": Vector3(910.0, 250.0, -410.0), "track": true, "min_speed": 15.0, "frames": 120},
-	"hud_04_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(12, 8.54, -38), "power": 0.2, "lift": 2.2, "reel_frames": 70, "swing": Vector3(637.0, 250.0, 637.0), "track": true, "min_speed": 15.0, "frames": 120},
-	"hud_05_slag_line_lintel_swing": {"level": "l04", "from": "spawn", "aim": Vector3(4, 9.44, 8), "power": 0.2, "lift": 2.2, "reel_frames": 15, "swing": Vector3(1000.0, 200.0, 660.0), "track": true, "min_speed": 15.0, "frames": 120},
-	"hud_06_crane_yard_arm_reel": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(-5, 14.99, -22), "power": 0.2, "lift": 1.5, "reel": true, "track": true, "frames": 90},
-	"hud_07_crucible_kiln_swing": {"level": "l06", "from": "spawn", "aim": Vector3(-4, 9.44, 1.5), "power": 0.2, "lift": 2.2, "reel_frames": 15, "swing": Vector3(-1000.0, 200.0, -300.0), "track": true, "min_speed": 15.0, "frames": 120},
-	"hud_08_induction_ledge_swing": {"level": "tutorial", "from": Vector3(0, 1, -56), "aim": Vector3(3.5, 7.74, -66), "power": 0.2, "lift": 2.2, "reel_frames": 40, "swing": Vector3(855.0, 250.0, 300.0), "track": true, "min_speed": 15.0, "frames": 120},
-	"hud_09_practice_range_gantry": {"level": "range", "from": Vector3(0, 1, -56), "aim": Vector3(4, 8.64, -70), "power": 0.2, "lift": 2.2, "reel_frames": 70, "swing": Vector3(874.0, 250.0, 246.0), "track": true, "min_speed": 15.0, "frames": 120},
+	"hud_03_pump_row_swing": {"level": "l02", "from": Vector3(0, 1, -16), "aim": Vector3(-5, 8.64, -37), "power": 0.4, "lift": 2.2, "reel_frames": 120, "swing": Vector3(910.0, 250.0, -410.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"hud_04_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(12, 8.54, -38), "power": 0.2, "lift": 2.2, "reel_frames": 60, "swing": Vector3(800.0, 250.0, 480.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"hud_05_slag_line_lintel_swing": {"level": "l04", "from": Vector3(-2, 1, -66), "aim": Vector3(-6, 9.54, -88), "power": 0.6, "lift": 2.2, "reel_frames": 110, "swing": Vector3(1000.0, 200.0, -180.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"hud_06_crane_yard_arm_reel": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(-5, 14.99, -22), "power": 0.2, "lift": 1.5, "reel": true, "practice": true, "track": true, "look": "velocity", "frames": 90},
+	"hud_07_crucible_kiln_swing": {"level": "l06", "from": Vector3(0, 10, -54), "aim": Vector3(-11, 16.34, -65.05), "power": 0.2, "lift": 1.5, "reel_frames": 60, "swing": Vector3(-600.0, 150.0, 600.0), "practice": true, "track": true, "look": "aim", "view": Vector3(0, 0.5, -46), "min_speed": 12.0, "frames": 150},
+	"hud_08_induction_ledge_swing": {"level": "tutorial", "from": Vector3(0, 1, -48), "aim": Vector3(3.5, 7.74, -66), "power": 0.4, "lift": 2.2, "reel_frames": 80, "swing": Vector3(900.0, 200.0, 180.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"hud_09_practice_range_gantry": {"level": "range", "from": Vector3(0, 1, -50), "aim": Vector3(4, 8.64, -70), "power": 0.4, "lift": 2.2, "reel_frames": 110, "swing": Vector3(900.0, 250.0, 180.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
 	"touch_01_sluice_gate_sentry_beam": {"level": "l01", "from": Vector3(-8, 1, -30), "aim": Vector3(-22, 3.6, -46), "latch": false, "power": 0.3, "frames": 40},
-	"touch_02_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(-12, 8.54, -38), "power": 0.2, "lift": 2.2, "reel_frames": 70, "swing": Vector3(637.0, 250.0, -637.0), "track": true, "min_speed": 15.0, "frames": 120},
-	"touch_03_crane_yard_arm": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(5, 14.99, -22), "power": 0.2, "lift": 1.5, "reel": true, "track": true, "frames": 90},
-	"touch_04_crucible_kiln_reel": {"level": "l06", "from": "spawn", "aim": Vector3(4, 9.44, 1.5), "power": 0.2, "lift": 2.2, "reel": true, "track": true, "frames": 120},
+	"touch_02_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(-12, 8.54, -38), "power": 0.2, "lift": 2.2, "reel_frames": 60, "swing": Vector3(-800.0, 250.0, 480.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"touch_03_crane_yard_arm": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(5, 14.99, -22), "power": 0.2, "lift": 1.5, "reel": true, "practice": true, "track": true, "look": "velocity", "frames": 90},
+	"touch_04_crucible_kiln_reel": {"level": "l06", "from": Vector3(0, 1, -14), "aim": Vector3(4, 9.44, 1.5), "power": 0.2, "lift": 2.2, "reel_frames": 60, "swing": Vector3(700.0, 150.0, 220.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
 }
 
 
@@ -199,6 +205,10 @@ func _run_live(name: String, probe: bool) -> void:
 		if argument.begins_with("--level="):
 			level_id = argument.substr(8)
 	args.append("--level=%s" % level_id)
+	# Practice removes the enemies, so a hound bite cannot knock a swing off its line. Only the swing and reel
+	# shots use it; the hound chase and the sentry beam keep their enemies.
+	if bool(shot.get("practice", false)):
+		args.append("--practice")
 	var main: Node = MainScene.instantiate()
 	main.set("override_args", args)
 	root.add_child(main)
@@ -213,6 +223,12 @@ func _run_live(name: String, probe: bool) -> void:
 		push_error("STORE_ART %s never reached play" % name)
 		quit(1)
 		return
+	# Practice is only a way to clear enemies for a clean swing; the store frame must not say so. The HUD
+	# resets the label's visibility every frame, so it is hidden through its modulate instead.
+	if bool(shot.get("practice", false)):
+		var practice_label: Variant = main.get("hud").get("_practice_label")
+		if practice_label is CanvasItem:
+			(practice_label as CanvasItem).modulate.a = 0.0
 	await _frames(SETTLE_FRAMES)
 	var player: RigidBody3D = main.get("player")
 	var tether: Node3D = main.get("tether")
@@ -241,18 +257,28 @@ func _run_live(name: String, probe: bool) -> void:
 	var swing: Vector3 = shot.get("swing", Vector3.ZERO)
 	if swing != Vector3.ZERO:
 		player.apply_central_impulse(swing)
-	# Track: the view keeps the anchor plate in frame. Capture early once the swing is fast and taut
-	# (min_speed m/s with at least AMBER_TENSION newtons), otherwise after "frames" physics frames.
+	# Track: the view follows its target once latched (or from the cast, for a cast in flight). Capture early
+	# once the swing is fast and taut (min_speed m/s with at least AMBER_TENSION newtons), once a hound is
+	# near (near m), otherwise after "frames" physics frames.
 	var track: bool = bool(shot.get("track", false))
+	var look: String = str(shot.get("look", "aim"))
+	var look_up: float = float(shot.get("look_up", 15.0))
 	var min_speed: float = float(shot.get("min_speed", 0.0))
+	var near: float = float(shot.get("near", 0.0))
+	# view: the point an "aim" look follows, when it is not the plate (the l06 shot keeps the teapot pool in frame).
+	var view: Vector3 = Vector3(shot.get("view", aim))
 	for step in int(shot.get("frames", 60)):
 		await process_frame
-		if track and tether.anchored:
-			_look_at(player, aim)
+		if track and (tether.anchored or not wait_latch):
+			_follow(player, look, view, look_up)
 		var speed: float = player.linear_velocity.length()
 		if min_speed > 0.0 and speed >= min_speed and tether.tension >= Tether.AMBER_AT_TENSION:
 			print("STORE_ART swing at %.1f m/s, %.0f N, after %d frames" % [speed, tether.tension, step])
 			break
+		if near > 0.0 and _hound_within(player, near):
+			print("STORE_ART hound within %.1f m after %d frames" % [near, step])
+			break
+	print("STORE_ART %s captured at %.1f m/s, %.0f N, state %s, health %.0f, at %s, line %.1f m, grounded %s" % [name, player.linear_velocity.length(), tether.tension, str(main.get("state")), float(player.get("health")), str(player.global_position), tether.line_length, str(player.get("grounded"))])
 	await RenderingServer.frame_post_draw
 	var image: Image = root.get_texture().get_image()
 	var path: String = ProjectSettings.globalize_path(SCREENSHOT_DIR + "%s_%dx%d.png" % [name, image.get_width(), image.get_height()])
@@ -284,17 +310,56 @@ func _print_probe(level: Node3D) -> void:
 
 ## The anchor plate nearest to a point, so a shot can name a rough spot instead of an exact plate.
 func _nearest_anchor(point: Vector3) -> Vector3:
-	var best: Vector3 = point
+	var found: Vector3 = _nearest_body("anchor", point, "")
+	return found if found.is_finite() else point
+
+
+## The position of the node nearest to a point in a group (of one enemy kind when kind is set). Returns
+## INF when the group has no such node, so a caller can tell "none" from "at the point".
+func _nearest_body(group: String, point: Vector3, kind: String) -> Vector3:
+	var best: Vector3 = Vector3.INF
 	var best_distance: float = INF
-	for node: Node in get_nodes_in_group("anchor"):
+	for node: Node in get_nodes_in_group(group):
 		var body := node as Node3D
-		if body == null:
+		if body == null or (not kind.is_empty() and str(node.get("kind")) != kind):
 			continue
 		var distance: float = body.global_position.distance_to(point)
 		if distance < best_distance:
 			best_distance = distance
 			best = body.global_position
 	return best
+
+
+## True when the nearest hound is within radius metres of the player.
+func _hound_within(player: RigidBody3D, radius: float) -> bool:
+	var hound: Vector3 = _nearest_body("enemies", player.global_position, "hound")
+	return hound.is_finite() and hound.distance_to(player.global_position) <= radius
+
+
+## Points the view for a track shot: "velocity" looks along the swing, "hound" follows the nearest hound,
+## anything else follows aim.
+func _follow(player: RigidBody3D, look: String, aim: Vector3, look_up: float) -> void:
+	match look:
+		"velocity":
+			_look_along(player, look_up)
+		"hound":
+			var hound: Vector3 = _nearest_body("enemies", player.global_position, "hound")
+			if hound.is_finite():
+				_look_at(player, hound)
+		_:
+			_look_at(player, aim)
+
+
+## Looks along the horizontal velocity with the pitch set to look_up degrees, so the line rises from the rod
+## into the upper frame and the level shows below. Keeps the last heading while the weight is nearly still.
+func _look_along(player: RigidBody3D, look_up: float) -> void:
+	var planar := Vector3(player.linear_velocity.x, 0.0, player.linear_velocity.z)
+	if planar.length() < 1.0:
+		return
+	var direction: Vector3 = planar.normalized()
+	player.yaw = atan2(-direction.x, -direction.z)
+	player.pitch = deg_to_rad(look_up)
+	player.apply_look(Vector2.ZERO)
 
 
 ## Renders one job into a SubViewport of its size and saves the result.
