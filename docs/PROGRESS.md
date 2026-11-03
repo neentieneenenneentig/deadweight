@@ -458,6 +458,20 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   - Limit: a hazard box hovering above the floor leaves the floor under it walkable. No level has one.
 - Gate: QUALITY GATE PASSED (59 scripts, 10 suites). R6's in-progress store_art.gd is in the parse count.
 
+## 2026-11-03: R6 store art + screenshots
+
+- Model: Haiku 5.5 executor; lead Opus 5.5 review.
+- `tools/store_art.gd`: an exact-size SubViewport compositor. It builds a catalog level, places a camera and draws the brand lockup (mark plus the DEADWEIGHT wordmark: paper DEAD, amber WEIGHT, cyan rule).
+  - It writes 8 Steam files to `store/art/steam/`: header 920×430, small 462×174, main 1232×706, vertical 748×896, library 600×900, hero 3840×1240 (no text), logo 1280×720 (transparent), and page background 1438×810.
+  - It writes the Play feature graphic 1024×500.
+  - Regenerate: `godot --path . --position 20000,20000 --script res://tools/store_art.gd`.
+- `tools/capture-store-art.ps1`: 9 HUD shots at 1920×1080 (Forward+) and 4 touch shots at 2400×1080 (Compatibility), in `store/art/screenshots/`. They use the game's `--level/--cam/--capture` and a `user://test_store_art.cfg` profile.
+- Lead review:
+  - the logo is legible on the small capsule, and the key art reads as the dreamscape;
+  - the screenshots are standing poses (0 M/S, READY TO CAST) with no rope in use. They will be reshot live in R6b.
+  - The screenshots also show HUD clutter: the threat banner sits over objective markers, and READY TO CAST appears twice. That is card G7b.
+- Owner: verify the sizes on partner.steamgames.com and in Play Console (O-steps).
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>

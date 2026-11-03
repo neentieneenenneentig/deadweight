@@ -22,7 +22,8 @@ owner = needs the human (devices, accounts).
 | R3 | App icon + store icon set | — | S | B | shell, vision | MUST | done |
 | R4 | Third-party notices + privacy policy | — | S | C/B | shell | MUST | done |
 | R5 | Store copy, release checklist, README | — | M | C | web | MUST | done |
-| R6 | Store art + screenshots | C6, G7, F11 | M | B | shell, vision | MUST | todo |
+| R6 | Store art + screenshots | C6, G7, F11 | M | B | shell, vision | MUST | done 2026-11-03 |
+| R6b | Live action screenshots | R6 | S | B | shell, vision | MUST | todo |
 | R7 | Store copy, notices + AI disclosure for the dreamscape | V1 | S | C | — | MUST | done 2026-11-03 |
 | V1 | Art direction: The Department of Unfinished Gravity (owner, via Codex) | — | L | — | shell, vision | MUST | done (2026-11-03) |
 | P1 | Android full-game unlock (Play Billing); only if the owner picks model A | F5, F10, O3b | M | A | shell, owner | MUST if A | todo |
@@ -46,6 +47,7 @@ owner = needs the human (devices, accounts).
 | G6 | HUD v2: layout, reticle, telemetry | F10 | M | B | shell, vision | MUST | done (2026-11-03) |
 | G7 | HUD v2: objective markers, damage arcs, touch options | G6 | M | B | shell, vision | MUST | done (2026-11-03) |
 | G8 | Gamepad + Steam Deck pass | F11, F2, G6 | S | B | shell | MUST | done 2026-11-03 |
+| G7b | HUD readability pass | G7, R6 | S | B | shell, vision | SHOULD | todo |
 | E1 | Hound AI v2 (navmesh) | F9 | M | A | shell, vision | SHOULD | done (2026-11-03) |
 | E2 | Sentry polish + Drone enemy | E1, F8 | M | A | shell, vision | MUST | done (2026-11-03) |
 | E3 | Training dummies, death FX, threat level | E2 | S | B | shell | SHOULD | done 2026-11-03 |
@@ -63,6 +65,7 @@ owner = needs the human (devices, accounts).
 | C8 | Level l08 DAMWALL | F8, F9, E2 | M | A | shell, vision | LATER | todo |
 | C9 | Level l09 HEADWATER | F8, F9, E2 | M | A | shell, vision | LATER | todo |
 | C10 | Balance pass | C1–C6 | S | B | shell, owner | MUST | pars + economy done 2026-11-03; owner playtest open |
+| Q1a | Desktop performance baseline + --fps overlay | C6 | S | B | shell | MUST | todo |
 | Q1 | Device performance pass | C6 | M | B | shell, owner | MUST | todo |
 | Q2 | Release candidate + bug bash + final builds | all MUST | M | A | shell, owner | MUST | todo |
 
@@ -209,6 +212,47 @@ RELEASE_CHECKLIST.md, README.md.
   `tests/dreamscape_preview.gd`'s cameras.
 **Acceptance:** every file is exactly the right size, has been viewed, and has no debug text. The
 logo is legible on the small capsule.
+
+### R6b — Live action screenshots
+**Edit:** tools/store_art.gd, tools/capture-store-art.ps1, store/art/screenshots/*. Replace the
+files; keep the names or update the list in the script.
+**Do:**
+- R6's shots are standing poses (0 M/S, READY TO CAST). Drive the real player and tether inside
+  tools/store_art.gd so the moments are live: an amber line taut to an anchor, a swing at speed
+  with the trail visible, the HUD speed reading above 15 m/s, a hound mid-chase, a sentry beam.
+- The cast path already exists, unused, in store_art.gd. Wire it in.
+- Remove the unused `_count_meshes` helper.
+- No edits in scripts/.
+**Acceptance:**
+- at least 6 of the 9 HUD shots and 3 of the 4 touch shots show the rope in use;
+- sizes are exact, and every image has been viewed.
+
+### G7b — HUD readability pass
+**Edit:** scripts/hud.gd, tests/hud_test.gd.
+**Do:** fix what R6's screenshots show:
+- the threat banner ("DRONE ACQUIRING — FIND COVER") and the hint text draw on top of objective
+  markers and their distance labels. Fade or hide markers inside the banner band, or give the
+  banner a backing;
+- "READY TO CAST" shows twice, at the reticle and in the rod panel. Keep one;
+- the edge arrows overlap (G7 follow-up). Spread or stack them;
+- world-marker labels for far objectives stay legible but small.
+**Acceptance:**
+- hud_test covers the banner-band fade and the arrow spacing;
+- review captures at 1280×720 and 2400×1080 touch;
+- the gate passes.
+
+### Q1a — Desktop performance baseline + `--fps` overlay
+**Edit:** scripts/main.gd (only a `--fps` argument that shows an FPS / frame-time / draw-call
+overlay), scripts/settings.gd and scripts/level_base.gd (quality presets only), tools/perf.ps1
+(new).
+**Do:**
+- tools/perf.ps1 runs every campaign level windowed off-screen at 1280×720 in Forward+ and
+  Compatibility at each quality preset;
+- it records the average and 1 % low FPS and the draw calls from a fixed camera path. It prints a
+  table and writes .tools/perf/latest.csv;
+- check that the presets actually differ (shadows, render scale, MSAA, distance).
+**Acceptance:** the table is recorded in PROGRESS, and the gate passes. The phone pass stays in Q1
+(owner).
 
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
