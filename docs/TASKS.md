@@ -47,7 +47,7 @@ owner = needs the human (devices, accounts).
 | G6 | HUD v2: layout, reticle, telemetry | F10 | M | B | shell, vision | MUST | done (2026-11-03) |
 | G7 | HUD v2: objective markers, damage arcs, touch options | G6 | M | B | shell, vision | MUST | done (2026-11-03) |
 | G8 | Gamepad + Steam Deck pass | F11, F2, G6 | S | B | shell | MUST | done 2026-11-03 |
-| G7b | HUD readability pass | G7, R6 | S | B | shell, vision | SHOULD | todo |
+| G7b | HUD readability pass | G7, R6 | S | B | shell, vision | SHOULD | done 2026-11-03 |
 | E1 | Hound AI v2 (navmesh) | F9 | M | A | shell, vision | SHOULD | done (2026-11-03) |
 | E2 | Sentry polish + Drone enemy | E1, F8 | M | A | shell, vision | MUST | done (2026-11-03) |
 | E3 | Training dummies, death FX, threat level | E2 | S | B | shell | SHOULD | done 2026-11-03 |
@@ -65,7 +65,7 @@ owner = needs the human (devices, accounts).
 | C8 | Level l08 DAMWALL | F8, F9, E2 | M | A | shell, vision | LATER | todo |
 | C9 | Level l09 HEADWATER | F8, F9, E2 | M | A | shell, vision | LATER | todo |
 | C10 | Balance pass | C1–C6 | S | B | shell, owner | MUST | pars + economy done 2026-11-03; owner playtest open |
-| Q1a | Desktop performance baseline + --fps overlay | C6 | S | B | shell | MUST | todo |
+| Q1a | Desktop performance baseline + --fps overlay | C6 | S | B | shell | MUST | done 2026-11-03 |
 | Q1 | Device performance pass | C6 | M | B | shell, owner | MUST | todo |
 | Q2 | Release candidate + bug bash + final builds | all MUST | M | A | shell, owner | MUST | todo |
 

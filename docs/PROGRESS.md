@@ -472,6 +472,27 @@ Newest entries at the bottom. Every task adds one entry (template at the end).
   - The screenshots also show HUD clutter: the threat banner sits over objective markers, and READY TO CAST appears twice. That is card G7b.
 - Owner: verify the sizes on partner.steamgames.com and in Play Console (O-steps).
 
+## 2026-11-03: G7b HUD readability, Q1a desktop perf baseline
+
+- Model: Haiku 5.5 executors; lead Opus 5.5 review.
+- G7b (`scripts/hud.gd`, `tests/hud_test.gd`):
+  - markers inside the hint or threat band fade to 0.2 alpha, and the hint line gets a soft backing;
+  - the reticle drops READY TO CAST (the rod panel is the single reel-state readout) and shows TRACKED in red only under `alert`;
+  - edge arrows on the same side are pushed 40 px apart;
+  - marker labels scale from 14 px at 10 m down to 10 px.
+  - Open: the clipped "PLEASE REMAIN IN MOTION" is a world Label3D (dreamscape.gd), not the HUD. Far-label density on touch l06 is still high, so consider a label cap.
+- Q1a (`scripts/main.gd` `--fps` only, `tools/perf.ps1`):
+  - `--fps` draws a top-right readout (FPS, mean and p99 ms, draw calls) and prints `FPS_SAMPLE` once a second;
+  - perf.ps1 runs 7 levels × 2 renderers × 3 presets off-screen at 1280×720 and writes `.tools/perf/latest.csv`.
+  - Lead fix: perf.ps1 wrote its profile to `Godot/app_userdata/…`, but the project uses a custom user dir (`%APPDATA%\DEADWEIGHT`). Every run loaded defaults (High, vsync on), so the executor's table compared High with High. Fixed.
+  - Findings (RTX 3060 Ti):
+    - FPS is pinned at 60 even with vsync off in the profile and `--disable-vsync`. The driver or DWM likely forces it; test on a high-refresh display or with driver vsync off.
+    - CPU frame setup is at most 0.2 ms (l05).
+    - In-game draw calls are 200–258 in Forward+ and 197–230 in Compatibility (tutorial 108). That is above the §7 160 budget, which was measured level-only in level_preview. The in-game count adds the HUD canvas items and the viewmodel. Q1 on the phone decides whether this matters.
+  - The presets differ in code (Low: no shadows or MSAA; Medium: 2 splits at 70 m with 2× MSAA; High: 4 splits at 100 m with 4× MSAA, glow and SSAO). Render scale is a separate user slider (mobile default 0.85).
+  - Rerun `tools/perf.ps1` for a corrected per-preset table.
+- Gate: subsets pass (hud, audio, ui, flow, meta, levels); the full gate runs after R6b.
+
 Template:
 ```
 ## YYYY-MM-DD: Txx <title>
