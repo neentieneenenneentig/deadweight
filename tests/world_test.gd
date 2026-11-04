@@ -335,7 +335,7 @@ func _test_features() -> void:
 
 	# Updraft: a RigidBody3D inside the column rises, while a control body outside it falls.
 	var lifted: RigidBody3D = _test_body(RangeScript.UPDRAFT_BASE + Vector3(0.0, 2.0, 0.0), true)
-	var control: RigidBody3D = _test_body(RangeScript.UPDRAFT_BASE + Vector3(4.0, 2.0, 0.0), false)
+	var control: RigidBody3D = _test_body(RangeScript.UPDRAFT_BASE + Vector3(RangeScript.UPDRAFT_SIZE.x * 0.5 + 4.0, 2.0, 0.0), false)
 	await _frames(10)
 	_check(lifted.linear_velocity.y > 0.5 and lifted.global_position.y > RangeScript.UPDRAFT_BASE.y + 2.0 and lifted.linear_velocity.y > control.linear_velocity.y + 1.0, "an updraft lifts a RigidBody3D in its column while a control body falls")
 	lifted.queue_free()
@@ -347,11 +347,12 @@ func _test_features() -> void:
 	_check(_range.find_children("*", "OmniLight3D", true, false).size() == 6, "lights stop at the cap of six")
 
 	# Repeats: the case pays once, and reset_cases puts it back on the floor for another run.
-	await _move_player(Vector3(14.0, 0.95, -98.0))
+	var case_spot: Vector3 = RangeScript.CASE_SPOT + Vector3(0.0, 0.95, 0.0)
+	await _move_player(case_spot)
 	var collected_once: int = _range_loot
 	_range.call("reset_cases")
 	await _move_player(Vector3(0.0, 0.95, 25.0))
-	await _move_player(Vector3(14.0, 0.95, -98.0))
+	await _move_player(case_spot)
 	_check(collected_once == 1 and _range_loot == 2 and int(_range.get("collected_loot")) == 1, "reset_cases puts the case back so it can be collected again")
 	_range.queue_free()
 	await _frames(3)

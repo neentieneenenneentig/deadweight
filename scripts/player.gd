@@ -149,7 +149,7 @@ func _ready() -> void:
 	camera = Camera3D.new()
 	camera.fov = 80.0
 	camera.near = 0.06
-	camera.far = 350.0
+	camera.far = 1000.0                 # the practice range is 720 m long; raid levels sit well inside this
 	camera.current = true
 	view_pivot.add_child(camera)
 	_build_viewmodel()

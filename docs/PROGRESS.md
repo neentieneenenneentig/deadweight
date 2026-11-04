@@ -554,3 +554,15 @@ Template:
   starting in the hover band. Main gameplay rules, saves, collision and navigation remain intact.
 - Follow-ups: physical Android frame-time profiling is still needed. Only l01 and range currently
   have playable level scripts; this work does not implement the other catalog placeholders.
+
+## 2026-11-04: S1 world scale, practice range rebuilt; run.ps1 window fix
+- Model: Claude Opus 5.5 (lead).
+- tools/run.ps1: dropped `-WindowStyle Hidden`. It hid the game window itself, so the game played
+  with audio only.
+- Owner playtest: one cast crosses the range. Measured carry for a full cast: 95–170 m to the
+  first landing, over 200 m in 8 s, peaks of 45–65 m/s.
+- scripts/levels/range.gd: rebuilt at 320 × 720 m (was 60 × 140). It keeps the same features,
+  scaled up. Labels can be read out to 450 m. scripts/player.gd: camera far is 1000 m.
+  tests/world_test.gd now reads the case spot and the updraft width from the range constants.
+- Gate: PASSED (59 scripts, 10 suites). The campaign rescale waits for owner feedback on the range
+  (TASKS S1).

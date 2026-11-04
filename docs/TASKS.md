@@ -268,6 +268,18 @@ overlay), scripts/settings.gd and scripts/level_base.gd (quality presets only), 
 **Acceptance:** the table is recorded in PROGRESS, and the gate passes. The phone pass stays in Q1
 (owner).
 
+### S1 — World scale: levels sized for the rod
+**Why:** owner playtest (2026-11-04): "one cast and I'm out of range". Measured on open ground, a
+full cast carries the player 95–170 m before the first landing and over 200 m in 8 s, at peaks of
+45–65 m/s and 24–38 m. Every level is about 60 × 150 m, so one cast crosses a whole level and
+flies over its walls.
+**Done so far (lead):** the practice range is now 320 × 720 m with 60 m walls, platforms at 25 to 200 m
+(5 to 45 m up), a 40 m anchor gantry, a 60 m updraft tower and 30 m slalom pillars. Camera far
+is 1000 m (was 350).
+**Next, once the owner has flown the new range:** rescale the tutorial and l01–l06 to match, about
+4–5× in length. Anchors must be spaced for a 48 m line. Then rerun the pars, enemy ranges
+(THREAT_RANGE 45, SHOT_RANGE 160), label distances (85 m), the draw-call budget on phone (Q1) and
+the store screenshots (R6).
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
 department, and added three AI-generated textures. The store text, press kit, rating answers and
