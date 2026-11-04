@@ -175,8 +175,8 @@ func _build_right(parent: Node, won: bool) -> void:
 	var stat_row: HBoxContainer = hbox(column, 8)
 	chip(stat_row, "TOP SPEED", "%.1f M/S" % float(stats.get("max_speed", 0.0)))
 	chip(stat_row, "AIRTIME", "%.1f S" % float(stats.get("max_airtime", 0.0)))
-	chip(stat_row, "CASTS", str(int(stats.get("casts", 0))))
 	chip(stat_row, "KILLS", str(int(stats.get("kills", 0))))
+	chip(stat_row, "STYLE", "%d / x%.1f" % [int(stats.get("style", 0)), float(stats.get("max_multiplier", 1.0))])
 	if not won or float(stats.get("damage_taken", 0.0)) > 0.0:
 		chip(stat_row, "DAMAGE", str(int(round(float(stats.get("damage_taken", 0.0))))))
 

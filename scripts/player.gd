@@ -8,6 +8,8 @@ signal died(source: String)
 signal landed(impact_speed: float)
 signal jumped
 signal footstep
+## The player hit an enemy body at speed (W3): the enemy takes slam damage.
+signal slammed(target: Node3D, speed: float)
 
 const BASE_LOOK_SENSITIVITY: float = 0.0024
 ## Time after leaving the ground during which a jump still counts as grounded (ledge forgiveness).
@@ -24,6 +26,13 @@ const GROUND_SPEED: float = 5.8
 const FALL_DAMAGE_SPEED: float = 14.0
 const FALL_LETHAL_SPEED: float = 30.0
 const FALL_LETHAL_DAMAGE: float = 100.0
+## Speed kills (W3): running into an enemy at SLAM_MIN_SPEED or more deals SLAM_DAMAGE_PER_MS per
+## m/s above SLAM_FREE_SPEED (about 60 at 11 m/s, a dead hound by 13 m/s). The player keeps most of
+## the momentum through the hit. Enemy contacts never count as ground, so a stomp is not a landing.
+const SLAM_MIN_SPEED: float = 11.0
+const SLAM_FREE_SPEED: float = 7.0
+const SLAM_DAMAGE_PER_MS: float = 15.0
+const SLAM_COOLDOWN: float = 0.4
 ## Contact normals above this height count as ground (about 57 degrees).
 const GROUND_NORMAL_MIN_Y: float = 0.55
 ## Air control adds at most this acceleration (m/s^2) while steering...
@@ -125,6 +134,8 @@ var _trauma: float = 0.0
 var _shake_scale: float = 1.0
 var _shake_clock: float = 0.0
 var _step_distance: float = 0.0
+var _slam_cooldown: float = 0.0
+var _previous_velocity: Vector3 = Vector3.ZERO
 
 
 func _ready() -> void:
@@ -174,7 +185,12 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var ground_normal: Vector3 = Vector3.UP
 	var most_upright: float = -1.0
 	grounded = false
+	_slam_cooldown = maxf(0.0, _slam_cooldown - step)
 	for index in state.get_contact_count():
+		var other: Object = state.get_contact_collider_object(index)
+		if other is Node and (other as Node).is_in_group("enemies"):
+			_try_slam(other as Node3D, state)
+			continue
 		var normal: Vector3 = state.get_contact_local_normal(index)
 		if normal.y > GROUND_NORMAL_MIN_Y:
 			grounded = true
@@ -185,6 +201,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		_touchdown()
 	_was_grounded = grounded
 	_previous_fall_speed = state.linear_velocity.y
+	_previous_velocity = state.linear_velocity
 	_track_airtime(step)
 	if not active:
 		_jump_buffer = 0.0
@@ -222,6 +239,24 @@ func _touchdown() -> void:
 	var damage: float = landing_damage(impact)
 	if active and damage > 0.0:
 		take_damage.call_deferred(damage, "impact", Vector3.INF)
+
+
+func _try_slam(target: Node3D, state: PhysicsDirectBodyState3D) -> void:
+	var speed: float = _previous_velocity.length()
+	if not active or _slam_cooldown > 0.0 or speed < SLAM_MIN_SPEED or not target.has_method("take_damage"):
+		return
+	_slam_cooldown = SLAM_COOLDOWN
+	target.call_deferred("take_damage", slam_damage(speed), "slam")
+	state.linear_velocity = _previous_velocity * 0.75 + Vector3.UP * 3.0
+	add_shake(0.35)
+	slammed.emit(target, speed)
+
+
+## Damage an enemy takes when the player hits it at speed m/s (W3).
+static func slam_damage(speed: float) -> float:
+	if speed < SLAM_MIN_SPEED:
+		return 0.0
+	return (speed - SLAM_FREE_SPEED) * SLAM_DAMAGE_PER_MS
 
 
 ## Health lost when landing at impact m/s of downward speed (S1).

@@ -76,6 +76,7 @@ var _health_style: StyleBoxFlat
 var _health_label: Label
 var _health_bar: ProgressBar
 var _speed_label: Label
+var _style_label: Label                              # W3: style points and the air multiplier
 var _timer_panel: PanelContainer
 var _clock_label: Label
 var _target_label: Label
@@ -395,6 +396,7 @@ func _build_vitals() -> void:
 	_health_label = _label(vitals, "CONDITION   100", 18)
 	_health_bar = _bar(vitals, CYAN, 4)
 	_speed_label = _label(vitals, "GROUNDED", 12, MUTED)
+	_style_label = _label(vitals, "STYLE   0", 12, AMBER)
 
 
 func _build_timer() -> void:
@@ -679,6 +681,7 @@ func update_state(data: Dictionary) -> void:
 	var extract_ready: bool = bool(data.get("extraction_ready", loot >= total_loot))
 
 	_update_vitals(health, speed, airborne)
+	_update_style(int(data.get("style", 0)), float(data.get("multiplier", 1.0)))
 	_update_timer(float(data.get("time", 0.0)), float(data.get("par_silver", 0.0)), float(data.get("par_gold", 0.0)))
 	_update_objectives(loot, total_loot, int(data.get("bonus", 0)), int(data.get("total_bonus", 0)), inside, extract_ready, clampf(float(data.get("extraction", 0.0)), 0.0, 1.0))
 	_update_weapon(data, sidearm, charge, reel, tension, tension_norm)
@@ -705,6 +708,13 @@ func _update_vitals(health: float, speed: float, airborne: bool) -> void:
 	_health_bar.value = health / 100.0
 	var state: String = "AIRBORNE" if airborne else ("FAST" if speed > FAST_SPEED else "GROUNDED")
 	_speed_label.text = "%.1f M/S   /   %s" % [speed, state] if show_telemetry else state
+
+
+## Style points, and the air multiplier while it is above 1 (it resets on touching the ground).
+func _update_style(style: int, multiplier: float) -> void:
+	if not is_instance_valid(_style_label):
+		return
+	_style_label.text = "STYLE   %d   /   AIR x%.1f" % [style, multiplier] if multiplier > 1.05 else "STYLE   %d" % style
 
 
 ## Timer plus the next medal target: gold while its par is still reachable, then silver, then bronze.

@@ -25,6 +25,16 @@ const FALL_DAMAGE: float = 35.0
 ## A player outside the level's footprint (over the outer plain, S1) is walked back to the last
 ## checkpoint after this long. There are no invisible walls; this is the only way the edge pushes back.
 const OUT_OF_BOUNDS_SECONDS: float = 3.0
+## Style (W3): time in the air scores STYLE_PER_SECOND points times the air multiplier. The
+## multiplier starts at 1 on take-off, grows by STYLE_MULT_RATE per second airborne up to
+## STYLE_MULT_MAX, and drops back to 1 the moment the player touches the ground. A kill made in the
+## air scores STYLE_KILL times the multiplier (double for a smash or slam) and drops supplies.
+const STYLE_PER_SECOND: float = 10.0
+const STYLE_MULT_RATE: float = 0.4
+const STYLE_MULT_MAX: float = 5.0
+const STYLE_KILL: float = 100.0
+const AIR_KILL_HEAL: float = 15.0
+const AIR_KILL_AMMO: int = 6
 const PlatformScript = preload("res://scripts/platform.gd")
 const UpgradesScript = preload("res://scripts/upgrades.gd")
 const EXTRACTION_SECONDS: float = 6.0
@@ -88,6 +98,8 @@ var _danger: float = 0.0
 var _air_time: float = 0.0
 var _fell_out: bool = false
 var _outside_time: float = 0.0                       # seconds the player has spent outside the footprint
+var style_score: float = 0.0                         # W3: this run's style points
+var air_multiplier: float = 1.0                      # W3: 1 on the ground, grows while airborne
 var _next_level: String = ""
 var _capture: bool = false
 var _hide_ui: bool = false
@@ -388,10 +400,12 @@ func _reset_run() -> void:
 	_air_time = 0.0
 	_fell_out = false
 	_outside_time = 0.0
+	style_score = 0.0
+	air_multiplier = 1.0
 	_hint = ""
 	_hint_raw = ""
 	_hint_time = 0.0
-	run_stats = {"casts": 0, "kills": 0, "smash_kills": 0, "shots": 0, "damage_taken": 0.0, "max_speed": 0.0, "max_airtime": 0.0}
+	run_stats = {"casts": 0, "kills": 0, "smash_kills": 0, "air_kills": 0, "shots": 0, "damage_taken": 0.0, "max_speed": 0.0, "max_airtime": 0.0, "style": 0, "max_multiplier": 1.0}
 
 
 ## Magazine size for this raid, from the sidearm workshop track (stock 10).
@@ -503,6 +517,7 @@ func _build_result(won: bool, cause: String) -> Dictionary:
 		"stats": {
 			"max_speed": float(run["max_speed"]), "max_airtime": float(run["max_airtime"]),
 			"casts": int(run["casts"]), "kills": int(run["kills"]), "damage_taken": float(run["damage_taken"]),
+			"style": int(run.get("style", 0)), "max_multiplier": float(run.get("max_multiplier", 1.0)),
 		},
 	}
 
@@ -554,6 +569,7 @@ func _process(delta: float) -> void:
 			"total_bonus": int(level.get("total_bonus")),
 			"extraction_ready": cases >= total,
 			"airborne": not player.grounded,
+			"style": int(style_score), "multiplier": air_multiplier,
 			# A tracking, non-dummy enemy sets the alert (CONTRACT 5.9); threat_level is 0 when none track.
 			"alert": float(level.call("threat_level")) > 0.0
 		})
@@ -569,9 +585,14 @@ func _physics_process(delta: float) -> void:
 	run_stats["max_speed"] = maxf(float(run_stats["max_speed"]), speed)
 	if player.grounded:
 		_air_time = 0.0
+		air_multiplier = 1.0
 	else:
 		_air_time += delta
+		air_multiplier = minf(STYLE_MULT_MAX, 1.0 + _air_time * STYLE_MULT_RATE)
+		style_score += STYLE_PER_SECOND * air_multiplier * delta
+		run_stats["max_multiplier"] = maxf(float(run_stats.get("max_multiplier", 1.0)), air_multiplier)
 		run_stats["max_airtime"] = maxf(float(run_stats["max_airtime"]), _air_time)
+	run_stats["style"] = int(style_score)
 	if speed >= Achievements.TERMINAL_SPEED:
 		_award("TERMINAL")
 	if _air_time >= Achievements.HANG_TIME_SECONDS:
@@ -950,9 +971,18 @@ func _on_enemy_killed(kind: String, by: String) -> void:
 		return
 	_sfx("kill")
 	run_stats["kills"] = int(run_stats["kills"]) + 1
-	if by in ["smash", "weight"]:
+	var heavy: bool = by in ["smash", "weight", "slam"]
+	if heavy:
 		run_stats["smash_kills"] = int(run_stats["smash_kills"]) + 1
 		_award("DEADWEIGHT")
+	# Air beats ground (W3): a kill made off the ground scores style and drops supplies.
+	if not player.grounded or heavy:
+		run_stats["air_kills"] = int(run_stats.get("air_kills", 0)) + 1
+		style_score += STYLE_KILL * air_multiplier * (2.0 if heavy else 1.0)
+		run_stats["style"] = int(style_score)
+		player.health = minf(player.max_health, player.health + AIR_KILL_HEAL)
+		reserve += AIR_KILL_AMMO
+		set_hint("AIR KILL  x%.1f  /  +%d health, +%d rounds" % [air_multiplier, int(AIR_KILL_HEAL), AIR_KILL_AMMO], 2.0)
 
 
 ## Tether events arrive as ids only (CONTRACT 4.9). Sounds play for every id; hints are picked here.

@@ -107,6 +107,7 @@ func _run() -> void:
 	# Landing damage (S1): none up to 14 m/s, 50 at 22 m/s, lethal 100 at 30 m/s and more beyond.
 	_check(Player.landing_damage(13.9) == 0.0 and is_equal_approx(Player.landing_damage(22.0), 50.0), "landing damage starts above 14 m/s and scales with speed")
 	_check(is_equal_approx(Player.landing_damage(30.0), 100.0) and Player.landing_damage(40.0) > 100.0, "a 30 m/s landing kills a stock player")
+	_check(Player.slam_damage(10.9) == 0.0 and is_equal_approx(Player.slam_damage(11.0), 60.0) and Player.slam_damage(13.0) >= 70.0, "speed kills: a slam starts at 11 m/s and a 13 m/s hit kills a hound")
 	tether.clear()
 	arena.queue_free()
 	await process_frame
