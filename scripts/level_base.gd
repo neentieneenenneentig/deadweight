@@ -38,6 +38,7 @@ const EnemyScript = preload("res://scripts/enemy.gd")
 const FX = preload("res://scripts/fx.gd")
 const Dreamscape = preload("res://scripts/dreamscape.gd")
 const DreamProps = preload("res://scripts/dream_props.gd")
+const TrapsScript = preload("res://scripts/world/traps.gd")
 ## Enemy kind table (CONTRACT 4.11 enemy()). Any other kind is skipped with a warning.
 const ENEMY_KINDS := ["hound", "sentry", "drone", "dummy"]
 ## threat_level(): a tracking enemy scores THREAT_FLOOR at THREAT_RANGE metres or farther, and 1.0 on the player.
@@ -59,6 +60,7 @@ const NAV_AGENT_RADIUS := 0.4
 const NAV_AGENT_HEIGHT := 1.8
 const NAV_MAX_CLIMB := 0.25
 const NAV_MAX_SLOPE := 38.0                          # degrees
+const NAV_SEARCH_POLYGONS := 40000
 const HAZARD_CARVE_MARGIN := 0.3                     # metres the hazard carve reaches below its box (floor spans)
 
 const GLOW_KEYS := ["cyan", "amber", "red", "orange", "white"]
@@ -184,6 +186,7 @@ var _footprint: Rect2                                # all ground() slabs merged
 var _scenery_body: StaticBody3D
 var _scenery_extra: Array[CollisionObject3D] = []    # moving scenery bodies (the pendulum), also kept out of the navmesh
 var _extra_bodies: Array[StaticBody3D] = []          # add_world_body() bodies, freed on rebuild
+var _traps: Node3D                                   # W2 ground dangers, made by traps() on first use
 ## Set in _design. NAN puts the outer plain at the lowest ground slab; a terrain level sets its border height.
 var outer_top: float = NAN
 var outer_material: String = "concrete"
@@ -192,6 +195,9 @@ var dreamscape: bool = true
 ## Navmesh cell size in metres. A level with a very large floor may raise it to keep the bake fast;
 ## the map follows it, so the server never sees a mismatch.
 var nav_cell_size: float = NAV_CELL_SIZE
+## Step height between navmesh cells. On a slope neighbouring cells differ by tan(slope) x cell size,
+## so a level with big cells must raise this or its hills come out unwalkable (1 m cells need 0.8).
+var nav_max_climb: float = NAV_MAX_CLIMB
 ## Open-world levels bake only this box (empty = everything): the slopes beyond it are mountains.
 var nav_bounds: AABB = AABB()
 ## Open-world levels can swap heavy colliders for cheap stand-ins in the bake: the bodies here are
@@ -257,6 +263,9 @@ func _reset_build_state() -> void:
 		if is_instance_valid(body):
 			body.free()
 	_extra_bodies.clear()
+	if is_instance_valid(_traps):
+		_traps.free()
+	_traps = null
 	_light_count = 0
 	_label_count = 0
 	_has_extraction = false
@@ -688,7 +697,16 @@ func _add_hazard_obstructions(geometry: NavigationMeshSourceGeometryData3D) -> v
 func get_nav_path(from: Vector3, to: Vector3) -> PackedVector3Array:
 	if not navigation_ready or not is_instance_valid(_nav_region):
 		return PackedVector3Array()
-	return NavigationServer3D.map_get_path(_nav_region.get_navigation_map(), from, to, true)
+	# The default search gives up after 4096 polygons, which an open-world route across 1 m cells can
+	# pass; NAV_SEARCH_POLYGONS keeps long routes whole while bounding a search for the unreachable.
+	var query := NavigationPathQueryParameters3D.new()
+	query.map = _nav_region.get_navigation_map()
+	query.start_position = from
+	query.target_position = to
+	query.path_search_max_polygons = NAV_SEARCH_POLYGONS
+	var result := NavigationPathQueryResult3D.new()
+	NavigationServer3D.query_path(query, result)
+	return result.path
 
 
 ## Settings for a new level navmesh. Parsing takes static colliders (not mesh instances), so the
@@ -701,7 +719,7 @@ func _new_navigation_mesh() -> NavigationMesh:
 	mesh.cell_height = NAV_CELL_HEIGHT
 	mesh.agent_radius = NAV_AGENT_RADIUS
 	mesh.agent_height = NAV_AGENT_HEIGHT
-	mesh.agent_max_climb = NAV_MAX_CLIMB
+	mesh.agent_max_climb = nav_max_climb
 	mesh.agent_max_slope = NAV_MAX_SLOPE
 	if nav_bounds.has_volume():
 		mesh.filter_baking_aabb = nav_bounds
@@ -811,6 +829,22 @@ func hazard(center: Vector3, size: Vector3, kind: String = "electric", dps: floa
 	record["dps"] = dps
 	_hazards.append(record)
 	_add_volume_visuals(record, 0.3 if kind_name == "water" else 0.12)
+
+
+## Builder: a damaging box with no visuals (the level draws what it is: a lake, a flood).
+func hazard_box(box: AABB, kind: String = "water", dps: float = WATER_DPS) -> void:
+	var record: Dictionary = _new_volume(kind, box.position + Vector3(box.size.x * 0.5, 0.0, box.size.z * 0.5), box.size)
+	record["dps"] = dps
+	_hazards.append(record)
+
+
+## The ground dangers (W2): cracking plates, mines, boulders and the flood. See scripts/world/traps.gd.
+func traps() -> Node3D:
+	if not is_instance_valid(_traps):
+		_traps = TrapsScript.new()
+		_traps.call("setup", self)
+		add_child(_traps)
+	return _traps
 
 
 ## Builder (call from _design): a water surface with its top at center.y. Deep water is also a

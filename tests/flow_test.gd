@@ -11,7 +11,7 @@ const Catalog = preload("res://scripts/level_catalog.gd")
 const InputSetup = preload("res://scripts/input_setup.gd")
 const PATH := "user://test_f10.cfg"
 const PATH_B := "user://test_f10b.cfg"
-const CAUSES := ["hound", "sentry", "drone", "fall", "impact", "hazard"]
+const CAUSES := ["hound", "sentry", "drone", "fall", "impact", "hazard", "mine", "boulder", "flood"]
 
 var _failures: int = 0
 var _checks: int = 0

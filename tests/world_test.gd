@@ -79,7 +79,8 @@ func _test_framework() -> void:
 	# These checks hold as levels land: l09 (v1.1) is the stand-in for a level without a script.
 	var campaign: Array[String] = Catalog.campaign_ids()
 	_check(campaign.has("l01") and not campaign.has("l09") and not campaign.has("range"), "catalog lists only the campaign levels that exist")
-	_check(Catalog.all_ids().size() == 12 and Catalog.all_ids()[10] == "range" and Catalog.all_ids()[11] == "valley", "catalog lists all twelve levels, the range then the highlands preview last")
+	var ids: Array[String] = Catalog.all_ids()
+	_check(ids.size() == 13 and ids[7] == "h01" and ids[11] == "range" and ids[12] == "valley", "catalog lists all thirteen levels: h01 after l06, then the range and the highlands preview last")
 	var details: Dictionary = Catalog.info("l01")
 	_check(details["available"] and details["title"] == "SLUICE GATE" and details["zone"] == "floodworks", "catalog merges the level INFO")
 	_check(not Catalog.info("l09")["available"], "levels without a script are unavailable")

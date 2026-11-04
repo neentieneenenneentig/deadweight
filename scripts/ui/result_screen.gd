@@ -9,6 +9,9 @@ const CAUSES := {
 	"drone": "DOWNED BY A DRONE",
 	"fall": "FELL OUT OF THE LEVEL",
 	"impact": "HIT THE GROUND TOO HARD",
+	"mine": "STEPPED ON A TEACUP",
+	"boulder": "FLATTENED BY A MARBLE",
+	"flood": "WENT UNDER WITH THE MELTWATER",
 	"hazard": "KILLED BY A HAZARD",
 }
 const TRY_THIS := {
@@ -17,6 +20,9 @@ const TRY_THIS := {
 	"drone": "Drones are fragile. One fast weight smash brings one down.",
 	"fall": "Falling out of the level costs health. Cut the line and land on solid ground.",
 	"impact": "Drops of more than about 10 m hurt, and 45 m kills. Lock the line before you land: a taut swing turns the fall into forward speed.",
+	"mine": "Teacups beep before they blow. Throw the weight in first, or lure a hound across them.",
+	"boulder": "A marble rolls when you walk under its slope. Get airborne or get sideways.",
+	"flood": "Once the duck is taken the water rises. Stay on the hills and travel by line, not by foot.",
 	"hazard": "Glowing floors and water hurt. Cross them in the air.",
 }
 const TRY_THIS_DEFAULT := "Spend banked salvage in the Workshop: a longer spool and stronger plating make every raid easier."

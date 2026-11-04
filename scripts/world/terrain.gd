@@ -39,6 +39,7 @@ var _ridges := FastNoiseLite.new()
 var _patches := FastNoiseLite.new()
 var _flats: Array[Vector3] = []      # x, z, radius
 var _lakes: Array[Vector3] = []      # x, z, radius
+var _mounds: Array[Vector4] = []     # x, z, radius, height
 
 
 func _init(seed_value: int, side: float) -> void:
@@ -61,6 +62,12 @@ func _init(seed_value: int, side: float) -> void:
 ## A flat spot (spawn, a pad, a camp). Heights inside radius ease to the height at its centre.
 func flatten(center: Vector2, radius: float) -> void:
 	_flats.append(Vector3(center.x, center.y, radius))
+
+
+## A smooth round hill height metres tall (cosine profile, at most about 25 degrees for a radius
+## four times the height), for a landmark that must stay walkable.
+func mound(center: Vector2, radius: float, height: float) -> void:
+	_mounds.append(Vector4(center.x, center.y, radius, height))
 
 
 ## A lake basin: the ground dips below WATER_Y inside radius.
@@ -139,6 +146,10 @@ func _raw_height(x: float, z: float) -> float:
 	var rise: float = pow(smoothstep(0.45, 0.95, r), 1.6)
 	var mountains: float = rise * (60.0 + ridge * ridge * 110.0)
 	var h: float = 6.0 + hills + mountains
+	for hill: Vector4 in _mounds:
+		var t: float = Vector2(x - hill.x, z - hill.y).length() / hill.z
+		if t < 1.0:
+			h += hill.w * (0.5 + 0.5 * cos(PI * t))
 	for basin: Vector3 in _lakes:
 		var d: float = Vector2(x - basin.x, z - basin.y).length() / basin.z
 		if d < 1.6:

@@ -941,7 +941,7 @@ func _on_player_died(source: String) -> void:
 	if state == "playing":
 		_sfx("death")
 	# A hard landing names itself, however close an enemy is.
-	_finish(false, "impact" if source == "impact" else _death_cause())
+	_finish(false, source if source in ["impact", "mine", "boulder", "flood"] else _death_cause())
 
 
 ## Landing and footstep cues come from the player's signals (A4). Only a live raid makes sound.
