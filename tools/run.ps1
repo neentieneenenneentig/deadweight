@@ -7,4 +7,5 @@ if (-not (Test-Path -LiteralPath $godot)) { throw 'Godot is missing. Run tools/s
 $launchArgs = @('--path', ('"' + $projectRoot + '"'))
 if ($Editor) { $launchArgs += '--editor' }
 if ($Touch) { $launchArgs += @('--','--touch') }
-Start-Process -FilePath $godot -ArgumentList $launchArgs -WindowStyle Hidden
+# No -WindowStyle Hidden: Windows applies it to the game window itself, so the game ran invisibly.
+Start-Process -FilePath $godot -ArgumentList $launchArgs
