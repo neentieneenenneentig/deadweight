@@ -433,16 +433,17 @@ func label(text: String, position: Vector3, font_size: int = 32, color: Color = 
 # --- Builder: objectives, extraction, enemies ---------------------------------------------------
 
 ## A required case: all of them must be collected before extraction unlocks.
-func case_at(floor_point: Vector3, title: String) -> void:
+## look picks the model (W4): "case" (the salvage case), "duck", "towel" or "firewood".
+func case_at(floor_point: Vector3, title: String, look: String = "case") -> void:
 	total_loot += 1
-	_case_spots.append({"floor_point": floor_point, "title": title})
-	_add_pickup(floor_point, title, "case", total_loot - 1)
+	_case_spots.append({"floor_point": floor_point, "title": title, "look": look})
+	_add_pickup(floor_point, title, "case", total_loot - 1, look)
 
 
 ## An optional cache; it pays on extraction. Often reachable only with the rod.
-func bonus_at(floor_point: Vector3, title: String) -> void:
+func bonus_at(floor_point: Vector3, title: String, look: String = "case") -> void:
 	total_bonus += 1
-	_add_pickup(floor_point, title, "bonus", total_bonus - 1)
+	_add_pickup(floor_point, title, "bonus", total_bonus - 1, look)
 
 
 ## The extraction pad (9.4 x 9.4 m, floor-centre point) with cyan markings and a pulsing ring.
@@ -937,7 +938,7 @@ func restock_cases() -> void:
 	collected_loot = 0
 	for index in range(_case_spots.size()):
 		var spot: Dictionary = _case_spots[index]
-		_add_pickup(spot["floor_point"] as Vector3, str(spot["title"]), "case", index)
+		_add_pickup(spot["floor_point"] as Vector3, str(spot["title"]), "case", index, str(spot.get("look", "case")))
 
 
 ## Hazard damage for one step at position: the dps of every hazard that contains it, times
@@ -1416,18 +1417,27 @@ func _build_environment() -> void:
 	add_child(_sun)
 
 
-func _add_pickup(floor_point: Vector3, title: String, kind: String, index: int) -> void:
+func _add_pickup(floor_point: Vector3, title: String, kind: String, index: int, look: String = "case") -> void:
 	var is_case: bool = kind == "case"
 	var node := Node3D.new()
 	node.position = floor_point
 	add_child(node)
 	var body := MeshInstance3D.new()
-	body.mesh = DreamProps.case_mesh()
-	body.set_surface_override_material(0, _materials["yellow" if is_case else "orange"])
-	body.set_surface_override_material(1, _materials["dark"])
-	body.set_surface_override_material(2, DreamProps.sky_material())
-	if not is_case:
-		body.scale = Vector3.ONE * 0.85
+	if look == "case":
+		body.mesh = DreamProps.case_mesh()
+		body.set_surface_override_material(0, _materials["yellow" if is_case else "orange"])
+		body.set_surface_override_material(1, _materials["dark"])
+		body.set_surface_override_material(2, DreamProps.sky_material())
+		if not is_case:
+			body.scale = Vector3.ONE * 0.85
+	else:
+		body.mesh = DreamProps.pickup_mesh(look)
+		var painted := StandardMaterial3D.new()
+		painted.vertex_color_use_as_albedo = true
+		painted.vertex_color_is_srgb = true
+		painted.roughness = 0.4
+		body.material_override = painted
+		body.scale = Vector3.ONE * 1.6
 	body.position.y = 0.4
 	node.add_child(body)
 	# No floating title: the light beam and the HUD objective marker point the way.

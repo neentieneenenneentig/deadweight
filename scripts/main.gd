@@ -355,6 +355,8 @@ func _begin_play() -> void:
 	player.yaw = float(level.get("spawn_yaw"))
 	player.pitch = -0.04
 	player.apply_look(Vector2.ZERO)
+	var objective: Dictionary = level.get("info")
+	hud.call("set_objective_text", str(objective.get("loot_label", "")), str(objective.get("mission", "")), str(objective.get("deliver", "")))
 	_checkpoint = level.get("spawn_position")
 	_checkpoint_yaw = float(level.get("spawn_yaw"))
 	_checkpoint_cue = _checkpoint
@@ -546,9 +548,10 @@ func _process(delta: float) -> void:
 		sound.motion(player.linear_velocity.length(), tether.tension, tether.reeling, true)
 		var cases: int = int(level.get("collected_loot"))
 		var total: int = int(level.get("total_loot"))
-		var default_hint: String = "SALVAGE %d / %d  /  follow the cyan case beacons" % [cases, total]
+		var objective: Dictionary = level.get("info")
+		var default_hint: String = "%s %d / %d  /  follow the cyan beacons" % [str(objective.get("loot_label", "SALVAGE")), cases, total]
 		if cases >= total:
-			default_hint = "ALL CASES SECURED  /  reach the amber extraction gate"
+			default_hint = str(objective.get("deliver_hint", "ALL CASES SECURED  /  reach the amber extraction gate"))
 		if extraction_inside:
 			default_hint = "HOLD POSITION  /  extraction in %.1fs" % maxf(0.0, EXTRACTION_SECONDS - extraction_time) if cases >= total else "EXTRACTION LOCKED  /  recover all %d cases" % total
 		hud.update_state({

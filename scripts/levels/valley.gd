@@ -15,6 +15,9 @@ const INFO := {
 	"enemies": false,
 	"practice": true,
 	"repeatable": true,
+	"loot_label": "FOR THE PRINCESS",
+	"mission": "FIND HER RUBBER DUCK IN THE FAR FOREST",
+	"deliver": "TAKE IT TO THE HOT TUB ON THE HILL",
 }
 
 

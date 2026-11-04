@@ -77,6 +77,10 @@ var _health_label: Label
 var _health_bar: ProgressBar
 var _speed_label: Label
 var _style_label: Label                              # W3: style points and the air multiplier
+## W4: a level can name its objective (INFO loot_label, mission, deliver); empty keeps the salvage wording.
+var _loot_title: String = "SALVAGE"
+var _mission_find: String = "RECOVER THE MARKED CASES"
+var _mission_deliver: String = "REACH THE CYAN EXTRACTION ZONE"
 var _timer_panel: PanelContainer
 var _clock_label: Label
 var _target_label: Label
@@ -736,21 +740,28 @@ func _update_timer(elapsed: float, par_silver: float, par_gold: float) -> void:
 
 
 func _update_objectives(loot: int, total_loot: int, bonus: int, total_bonus: int, inside: bool, extract_ready: bool, extraction: float) -> void:
-	_loot_label.text = "SALVAGE   %d / %d" % [loot, total_loot]
+	_loot_label.text = "%s   %d / %d" % [_loot_title, loot, total_loot]
 	_bonus_label.text = "BONUS   %d / %d" % [bonus, total_bonus] if total_bonus > 0 else "BONUS   NONE THIS RAID"
 	_mission_label.text = _mission_text(inside, extract_ready)
 	_extract_bar.visible = inside and extract_ready
 	_extract_bar.value = extraction
 
 
+## Names the objective for this level (W4). Empty strings keep the default salvage wording.
+func set_objective_text(title: String, find: String, deliver: String) -> void:
+	_loot_title = title if not title.is_empty() else "SALVAGE"
+	_mission_find = find if not find.is_empty() else "RECOVER THE MARKED CASES"
+	_mission_deliver = deliver if not deliver.is_empty() else "REACH THE CYAN EXTRACTION ZONE"
+
+
 func _mission_text(inside: bool, extract_ready: bool) -> String:
 	if inside and extract_ready:
 		return "HOLD POSITION  /  EXTRACTING"
 	if inside:
-		return "RECOVER ALL CASES TO EXTRACT"
+		return "BRING EVERYTHING FIRST" if _loot_title != "SALVAGE" else "RECOVER ALL CASES TO EXTRACT"
 	if extract_ready:
-		return "REACH THE CYAN EXTRACTION ZONE"
-	return "RECOVER THE MARKED CASES"
+		return _mission_deliver
+	return _mission_find
 
 
 func _update_weapon(data: Dictionary, sidearm: bool, charge: float, reel: String, tension: float, tension_norm: float) -> void:

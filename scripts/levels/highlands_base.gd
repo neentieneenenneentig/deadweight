@@ -25,6 +25,8 @@ const BIG_DUCK_XZ := Vector2(-200.0, -90.0)
 
 var land: Terrain
 var keep_clear: Array[Vector3] = []
+## Extra flat, tree-free spots (x, z, radius) a subclass sets before calling super._design().
+var extra_spots: Array[Vector3] = []
 
 
 func _design() -> void:
@@ -40,6 +42,8 @@ func _design() -> void:
 	land.flatten(TUB_XZ, 12.0)
 	land.flatten(PAD_XZ, 9.0)
 	land.flatten(DUCK_XZ, 6.0)
+	for spot: Vector3 in extra_spots:
+		land.flatten(Vector2(spot.x, spot.y), spot.z)
 	land.lake(Vector2(WEST_LAKE.x, WEST_LAKE.y), WEST_LAKE.z)
 	land.lake(Vector2(EAST_LAKE.x, EAST_LAKE.y), EAST_LAKE.z)
 	land.generate()
@@ -48,12 +52,14 @@ func _design() -> void:
 		Vector3(SPAWN_XZ.x, SPAWN_XZ.y, 26.0), Vector3(TUB_XZ.x, TUB_XZ.y, 20.0),
 		Vector3(PAD_XZ.x, PAD_XZ.y, 12.0), Vector3(DUCK_XZ.x, DUCK_XZ.y, 8.0),
 	]
+	for spot: Vector3 in extra_spots:
+		keep_clear.append(Vector3(spot.x, spot.y, spot.z + 2.0))
 	Nature.scatter(self, land, SEED, keep_clear)
 	var spawn_floor := Vector3(SPAWN_XZ.x, land.height_at(SPAWN_XZ.x, SPAWN_XZ.y), SPAWN_XZ.y)
 	set_spawn(spawn_floor)
 	_build_hot_tub()
 	_build_big_duck()
-	case_at(_floor(DUCK_XZ), "01 / THE RUBBER DUCK")
+	case_at(_floor(DUCK_XZ), "01 / THE RUBBER DUCK", "duck")
 	extraction(_floor(PAD_XZ))
 	hint_zone(spawn_floor + Vector3(0.0, 1.2, -6.0), Vector3(16.0, 3.0, 10.0), "THE HIGHLANDS  /  find the princess's rubber duck in the far forest, then bring it to her hot tub on the eastern hill", 9.0)
 	_freeze_lakes()
@@ -138,6 +144,11 @@ func _sign(text: String, base: Vector3, size: Vector2) -> void:
 		box(Vector3(center.x + side * (size.x * 0.5 - 0.3), base.y + 0.9, center.z - 0.1), Vector3(0.18, 1.8 + size.y * 0.5, 0.18), "dark")
 	var face: Label3D = label(text, center + Vector3(0.0, 0.0, 0.1), 36, Color("fff4dc"), 0.012)
 	face.double_sided = false
+
+## The top of the giant duck's head, where something small and absurd can be left for the rod.
+func big_duck_head() -> Vector3:
+	return Vector3(BIG_DUCK_XZ.x, Terrain.WATER_Y + 13.7, BIG_DUCK_XZ.y + 3.5)
+
 
 ## Override: traps, hostiles and the flood for this version of the valley.
 func _populate() -> void:
