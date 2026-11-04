@@ -26,7 +26,7 @@ const SPAWN := Vector3(0.0, 0.0, 40.0)
 ## Floor centre and size. The floor runs from z = +70 behind the spawn to z = -930.
 const FLOOR_CENTER := Vector3(0.0, 0.0, -430.0)
 const FLOOR_SIZE := Vector2(400.0, 1000.0)
-## Visible walls. Invisible containment (level_base) reaches far higher, so the range cannot be left.
+## The walls. Beyond them the outer plain goes on (level_base), and a player who gets over is walked back.
 const WALL_HEIGHT := 60.0
 ## Centre of the welcome hint zone. Tests use it to check that the zone fires once.
 const HINT_ZONE_CENTER := Vector3(0.0, 1.2, 30.0)
@@ -55,8 +55,10 @@ const SLALOM := [
 const DUMMY_SPOTS := [Vector3(-80.0, 0.0, -400.0), Vector3(75.0, 0.0, -430.0), Vector3(-85.0, 0.0, -600.0)]
 const CASE_SPOT := Vector3(80.0, 0.0, -860.0)
 const EXTRACTION_SPOT := Vector3(-80.0, 0.0, -880.0)
-## Labels here are read from much further away than in a raid level.
+## Text here is read from much further away than in a raid level.
 const FAR_LABEL_RANGE := 500.0
+## Sign plates are this thick. Text sits on the front (+z) face only.
+const PLATE_DEPTH := 0.25
 
 
 func _design() -> void:
@@ -95,27 +97,50 @@ func _build_grid() -> void:
 	box(Vector3(0.0, 0.017, FLOOR_CENTER.z), Vector3(0.4, 0.03, FLOOR_SIZE.y - 2.0), "yellow", false)
 
 
-func _far_label(text: String, position: Vector3, font_size: int, color: Color, pixel_size: float) -> void:
-	var node: Label3D = label(text, position, font_size, color, pixel_size, true)
-	node.visibility_range_end = FAR_LABEL_RANGE
+## Nothing in the range floats: every word is on a solid plate or painted on the floor.
+## A solid plate with text on its front (+z) face, the side that faces the spawn. posts stands it on
+## two solid legs down to the floor.
+func _plate(text: String, center: Vector3, size: Vector2, font_size: int, color: Color, pixel_size: float, posts: bool = false) -> void:
+	box(center, Vector3(size.x, size.y, PLATE_DEPTH), "dark")
+	var face: Label3D = label(text, center + Vector3(0.0, 0.0, PLATE_DEPTH * 0.5 + 0.02), font_size, color, pixel_size)
+	face.double_sided = false
+	face.visibility_range_end = FAR_LABEL_RANGE
+	if not posts:
+		return
+	var bottom: float = center.y - size.y * 0.5
+	for side: float in [-1.0, 1.0]:
+		box(Vector3(center.x + side * (size.x * 0.5 - 0.6), bottom * 0.5, center.z), Vector3(0.35, bottom, 0.35), "rust")
 
 
-## A tall post and a billboard label at each marked distance, so distances read off the ground.
+## Text painted flat on the floor. It reads upright to a player looking down the range (-z).
+func _floor_paint(text: String, position: Vector3, font_size: int, color: Color, pixel_size: float) -> void:
+	var paint: Label3D = label(text, position, font_size, color, pixel_size)
+	paint.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+	paint.double_sided = false
+	paint.visibility_range_end = FAR_LABEL_RANGE
+
+
+## At each marked distance: a yellow line across the floor, the number painted beside the centre
+## line, and a solid post with a number plate, so distances read from the ground and from the air.
 func _build_distance_markers() -> void:
 	for distance: int in MARKER_DISTANCES:
 		var z: float = SPAWN.z - float(distance)
-		box(Vector3(-12.0, 3.0, z), Vector3(0.5, 6.0, 0.5), "yellow", false)
-		_far_label("%d M" % distance, Vector3(-12.0, 8.0, z), 48, Color("ffc46b"), 0.055)
+		box(Vector3(0.0, 0.02, z), Vector3(60.0, 0.03, 0.35), "yellow", false)
+		_floor_paint("%d" % distance, Vector3(14.0, 0.05, z - 4.0), 96, Color("ffc46b"), 0.06)
+		box(Vector3(-12.0, 3.0, z), Vector3(0.5, 6.0, 0.5), "yellow")
+		_plate("%d M" % distance, Vector3(-12.0, 6.8, z), Vector2(4.4, 1.6), 72, Color("ffc46b"), 0.016)
 
 
 ## Platforms at marked distances and heights. They are targets for the rod and a sense of scale,
-## not a route the player must take.
+## not a route the player must take. The distance and height are printed on a fascia under the
+## deck's front edge, high enough to walk under.
 func _build_platforms() -> void:
 	for entry: Dictionary in PLATFORMS:
 		var height: float = float(entry["height"])
 		var top := Vector3(float(entry["x"]), height, SPAWN.z - float(entry["distance"]))
 		platform(top, Vector2(10.0, 10.0), "dark", true)
-		_far_label("%d M  /  %d M UP" % [int(entry["distance"]), int(height)], top + Vector3(0.0, 3.0, 0.0), 36, Color("e4ddbd"), 0.035)
+		var fascia := Vector3(top.x, height - 0.3 - 0.65, top.z + 5.0 - PLATE_DEPTH * 0.5)
+		_plate("%d M  /  %d M UP" % [int(entry["distance"]), int(height)], fascia, Vector2(9.6, 1.3), 48, Color("e4ddbd"), 0.016)
 
 
 ## Anchor gantry: a beam 30 m up with cyan plates under it. Weights latch to the plates from below.
@@ -125,14 +150,15 @@ func _build_gantry() -> void:
 	box(Vector3(0.0, GANTRY_HEIGHT, GANTRY_Z), Vector3(145.0, 1.2, 3.0), "rust")
 	for x: float in [-45.0, -15.0, 15.0, 45.0]:
 		anchor(Vector3(x, ANCHOR_Y, GANTRY_Z), Vector3.DOWN)
-	_far_label("ANCHOR GANTRY  /  30 M", Vector3(0.0, GANTRY_HEIGHT + 4.0, GANTRY_Z), 48, Color("67d5d2"), 0.09)
+	# A sign board stands on the beam, like a road gantry's, clear of the plates underneath.
+	_plate("ANCHOR GANTRY\n30 M", Vector3(0.0, GANTRY_HEIGHT + 0.6 + 3.8, GANTRY_Z), Vector2(30.0, 7.6), 64, Color("67d5d2"), 0.045)
 
 
 ## Pillar slalom: tall pillars that force a zig-zag, so swings and wraps have things to hit.
 func _build_slalom() -> void:
 	for spot: Vector2 in SLALOM:
 		pillar(Vector3(spot.x, 0.0, spot.y), SLALOM_HEIGHT, 3.0, "rust")
-	_far_label("PILLAR SLALOM", Vector3(0.0, 12.0, SLALOM[0].y + 20.0), 44, Color("e8d6a8"), 0.07)
+	_plate("PILLAR SLALOM", Vector3(-52.0, 4.0, SLALOM[0].y + 20.0), Vector2(16.0, 3.0), 64, Color("e8d6a8"), 0.026, true)
 
 
 ## Three training dummies (E3): they never attack, flash when hit and stand back up after a kill.
@@ -146,7 +172,9 @@ func _build_dummies() -> void:
 func _build_updraft_tower() -> void:
 	updraft(UPDRAFT_BASE, UPDRAFT_SIZE, 26.0)
 	platform(UPDRAFT_BASE + Vector3(0.0, UPDRAFT_SIZE.y, 0.0), Vector2(18.0, 18.0), "dark", true)
-	_far_label("UPDRAFT  /  60 M", UPDRAFT_BASE + Vector3(0.0, UPDRAFT_SIZE.y + 5.0, 0.0), 48, Color("67d5d2"), 0.08)
+	var deck_front: float = UPDRAFT_BASE.z + 9.0 - PLATE_DEPTH * 0.5
+	_plate("UPDRAFT  /  60 M", Vector3(UPDRAFT_BASE.x, UPDRAFT_SIZE.y - 0.3 - 0.9, deck_front), Vector2(17.0, 1.8), 56, Color("67d5d2"), 0.024)
+	_plate("UPDRAFT\n60 M", UPDRAFT_BASE + Vector3(-17.0, 4.5, 14.0), Vector2(11.0, 5.0), 64, Color("67d5d2"), 0.03, true)
 
 
 ## Welcome sign and the hint zones: one at the start, one under the gantry, one by the tower.

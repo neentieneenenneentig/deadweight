@@ -66,11 +66,15 @@ const NO_SHADOW_KEYS := ["cyan", "amber", "red", "orange", "white", "water", "gl
 const GRIME_KEYS := ["concrete", "light_concrete", "dark", "rust", "metal", "stripe"]
 const GRIME_SCALE := 0.08
 
-## Containment (S1): the invisible boundary walls are CONTAIN_WALL m thick and reach CONTAIN_TOP m
-## up. The bedrock top sits BEDROCK_BELOW_KILL m under kill_y.
-const CONTAIN_WALL := 1.0
-const CONTAIN_TOP := 600.0
+## The outer world (S1). There are no invisible walls: past the ground() footprint the land simply
+## goes on, a visible solid plain OUTER_REACH m wide at the height of the lowest ground slab, so
+## nothing can fall off the edge of the world. A player who leaves the footprint is walked back by
+## main (OUT_OF_BOUNDS_SECONDS). A visible bedrock slab BEDROCK_BELOW_KILL m under kill_y floors every pit.
+const OUTER_REACH := 1500.0
+const OUTER_THICKNESS := 2.0
 const BEDROCK_BELOW_KILL := 4.0
+## A position this far past the footprint's edge counts as outside it.
+const BOUNDS_MARGIN := 1.0
 const MAX_LIGHTS := 6                               # lights cost draw calls and shader work on mobile
 const HAZARD_KINDS := ["electric", "heat", "water"]
 const HAZARD_ZAP_INTERVAL := 0.5                     # seconds between hazard_zap sounds
@@ -159,8 +163,13 @@ var _hint_zones: Array[Dictionary] = []              # {box, text, duration, fir
 var _light_count: int = 0
 var _zap_time: float = -10.0                         # clock time of the last hazard_zap
 var _in_water: bool = false                          # inside a deep-water volume; the splash plays on entry (A4)
-var _ground_rects: Array[Rect2] = []                 # x/z footprint of every ground() slab, for _contain()
-var _bounds_body: StaticBody3D                       # containment walls and bedrock (S1), kept out of the navmesh
+var _ground_rects: Array[Rect2] = []                 # x/z footprint of every ground() slab, for the outer world
+var _ground_low: float = INF                         # top of the lowest ground() slab
+var _footprint: Rect2                                # all ground() slabs merged; empty for a bare arena
+## Solid scenery off the play space (S1): the outer plain, bedrock, skyline towers and dreamscape
+## props. Everything that looks solid is solid, but these stay out of the navmesh (bake_navigation).
+var _scenery_body: StaticBody3D
+var _scenery_extra: Array[CollisionObject3D] = []    # moving scenery bodies (the pendulum), also kept out of the navmesh
 ## Navmesh cell size in metres. A level with a very large floor may raise it to keep the bake fast;
 ## the map follows it, so the server never sees a mismatch.
 var nav_cell_size: float = NAV_CELL_SIZE
@@ -209,8 +218,11 @@ func _reset_build_state() -> void:
 	_updrafts.clear()
 	_hint_zones.clear()
 	_ground_rects.clear()
-	if is_instance_valid(_bounds_body):
-		_bounds_body.free()
+	_ground_low = INF
+	_footprint = Rect2()
+	if is_instance_valid(_scenery_body):
+		_scenery_body.free()
+	_scenery_extra.clear()
 	_light_count = 0
 	_label_count = 0
 	_has_extraction = false
@@ -263,6 +275,7 @@ func set_kill_y(y: float) -> void:
 ## A flat slab whose top surface is at center.y.
 func ground(center: Vector3, size: Vector2, material: String = "concrete", thickness: float = 1.2) -> void:
 	_ground_rects.append(Rect2(center.x - size.x * 0.5, center.z - size.y * 0.5, size.x, size.y))
+	_ground_low = minf(_ground_low, center.y)
 	_box_at(Transform3D(Basis.IDENTITY, center - Vector3.UP * (thickness * 0.5)), Vector3(size.x, thickness, size.y), material, true)
 
 
@@ -587,14 +600,18 @@ func bake_navigation(synchronous: bool = true) -> void:
 	var mesh: NavigationMesh = _new_navigation_mesh()
 	var geometry := NavigationMeshSourceGeometryData3D.new()
 	# Parsing reads the scene tree, so it always runs here on the main thread; only the bake is threaded.
-	# The containment body leaves layer 1 for the parse only. The walls and bedrock would widen the
+	# Scenery bodies leave layer 1 for the parse only. The outer plain and the props would widen the
 	# baked volume and shift the voxel grid, and that can break narrow joins such as ramp tops.
-	var bounds_valid: bool = is_instance_valid(_bounds_body)
-	if bounds_valid:
-		_bounds_body.collision_layer = 0
+	var scenery: Array[CollisionObject3D] = _scenery_extra.duplicate()
+	if is_instance_valid(_scenery_body):
+		scenery.append(_scenery_body)
+	for body: CollisionObject3D in scenery:
+		if is_instance_valid(body):
+			body.collision_layer = 0
 	NavigationServer3D.parse_source_geometry_data(mesh, geometry, self)
-	if bounds_valid:
-		_bounds_body.collision_layer = LAYER_WORLD
+	for body: CollisionObject3D in scenery:
+		if is_instance_valid(body):
+			body.collision_layer = LAYER_WORLD
 	# Both bake paths read this geometry, so the hazard carve applies to sync and threaded bakes alike.
 	_add_hazard_obstructions(geometry)
 	if synchronous:
@@ -793,7 +810,8 @@ func light(position: Vector3, color: Color, energy: float = 1.2, light_range: fl
 
 
 ## Builder (call from _design): a ring of dark towers far off with amber window strips. Deterministic
-## for a given seed_value. Not solid, and merged with the other static geometry.
+## for a given seed_value. Solid scenery that stands on the outer plain, kept out of the navmesh. A
+## tower that would land on the play floor is left out. Call after the ground() slabs.
 func skyline(seed_value: int, center: Vector3, inner_radius: float, outer_radius: float, count: int = 24) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
@@ -804,7 +822,10 @@ func skyline(seed_value: int, center: Vector3, inner_radius: float, outer_radius
 		var depth: float = rng.randf_range(6.0, 12.0)
 		var height: float = rng.randf_range(12.0, 38.0)
 		var frame := Transform3D(Basis(Vector3.UP, rng.randf() * TAU), center + Vector3(cos(angle) * distance, height * 0.5, sin(angle) * distance))
-		_box_at(frame, Vector3(width, height, depth), "dark", false)
+		var reach: float = Vector2(width, depth).length() * 0.5 + 2.0
+		if _on_play_floor(Vector2(frame.origin.x, frame.origin.z), reach):
+			continue
+		scenery_box(frame, Vector3(width, height, depth), "dark")
 		var window_frame: Transform3D = frame * Transform3D(Basis.IDENTITY, Vector3(0.0, height * 0.25, depth * 0.5 + 0.02))
 		_box_at(window_frame, Vector3(width * 0.5, 0.35, 0.04), "amber", false)
 
@@ -1073,51 +1094,86 @@ func _finish_build() -> void:
 	dream.name = "DreamAtmosphere"
 	add_child(dream)
 	dream.dress(self)
-	_contain()
+	_build_outer_world()
 	_pending_count = _pending.size()
 	_merge_statics()
 	_build_environment()
 	apply_quality(quality)
 
 
-## No level can be left (S1). Invisible walls stand on the edges of the ground() footprint, from
-## below the bedrock to CONTAIN_TOP. A visible bedrock slab under the whole footprint gives every
-## pit a floor, so nothing falls forever. kill_y is above it, so the fall respawn still fires
-## first. Built after the dreamscape, so its play-bounds scan does not see these colliders. They live on their own body,
-## which bake_navigation leaves out.
-func _contain() -> void:
+## The world goes on past the level (S1). A visible, solid plain OUTER_REACH m wide surrounds the
+## ground() footprint, flush with its lowest slab, so a player who gets over a wall lands on ground
+## and main walks them back. A visible bedrock slab under the footprint floors every pit; kill_y is
+## above it, so the fall respawn still fires first. Built after the dreamscape, so its play-bounds
+## scan does not see these colliders. Nothing here is invisible, and none of it is in the navmesh.
+func _build_outer_world() -> void:
 	if _ground_rects.is_empty():
 		return
-	var area: Rect2 = _ground_rects[0]
+	_footprint = _ground_rects[0]
 	for rect: Rect2 in _ground_rects:
-		area = area.merge(rect)
-	var bedrock_top: float = kill_y - BEDROCK_BELOW_KILL
-	var bottom: float = bedrock_top - 4.0
-	var height: float = CONTAIN_TOP - bottom
-	var mid_y: float = bottom + height * 0.5
-	var center: Vector2 = area.get_center()
-	var half: Vector2 = area.size * 0.5 + Vector2.ONE * CONTAIN_WALL * 0.5
-	var walls: Array[Array] = [
-		[Vector3(center.x, mid_y, center.y - half.y), Vector3(area.size.x + CONTAIN_WALL * 2.0, height, CONTAIN_WALL)],
-		[Vector3(center.x, mid_y, center.y + half.y), Vector3(area.size.x + CONTAIN_WALL * 2.0, height, CONTAIN_WALL)],
-		[Vector3(center.x - half.x, mid_y, center.y), Vector3(CONTAIN_WALL, height, area.size.y)],
-		[Vector3(center.x + half.x, mid_y, center.y), Vector3(CONTAIN_WALL, height, area.size.y)],
+		_footprint = _footprint.merge(rect)
+	var area: Rect2 = _footprint
+	var reach: float = OUTER_REACH
+	var y: float = _ground_low - OUTER_THICKNESS * 0.5
+	var wide: float = area.size.x + reach * 2.0
+	# North and south run the full width, so they cover the corners; west and east fill between them.
+	var slabs: Array[Array] = [
+		[Vector3(area.get_center().x, y, area.position.y - reach * 0.5), Vector3(wide, OUTER_THICKNESS, reach)],
+		[Vector3(area.get_center().x, y, area.end.y + reach * 0.5), Vector3(wide, OUTER_THICKNESS, reach)],
+		[Vector3(area.position.x - reach * 0.5, y, area.get_center().y), Vector3(reach, OUTER_THICKNESS, area.size.y)],
+		[Vector3(area.end.x + reach * 0.5, y, area.get_center().y), Vector3(reach, OUTER_THICKNESS, area.size.y)],
 	]
-	var bedrock := Transform3D(Basis.IDENTITY, Vector3(center.x, bedrock_top - 1.0, center.y))
-	walls.append([bedrock.origin, Vector3(area.size.x, 2.0, area.size.y)])
-	_bounds_body = StaticBody3D.new()
-	_bounds_body.name = "Containment"
-	_bounds_body.collision_layer = LAYER_WORLD
-	_bounds_body.collision_mask = 0
-	add_child(_bounds_body)
-	for wall: Array in walls:
-		var shape := BoxShape3D.new()
-		shape.size = wall[1]
-		var collision := CollisionShape3D.new()
-		collision.shape = shape
-		collision.position = wall[0]
-		_bounds_body.add_child(collision)
-	_box_at(bedrock, Vector3(area.size.x, 2.0, area.size.y), "dark", false)
+	for slab: Array in slabs:
+		scenery_box(Transform3D(Basis.IDENTITY, slab[0]), slab[1], "concrete")
+	var bedrock_top: float = kill_y - BEDROCK_BELOW_KILL
+	var center: Vector2 = area.get_center()
+	scenery_box(Transform3D(Basis.IDENTITY, Vector3(center.x, bedrock_top - 1.0, center.y)), Vector3(area.size.x, 2.0, area.size.y), "dark")
+
+
+## True when position is over the ground() footprint (or within BOUNDS_MARGIN of it). A bare arena
+## with no ground() slabs has no bounds.
+func is_in_bounds(position: Vector3) -> bool:
+	if _footprint.size == Vector2.ZERO:
+		return true
+	return _footprint.grow(BOUNDS_MARGIN).has_point(Vector2(position.x, position.z))
+
+
+## True when a circle of radius reach around point overlaps a ground() slab.
+func _on_play_floor(point: Vector2, reach: float) -> bool:
+	for rect: Rect2 in _ground_rects:
+		if rect.grow(reach).has_point(point):
+			return true
+	return false
+
+
+## A visible box that is also solid, on the scenery body (kept out of the navmesh). placement may
+## carry a uniform or per-axis scale; the collider bakes it into its size.
+func scenery_box(placement: Transform3D, size: Vector3, material: String) -> void:
+	_box_at(placement, size, material, false)
+	var shape := BoxShape3D.new()
+	shape.size = (size * placement.basis.get_scale()).abs()
+	add_scenery_collider(shape, placement.orthonormalized())
+
+
+## A collider on the scenery body. The body is made on first use.
+func add_scenery_collider(shape: Shape3D, placement: Transform3D) -> void:
+	if not is_instance_valid(_scenery_body):
+		_scenery_body = StaticBody3D.new()
+		_scenery_body.name = "Scenery"
+		_scenery_body.collision_layer = LAYER_WORLD
+		_scenery_body.collision_mask = 0
+		add_child(_scenery_body)
+	var collision := CollisionShape3D.new()
+	collision.shape = shape
+	collision.transform = placement
+	_scenery_body.add_child(collision)
+
+
+## A moving scenery body (the dreamscape pendulum). It is solid, but bake_navigation leaves it out.
+func register_scenery_body(body: CollisionObject3D) -> void:
+	body.collision_layer = LAYER_WORLD
+	body.collision_mask = 0
+	_scenery_extra.append(body)
 
 
 func _frame(origin: Vector3, yaw_degrees: float) -> Transform3D:
@@ -1259,18 +1315,7 @@ func _add_pickup(floor_point: Vector3, title: String, kind: String, index: int) 
 		body.scale = Vector3.ONE * 0.85
 	body.position.y = 0.4
 	node.add_child(body)
-	var marker := Label3D.new()
-	marker.text = ("◇  SALVAGE\n" if is_case else "◇  BONUS CACHE\n") + title
-	marker.position.y = 2.5
-	marker.font_size = 32
-	marker.pixel_size = 0.012
-	marker.modulate = Color("5ad6c8") if is_case else Color("ffc46b")
-	marker.outline_modulate = Color("101e24")
-	marker.outline_size = 8
-	marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	marker.visibility_range_end = 70.0
-	node.add_child(marker)
-	_label_count += 1
+	# No floating title: the light beam and the HUD objective marker point the way.
 	var beam := MeshInstance3D.new()
 	var beam_mesh := CylinderMesh.new()
 	beam_mesh.top_radius = 0.045

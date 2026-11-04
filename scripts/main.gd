@@ -22,6 +22,9 @@ const INPUT_SETUP_PATH := "res://scripts/input_setup.gd"
 
 const CHECKPOINT_SECONDS: float = 0.5
 const FALL_DAMAGE: float = 35.0
+## A player outside the level's footprint (over the outer plain, S1) is walked back to the last
+## checkpoint after this long. There are no invisible walls; this is the only way the edge pushes back.
+const OUT_OF_BOUNDS_SECONDS: float = 3.0
 const PlatformScript = preload("res://scripts/platform.gd")
 const UpgradesScript = preload("res://scripts/upgrades.gd")
 const EXTRACTION_SECONDS: float = 6.0
@@ -84,6 +87,7 @@ var _hitmarker: float = 0.0
 var _danger: float = 0.0
 var _air_time: float = 0.0
 var _fell_out: bool = false
+var _outside_time: float = 0.0                       # seconds the player has spent outside the footprint
 var _next_level: String = ""
 var _capture: bool = false
 var _hide_ui: bool = false
@@ -383,6 +387,7 @@ func _reset_run() -> void:
 	_danger = 0.0
 	_air_time = 0.0
 	_fell_out = false
+	_outside_time = 0.0
 	_hint = ""
 	_hint_raw = ""
 	_hint_time = 0.0
@@ -597,6 +602,24 @@ func _physics_process(delta: float) -> void:
 		extraction_time = 0.0
 	if player.global_position.y < float(level.get("kill_y")) and _cam_override.is_empty():
 		_fall_respawn()
+		return
+	_track_bounds(delta)
+
+
+## Past the footprint the world goes on (S1), but the run does not: after OUT_OF_BOUNDS_SECONDS
+## outside it the player is put back on the last safe ground, with no damage.
+func _track_bounds(delta: float) -> void:
+	if not _cam_override.is_empty() or bool(level.call("is_in_bounds", player.global_position)):
+		_outside_time = 0.0
+		return
+	if _outside_time <= 0.0:
+		set_hint("OUTSIDE THE SITE  /  heading back to the last safe ground", OUT_OF_BOUNDS_SECONDS + 1.0)
+	_outside_time += delta
+	if _outside_time >= OUT_OF_BOUNDS_SECONDS:
+		_outside_time = 0.0
+		tether.cut()
+		_return_to_checkpoint()
+		set_hint("BACK ON SITE  /  line cut, last safe ground", 3.0)
 
 
 # --- Input -------------------------------------------------------------------------------------
@@ -656,7 +679,7 @@ func _track_checkpoint(delta: float) -> void:
 	if _checkpoint_timer > 0.0:
 		return
 	_checkpoint_timer = CHECKPOINT_SECONDS
-	if player.grounded and player.global_position.y > float(level.get("kill_y")) + 2.0:
+	if player.grounded and player.global_position.y > float(level.get("kill_y")) + 2.0 and bool(level.call("is_in_bounds", player.global_position)):
 		_checkpoint = player.global_position
 		_checkpoint_yaw = player.yaw
 		# The cue marks new ground, not each half-second refresh: it plays once the player has moved on.

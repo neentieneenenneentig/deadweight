@@ -26,7 +26,15 @@ const SIGHT_RANGE_HOUND := 37.0
 const SIGHT_RANGE_SENTRY := 46.0
 const SIGHT_RANGE_DRONE := 40.0
 const TRACK_MEMORY := 8.0            # seconds a hound keeps chasing after it last saw the player
-const BITE_RANGE := 1.9              # metres, 3D
+## The bite: a hound that closes to BITE_START stops, crouches for BITE_WINDUP (the tell), then lunges.
+## The lunge lands if the player is still inside BITE_REACH, and slides the hound to LUNGE_STOP from
+## them. A chasing hound holds at HOLD_DISTANCE instead of running into the player.
+const BITE_START := 2.3              # planar metres
+const BITE_REACH := 2.7              # planar metres
+const BITE_WINDUP := 0.3             # seconds
+const LUNGE_STOP := 1.1              # planar metres
+const HOLD_DISTANCE := 1.5           # planar metres
+const GROUND_DECEL := 15.0           # m/s^2, how quickly a hound on the ground changes speed
 const BITE_DAMAGE := 12.0            # before damage_scale (CONTRACT 5.3)
 const BITE_COOLDOWN := 1.1
 const BITE_RECOVER := 0.6            # seconds in ATTACK after a bite
@@ -101,7 +109,8 @@ var _visible_target: bool = false
 var _locked_aim: Vector3
 # Hound state.
 var _state: State = State.PATROL
-var _state_timer: float = 0.0        # counts down ALERT, ATTACK recovery and the SEARCH budget
+var _state_timer: float = 0.0        # counts down ALERT, the ATTACK crouch and recovery, and the SEARCH budget
+var _bite_struck: bool = false       # in ATTACK: false during the crouch, true once the lunge has gone
 var _search_arrived: bool = false
 var _patrol_center: Vector3
 var _patrol_angle: float = 0.0
@@ -438,14 +447,13 @@ func _sight_range() -> float:
 	return SIGHT_RANGE_SENTRY
 
 
-func _tick_hound(delta: float, distance: float) -> void:
+func _tick_hound(delta: float, _distance: float) -> void:
 	_path_timer -= delta
 	if _path_timer <= 0.0:
 		_refresh_path()
-	if _visible_target and distance < BITE_RANGE and _attack_cooldown <= 0.0:
-		_bite()
-	else:
-		_run_state(delta)
+	if _state != State.ATTACK and _can_bite():
+		_start_bite()
+	_run_state(delta)
 	_animate_hound(delta, Vector2(velocity.x, velocity.z).length())
 	_eye_material.emission_energy_multiplier = lerpf(_eye_material.emission_energy_multiplier, _eye_glow(), minf(1.0, delta * 6.0))
 
@@ -471,13 +479,21 @@ func _run_state(delta: float) -> void:
 				return
 			# Straight-line steering is only safe when the player is in sight and not above the hound's reach.
 			var direct: bool = _visible_target and not _is_high()
-			_steer(target.global_position, CHASE_SPEED, delta, direct)
+			if direct and _planar_distance(target.global_position) < HOLD_DISTANCE:
+				# Close enough to bite: hold here and wait for the bite to come round, never run into the player.
+				_face_target(delta)
+				_halt(delta)
+			else:
+				_steer(target.global_position, CHASE_SPEED, delta, direct)
 		State.ATTACK:
 			_face_target(delta)
 			_halt(delta)
 			_state_timer -= delta
 			if _state_timer <= 0.0:
-				_set_state(State.CHASE)
+				if _bite_struck:
+					_set_state(State.CHASE)
+				else:
+					_strike()
 		State.SEARCH:
 			_run_search(delta, sees)
 
@@ -514,11 +530,34 @@ func _set_state(next: State) -> void:
 			_search_arrived = false
 
 
-func _bite() -> void:
-	_attack_cooldown = BITE_COOLDOWN
+func _can_bite() -> bool:
+	return _visible_target and not _giving_up and _attack_cooldown <= 0.0 and not _is_high() \
+		and _planar_distance(target.global_position) < BITE_START
+
+
+## The tell: the hound stops and crouches, head back, for BITE_WINDUP.
+func _start_bite() -> void:
 	_set_state(State.ATTACK)
+	_state_timer = BITE_WINDUP
+	_bite_struck = false
+	_attack_cooldown = BITE_WINDUP + BITE_COOLDOWN
+
+
+## The lunge. The hound springs at the player and stops LUNGE_STOP short of them; the bite lands only
+## if they are still in reach, so moving away during the crouch dodges it.
+func _strike() -> void:
+	_bite_struck = true
 	_state_timer = BITE_RECOVER
+	var to_player: Vector3 = target.global_position - global_position
+	to_player.y = 0.0
+	var gap: float = to_player.length()
+	if gap > 0.01:
+		var speed: float = sqrt(2.0 * GROUND_DECEL * maxf(0.0, gap - LUNGE_STOP))
+		velocity.x = to_player.x / gap * speed
+		velocity.z = to_player.z / gap * speed
 	_play("hound_bite")
+	if not (_visible_target and gap < BITE_REACH and not _is_high()):
+		return
 	target.call("take_damage", BITE_DAMAGE * damage_scale, kind, global_position)
 	if target is RigidBody3D:
 		# The player has no knockback method, so the bite pushes the RigidBody3D directly.
@@ -624,8 +663,8 @@ func _halt(delta: float) -> void:
 
 
 func _move_on_ground(desired: Vector3, delta: float) -> void:
-	velocity.x = move_toward(velocity.x, desired.x, delta * 15.0)
-	velocity.z = move_toward(velocity.z, desired.z, delta * 15.0)
+	velocity.x = move_toward(velocity.x, desired.x, delta * GROUND_DECEL)
+	velocity.z = move_toward(velocity.z, desired.z, delta * GROUND_DECEL)
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	else:
@@ -673,7 +712,10 @@ func _animate_hound(delta: float, planar_speed: float) -> void:
 		_legs[i].rotation.x = sin(phase) * stride * 0.55
 		_knees[i].rotation.x = maxf(0.0, cos(phase)) * stride * 0.9
 	_visual.position.y = absf(sin(_gait)) * stride * 0.05
-	var lunge: float = -0.45 if _state == State.ATTACK else 0.0
+	# The crouch pulls the head back; the lunge snaps it forward.
+	var lunge: float = 0.0
+	if _state == State.ATTACK:
+		lunge = -0.45 if _bite_struck else 0.4
 	var look: float = sin(_clock * 1.4) * 0.8 if (_state == State.SEARCH and _search_arrived) else 0.0
 	_head.rotation.x = lerpf(_head.rotation.x, lunge, minf(1.0, delta * 8.0))
 	_head.rotation.y = lerpf(_head.rotation.y, look, minf(1.0, delta * 5.0))

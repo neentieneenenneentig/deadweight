@@ -32,7 +32,17 @@ func _run() -> void:
 	second.call("build", player, true)
 	var other_water: ShaderMaterial = (second.get("_materials") as Dictionary)["water"]
 	_check(water != other_water, "simultaneous levels have independent water clocks")
-	_check(dream.find_children("*", "CollisionObject3D", true, false).is_empty(), "dream decoration adds no collision bodies")
+	# Anything that looks solid is solid (S1): the props collide on the level's scenery body, the
+	# pendulum ball on its own, and neither is parsed into the navmesh. No floating notices remain.
+	var scenery: StaticBody3D = level.get_node_or_null("Scenery")
+	_check(scenery != null and scenery.get_child_count() > 50, "dream props are solid on the scenery body")
+	var ball: StaticBody3D = pendulum.get_node_or_null("PendulumBall")
+	_check(ball != null and ball.collision_layer == 1, "the pendulum ball is solid")
+	var notices: int = 0
+	for text: Node in level.find_children("*", "Label3D", true, false):
+		if (text as Label3D).text.contains("IN MOTION") or (text as Label3D).text.contains("YESTERDAY"):
+			notices += 1
+	_check(notices == 0, "dream decoration adds no floating notices")
 	var forms: MultiMeshInstance3D = dream.get_node("UnfiledForms")
 	var count: int = forms.multimesh.instance_count
 	await _frames(90)
@@ -42,7 +52,7 @@ func _run() -> void:
 	player.queue_free()
 	await _frames(2)
 	_check(not is_instance_valid(dream), "animated scenery is freed with its level")
-	print("DREAMSCAPE TEST: 8 checks, %d failures" % _failures)
+	print("DREAMSCAPE TEST: 10 checks, %d failures" % _failures)
 	quit(0 if _failures == 0 else 1)
 
 func _frames(count: int) -> void:

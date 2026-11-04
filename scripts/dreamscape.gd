@@ -1,7 +1,10 @@
 extends Node3D
 ## The Department of Unfinished Gravity. Static scenery joins the level's material
 ## batches. Three dynamic draws add a pendulum, orbital ring and rising paper forms.
-## Decoration never adds collision or navigation; animation inherits scene-tree pause.
+## Anything that looks solid is solid (S1): chairs, doors and their steps, arches, the clock, the
+## sphere, the portrait frame and the pendulum all collide, on the level's scenery body, which the
+## navmesh leaves out. Only the thin orbit ring and the paper forms are visual. No floating text.
+## Animation inherits scene-tree pause.
 const PORCELAIN = preload("res://assets/dreamscape/porcelain.png")
 const SKY = preload("res://assets/dreamscape/afternoon_sky.png")
 const PORTRAIT = preload("res://assets/dreamscape/vacant_chair.png")
@@ -59,13 +62,9 @@ func dress(level: Node3D) -> void:
 	for side: float in [left - 15, right + 15]:
 		for i in range(4):
 			_arch(Vector3(side, -2, middle + 46 - float(i) * 25), 7.0, 0.0)
-	_sphere(Vector3(left - 3, 48, middle - 74), Vector3(12, 16, 12), "light_concrete")
+	_sphere(Vector3(left - 3, 48, middle - 74), Vector3(14, 14, 14), "light_concrete")
 	_orbit = _moving_ring(Vector3(left - 3, 48, middle - 74), 17.5)
 	_portrait(Vector3(right - 2, 19, middle - 23), 15.0, -0.3)
-	# These notices are scenery; gameplay instructions keep their literal wording.
-	_notice("PLEASE REMAIN\nIN MOTION", Vector3(left + 1, 30, middle + 10), 0.045)
-	_notice("OFFICE HOURS\nYESTERDAY", Vector3(right, 18, middle + 12), 0.04)
-	_notice("DEPARTMENT OF\nUNFINISHED GRAVITY", Vector3(right - 2, 9, middle - 23), 0.028)
 	_make_papers(bounds)
 	_animate(0.0)
 
@@ -149,11 +148,13 @@ func _play_bounds() -> AABB:
 	return bounds
 
 func _box(at: Vector3, size: Vector3, material: String, rotation: Vector3 = Vector3.ZERO) -> void:
-	_level.call("_box_at", Transform3D(Basis.from_euler(rotation), at), size, material, false)
+	_level.call("scenery_box", Transform3D(Basis.from_euler(rotation), at), size, material)
 
 func _part(frame: Transform3D, at: Vector3, size: Vector3, material: String) -> void:
-	_level.call("_box_at", frame * Transform3D(Basis.IDENTITY, at), size, material, false)
+	_level.call("scenery_box", frame * Transform3D(Basis.IDENTITY, at), size, material)
 
+## A round sphere collides as a sphere; a flat disc (one short axis, the clock face) as a cylinder
+## lying along z.
 func _sphere(at: Vector3, size: Vector3, material: String) -> void:
 	var mesh := SphereMesh.new()
 	mesh.radius = 0.5
@@ -161,6 +162,15 @@ func _sphere(at: Vector3, size: Vector3, material: String) -> void:
 	mesh.radial_segments = 24
 	mesh.rings = 12
 	_level.call("_stage_mesh", mesh, Transform3D(Basis.from_scale(size), at), material)
+	if is_equal_approx(size.x, size.y) and is_equal_approx(size.y, size.z):
+		var ball := SphereShape3D.new()
+		ball.radius = size.x * 0.5
+		_level.call("add_scenery_collider", ball, Transform3D(Basis.IDENTITY, at))
+	else:
+		var disc := CylinderShape3D.new()
+		disc.radius = size.x * 0.5
+		disc.height = size.z
+		_level.call("add_scenery_collider", disc, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), at))
 
 func _ring(at: Vector3, radius: float, thickness: float, material: String, rotation: Vector3 = Vector3.ZERO) -> void:
 	var mesh := TorusMesh.new()
@@ -190,7 +200,7 @@ func _arch(at: Vector3, radius: float, yaw: float) -> void:
 		var angle: float = (float(i) + 0.5) * PI / 18.0
 		var pos := Vector3(cos(angle) * radius, radius * 2 + sin(angle) * radius, 0)
 		var transform := Transform3D(Basis(Vector3.BACK, angle - PI * 0.5), pos)
-		_level.call("_box_at", frame * transform, Vector3(radius * PI / 18.0 + 0.08, 1.7, 2.8), "light_concrete", false)
+		_level.call("scenery_box", frame * transform, Vector3(radius * PI / 18.0 + 0.08, 1.7, 2.8), "light_concrete")
 
 func _door(at: Vector3, size: float, yaw: float) -> void:
 	var frame := Transform3D(Basis(Vector3.UP, yaw), at)
@@ -230,6 +240,17 @@ func _clock(at: Vector3, radius: float) -> void:
 	surface.append_from(stem, 0, Transform3D(Basis.IDENTITY, Vector3(0, -radius * 0.375, 0)))
 	var moving: MeshInstance3D = _moving_mesh(surface.commit(), Vector3.ZERO, "yellow")
 	moving.reparent(_pendulum, false)
+	# The ball is solid too. The body rides the swing; the level keeps it out of the navmesh.
+	var body := StaticBody3D.new()
+	body.name = "PendulumBall"
+	var ball_shape := SphereShape3D.new()
+	ball_shape.radius = 1.0
+	var collision := CollisionShape3D.new()
+	collision.shape = ball_shape
+	collision.position = Vector3(0, -radius * 0.75, 0)
+	body.add_child(collision)
+	_pendulum.add_child(body)
+	_level.call("register_scenery_body", body)
 
 func _portrait(at: Vector3, size: float, yaw: float) -> void:
 	var frame := Transform3D(Basis(Vector3.UP, yaw), at)
@@ -246,8 +267,3 @@ func _portrait(at: Vector3, size: float, yaw: float) -> void:
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	view.material_override = material
 	_level.add_child(view)
-
-func _notice(words: String, at: Vector3, scale: float) -> void:
-	var note: Label3D = _level.call("label", words, at, 38, Color("f4e6c8"), scale)
-	note.visibility_range_end = 220.0
-	note.outline_modulate = Color("372c45")

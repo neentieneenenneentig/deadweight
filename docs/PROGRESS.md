@@ -579,3 +579,21 @@ Template:
 - scripts/levels/range.gd: 400 × 1000 m. Tests updated: physics (landing damage), world
   (containment rays, the bodies count), meta (assist per kg) and flow (the impact cause).
 - Gate: PASSED. The campaign rescale is next (TASKS S1).
+## 2026-11-04: S1 range feedback: no invisible walls, solid props, no floating text, hounds bite
+- Model: Claude Opus 5.5 (lead). Owner flew the range: "feels playable", but floating text, stairs
+  you fly through, invisible walls, and hounds that run inside the player.
+- scripts/level_base.gd: `_contain()` is replaced by `_build_outer_world()`: a visible solid plain
+  1.5 km past the footprint, flush with the lowest slab, plus visible bedrock. `is_in_bounds()`,
+  `scenery_box()`, `add_scenery_collider()` and `register_scenery_body()` put solid scenery on a
+  "Scenery" body that bake_navigation keeps out of the parse. Skyline towers are solid and skip
+  the floor. Pickups lose their floating title.
+- scripts/main.gd: `_track_bounds()` walks a player outside the footprint back after 3 s; no
+  checkpoint is set outside.
+- scripts/dreamscape.gd: every prop is solid (the clock collides as a disc, the sphere is round, the
+  pendulum ball has its own body). The three floating notices are removed.
+- scripts/enemy.gd: the hound holds at 1.5 m, crouches 0.3 s, then lunges to 1.1 m and bites if
+  the player is still within 2.7 m. scripts/player.gd: the player collides with enemies (mask 1 | 8).
+- scripts/levels/range.gd: text on solid plates (distance posts, platform fascias, a sign on the
+  gantry beam, slalom and updraft boards) and distance numbers painted on the floor.
+- Tests: world (no wall above the visible one, the outer plain, in-bounds, no billboard text, the
+  bite tell and stand-off), dreamscape (solid props, no notices). Gate: PASSED.

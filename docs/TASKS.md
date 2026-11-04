@@ -278,9 +278,18 @@ flies over its walls.
   carries 50–60 m to the first landing (about 90 m in 8 s), peaking at 27–30 m/s and 8 m up.
 - Landing damage: none up to 14 m/s (about a 10 m drop), 100 at 30 m/s (about 46 m), and more
   past that. The cause is "impact" (HIT THE GROUND TOO HARD).
-- Containment: invisible walls up to 600 m stand on every level's ground() footprint, with
-  bedrock under it. They sit on their own body, which the navmesh bake leaves out. The map can't be
-  left.
+- No invisible walls (owner, 2026-11-04: "no invisible walls! ever!"). Past every level's ground()
+  footprint a visible, solid plain runs on for 1.5 km, flush with the floor, and visible bedrock
+  floors every pit. A player who gets outside the footprint is walked back to the last checkpoint
+  after 3 s (OUTSIDE THE SITE), with no damage. Checkpoints are never set outside.
+- Anything that looks solid is solid: the dreamscape props (chairs, doors and their steps, arches,
+  clock, sphere, portrait frame, pendulum) and the skyline towers collide. They sit on a separate
+  Scenery body that the navmesh bake leaves out. A skyline tower that would land on the floor is
+  skipped.
+- No floating text: the dreamscape notices and the pickup titles are gone, and the range prints
+  everything on solid plates or paints it on the floor.
+- Hounds hold 1.5 m from the player, crouch for 0.3 s (the tell), then lunge and bite; moving away
+  during the crouch dodges it. The player now collides with enemy bodies.
 - The practice range is 400 × 1000 m: platforms at 25 to 200 m out (5 to 30 m up), a 30 m gantry,
   a 60 m updraft tower and 30 m slalom pillars. Navmesh cells are 0.5 m there. Camera far is 1500 m.
 
@@ -293,6 +302,10 @@ line, and tall drops must be lockable so they don't kill. Then redo:
 - `nav_cell_size` for large floors (the bake budget is 2 s);
 - the draw-call budget on phone (Q1);
 - the store screenshots (R6).
+The rescale must also follow the owner's rules from the range: no floating or billboard text
+(the tutorial and l01, l02 and l06 still have billboard labels), and no non-solid prop that looks
+solid (the per-level teacups, bathtub and kiln chimneys are still visual only).
+
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
 department, and added three AI-generated textures. The store text, press kit, rating answers and

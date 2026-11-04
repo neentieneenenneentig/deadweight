@@ -135,7 +135,7 @@ func _ready() -> void:
 	contact_monitor = true
 	max_contacts_reported = 6
 	collision_layer = 2
-	collision_mask = 1
+	collision_mask = 1 | 8              # the world, and enemy bodies: the player cannot walk through a hound
 	linear_damp_mode = RigidBody3D.DAMP_MODE_REPLACE
 	linear_damp = 0.035
 	var surface := PhysicsMaterial.new()
