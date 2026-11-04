@@ -47,7 +47,7 @@ func _test_boot_and_title() -> void:
 	_check(_main.state == "title", "boot ends on the title")
 	_check(_main.ui.current_screen() == "title" and _main.ui.visible, "the title screen is open")
 	_check(not _main.hud.visible, "the in-game HUD is hidden on the title (its old menus never show)")
-	_check(_main.level != null and _main.level.get("level_id") == "l01" and _main.practice, "the title sits over Sluice Gate in practice mode")
+	_check(_main.level != null and _main.level.get("level_id") == "valley" and _main.practice, "the title sits over the snowy valley in practice mode")
 	_check(get_nodes_in_group("enemies").is_empty(), "the title backdrop has no enemies")
 	_check(_main._attract.current, "the attract camera is the active camera")
 	_check(Input.mouse_mode != Input.MOUSE_MODE_CAPTURED, "the mouse is free on the title")

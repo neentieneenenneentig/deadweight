@@ -2,8 +2,8 @@ shader_type spatial;
 render_mode diffuse_burley;
 
 uniform sampler2D porcelain : source_color, filter_linear_mipmap, repeat_enable;
-uniform vec4 chalk : source_color = vec4(0.82, 0.77, 0.65, 1.0);
-uniform vec4 ink : source_color = vec4(0.26, 0.32, 0.32, 1.0);
+uniform vec4 chalk : source_color = vec4(0.57, 0.79, 0.18, 1.0);
+uniform vec4 ink : source_color = vec4(0.14, 0.04, 0.26, 1.0);
 varying vec3 world_position;
 varying vec3 world_normal;
 
@@ -29,5 +29,6 @@ void fragment() {
 		+ texture(porcelain, world_position.xy * 0.18).rgb * weights.z;
 	vec3 tiles = mix(chalk.rgb, ink.rgb, checker);
 	ALBEDO = mix(chalk.rgb, tiles, smoothstep(0.65, 0.95, abs(world_normal.y))) * patina;
+	EMISSION = ALBEDO * 0.07;
 	ROUGHNESS = 0.72;
 }

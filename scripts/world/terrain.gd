@@ -15,19 +15,19 @@ const CELL := 5.0                    # metres between height samples
 const EDGE_HEIGHT := 150.0           # the field's border height; the outer plain sits here
 const EDGE_BLEND := 140.0            # metres over which the border blends to EDGE_HEIGHT
 const WATER_Y := -1.5                # lake surface
-const SNOW_LINE := 88.0              # metres; noise moves it up and down by SNOW_JITTER
-const SNOW_JITTER := 16.0
+const SNOW_LINE := 10.0              # metres; noise moves it up and down by SNOW_JITTER
+const SNOW_JITTER := 9.0
 const TREE_LINE := 98.0
 
-# Stylised, warm palette (vertex colours; the material adds a little light variation).
-const MEADOW := Color("7fb24a")
-const MEADOW_LIGHT := Color("a5c95c")
-const FOREST_FLOOR := Color("4f7f37")
-const SHORE := Color("d2c38c")
-const ROCK := Color("8e8a7e")
-const ROCK_DARK := Color("6c6a63")
-const SNOW := Color("f3f5f8")
-const LAKE_BED := Color("5e7f6d")
+# Cold alpine palette (vertex colours; the material adds a little light variation).
+const MEADOW := Color("c1d1d8")
+const MEADOW_LIGHT := Color("e3edf0")
+const FOREST_FLOOR := Color("809aa9")
+const SHORE := Color("94afc0")
+const ROCK := Color("738597")
+const ROCK_DARK := Color("465d74")
+const SNOW := Color("e8f0f3")
+const LAKE_BED := Color("35566d")
 
 var size: float                      # metres per side, centred on the origin
 var count: int                       # samples per side
@@ -169,7 +169,7 @@ func _color_at(x: float, z: float, h: float, n: Vector3) -> Color:
 	if h < WATER_Y + 1.4:
 		return SHORE
 	if is_snow(x, z, h) and slope < 0.38:
-		return SNOW.lerp(Color("dfe6ee"), vary * 0.5)
+		return SNOW.lerp(Color("b3ccdf"), vary * 0.5)
 	if slope > 0.42 or h > TREE_LINE + 25.0:
 		return ROCK.lerp(ROCK_DARK, vary)
 	var grass: Color = MEADOW.lerp(MEADOW_LIGHT, vary)

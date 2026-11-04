@@ -35,7 +35,7 @@ static func case_mesh() -> ArrayMesh:
 static func sky_material() -> StandardMaterial3D:
 	if _sky == null:
 		_sky = StandardMaterial3D.new()
-		_sky.albedo_texture = preload("res://assets/dreamscape/afternoon_sky.png")
+		_sky.albedo_texture = preload("res://assets/dreamscape/nightmare_sky.png")
 		_sky.uv1_scale = Vector3(0.42, 0.28, 1)
 		_sky.uv1_offset = Vector3(0.1, 0.22, 0)
 		_sky.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -58,14 +58,14 @@ static func pickup_mesh(look: String) -> ArrayMesh:
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	match look:
 		"duck":
-			_painted(tool, _ball(0.36), Transform3D(Basis.from_scale(Vector3(1.0, 0.8, 1.25)), Vector3(0, 0, 0)), Color("f7cf3c"))
-			_painted(tool, _ball(0.22), Transform3D(Basis.IDENTITY, Vector3(0, 0.34, 0.2)), Color("f7cf3c"))
-			_painted(tool, _block(Vector3(0.16, 0.06, 0.16)), Transform3D(Basis.IDENTITY, Vector3(0, 0.31, 0.44)), Color("f08a3c"))
+			_painted(tool, _ball(0.36), Transform3D(Basis.from_scale(Vector3(1.0, 0.8, 1.25)), Vector3(0, 0, 0)), Color("f2c743"))
+			_painted(tool, _ball(0.22), Transform3D(Basis.IDENTITY, Vector3(0, 0.34, 0.2)), Color("f2c743"))
+			_painted(tool, _block(Vector3(0.16, 0.06, 0.16)), Transform3D(Basis.IDENTITY, Vector3(0, 0.31, 0.44)), Color("ed9647"))
 			for side: float in [-1.0, 1.0]:
 				_painted(tool, _ball(0.035), Transform3D(Basis.IDENTITY, Vector3(side * 0.1, 0.42, 0.38)), Color("1d1d22"))
 		"towel":
 			for k in range(4):
-				var stripe: Color = Color("f4f0ea") if k % 2 == 0 else Color("e98bb0")
+				var stripe: Color = Color("e3e8e5") if k % 2 == 0 else Color("779ea9")
 				_painted(tool, _block(Vector3(0.8, 0.08, 0.5)), Transform3D(Basis.IDENTITY, Vector3(0, -0.15 + float(k) * 0.085, 0)), stripe)
 		_:
 			# Two logs below, one on top, tied with a red band.
@@ -75,7 +75,7 @@ static func pickup_mesh(look: String) -> ArrayMesh:
 				log_mesh.bottom_radius = 0.13
 				log_mesh.height = 0.8
 				log_mesh.radial_segments = 8
-				_painted(tool, log_mesh, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), at), Color("8b5d3c"))
+				_painted(tool, log_mesh, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), at), Color("735343"))
 			_painted(tool, _block(Vector3(0.5, 0.04, 0.06)), Transform3D(Basis.IDENTITY, Vector3(0, 0.0, 0.0)), Color("d9403a"))
 	_looks[look] = tool.commit()
 	return _looks[look]

@@ -80,10 +80,10 @@ const DRONE_ROTOR_SPIN := 40.0       # rad/s, visual only
 const DUMMY_HEALTH := 60.0
 const DUMMY_REFILL := 3.0            # seconds down before it stands back up at full health
 const DUMMY_FLASH := Color("9ff0e6") # hit flash: pale cyan, so it reads as a target rather than a threat
-const PORCELAIN := Color("e8ddc7")
+const PORCELAIN := Color("c3d6dc")
 
 # Death FX (E3): every kind throws a porcelain-shard burst, scaled by kind, once per death (see _die).
-const SHARD_COLOR := Color("f1e6d2")
+const SHARD_COLOR := Color("d1e0e6")
 const DEATH_SCALE := {"hound": 0.8, "sentry": 1.1, "drone": 1.0, "dummy": 0.7}
 
 var target: Node3D
@@ -199,12 +199,12 @@ func _build_body() -> void:
 	add_child(collision)
 	_visual = Node3D.new()
 	add_child(_visual)
-	_body_material = _material(Color("e8ddc7"))
+	_body_material = _material(PORCELAIN)
 	_body_material.albedo_texture = preload("res://assets/dreamscape/porcelain.png")
 	_body_material.roughness = 0.3
-	var armor := _material(Color("b78b9f"))
-	var joints := _material(Color("51435e"))
-	_eye_material = _material(Color("f7533c"), true)
+	var armor := _material(Color("7b8d9c"))
+	var joints := _material(Color("394b59"))
+	_eye_material = _material(Color("ff2855"), true)
 	match kind:
 		"hound":
 			_build_hound(armor, joints)
@@ -321,7 +321,7 @@ func _build_dummy(armor: StandardMaterial3D, joints: StandardMaterial3D) -> void
 	torus.ring_segments = 6
 	var ring := MeshInstance3D.new()
 	ring.mesh = torus
-	ring.material_override = _material(Color("5ad6c8"), true)
+	ring.material_override = _material(Color("19ffe0"), true)
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ring.rotation.x = PI * 0.5                                                             # a ring in the XY plane
 	ring.position = Vector3(0, 1.25, 0.24)                                                 # on the +Z chest, where the range player comes from
@@ -403,7 +403,7 @@ func _physics_process(delta: float) -> void:
 	_clock += delta
 	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
 	_hurt_flash = maxf(0.0, _hurt_flash - delta)
-	_body_material.albedo_color = Color("b44d37") if _hurt_flash > 0.0 else Color("e8ddc7")
+	_body_material.albedo_color = Color("ff315c") if _hurt_flash > 0.0 else PORCELAIN
 	var offset: Vector3 = target.global_position - global_position
 	var distance: float = offset.length()
 	_ray_clock -= delta

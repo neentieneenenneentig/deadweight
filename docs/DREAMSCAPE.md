@@ -1,8 +1,8 @@
 # The Department of Unfinished Gravity
 
-An owner-directed visual revision for DEADWEIGHT, 2026-11-03.
+An owner-directed visual revision for DEADWEIGHT, 2026-11-03 to 2026-11-04.
 
-![The playable dreamscape](images/dreamscape.png)
+![Cold alpine starting world](images/alpine-valley.png)
 
 ## Research and interpretation
 
@@ -22,68 +22,94 @@ of conventional reason. These are references for methods, not paintings to repro
 [V&A: Surrealism and design](https://www.vam.ac.uk/articles/surrealism-and-design),
 [The Met: Surrealism](https://www.metmuseum.org/essays/surrealism)
 
-The resulting interpretation is quiet, solemn and faintly comic. A chair holds an
-office nobody occupies. A clock points downward and announces yesterday. Doors offer
-thresholds without destinations. The weight that should stop you is what lets you fly.
-These are our invented motifs, not claims about what Camus prescribed for visual art.
+The absurd objectives and official rituals can inhabit a grounded world. The owner's
+final direction makes cold, snowy mountains the baseline and assigns the more extreme
+palettes to particular campaign regions. An impossible task in a recognisable landscape
+can carry the absurd without turning every tree and floor into a hallucination.
 
-## In the game
+The environment reference is chunky, painted fantasy scenery. The emphasis is on
+silhouette, terrain composition and material variation. Blizzard exterior level designer
+Sarah Boulian Verrall describes terrain sculpting, painting and placed props as parts of
+that work in her [Stormsong Valley breakdown](https://sboulian.artstation.com/projects/y9Jq3).
+Our textures and meshes are original; no Warcraft assets were imported.
 
-- Painted celadon and apricot sky, light atmospheric haze, long architectural shadows.
-- Ivory ceramic checker floors with derivative filtering to reduce distant shimmer.
-- Generated porcelain patina on architecture, enemies, tools and the cast weight.
-- Dusty rose structures and plum shade; brass and green remain functional accents.
-- Giant empty chairs, freestanding arcades, floating doorsteps, an egg with a ring,
-  a useless pendulum clock, and an original generated mural of a vacant chair.
-- Porcelain tea hounds, alarm-clock sentries, ceramic drones and an elongated ceramic
-  cast weight. Existing animation pivots, enemy tells and physics shapes are retained.
-- Menus adopt warm paper, plum and celadon with the department's title-screen subtitle.
+## Campaign direction
 
-The shared level builder applies this direction to both available environments, Sluice
-Gate and Practice Range. The other catalog entries are still placeholders. Their zone
-palettes are prepared, but those unbuilt levels have not been visually validated.
-Traversal geometry, objective positions, progression, controls and save formats stay intact.
+| Region | Sky and palette | Use |
+| --- | --- | --- |
+| Floodworks | Cold blue sky, snow, slate, weathered brass | Tutorial, raids 01-03 and practice range |
+| Highlands | Cold blue sky, snowfields, frozen lakes, dark evergreens | Main-menu backdrop, valley and princess raid |
+| Foundry | Animated violet nightmare sky, magenta, lime and cyan | Raids 04-06; impossible furniture and clocks |
+| Spillway | Painted afternoon, celadon, stone and muted rose | Prepared for the later catalog entries, whose level scripts are not yet present |
 
-## Assets and implementation
+The shared UI and tools use restrained slate-blue, pale metal and brass. The neon
+palette is no longer applied to the whole game. The rejected zigzag lightning has
+been removed from the shader entirely.
 
-The built-in image generation tool produced three assets; no API/CLI fallback was used.
-Files are project-local and have mipmaps enabled in their Godot import configurations.
+## Geometry and materials
+
+- New generated cold-sky panorama and painted slate material, both mipmapped.
+- Compact opening levels sit inside real irregular mountain ridges, with matching terrain colliders.
+- The highlands have wind-scoured snow, exposed slate faces and icy-blue lakes.
+- Pines have unequal layered boughs, bent centres, notched edges and painted snow cover.
+- Broadleaf trees are bare winter branches rather than spherical canopies.
+- Boulders have fractured, asymmetric outlines and flattened ledges instead of sphere primitives.
+- Short stone blocks have unequal chamfers; their collision hulls follow those surfaces.
+- Terrain and rock materials blend slate and snow according to surface orientation.
+
+The main-menu camera now overlooks the snowy valley. Campaign ordering, mission
+objectives, controls and saves are unchanged. The new mountain surroundings remain
+outside the existing route navmeshes; trees and boulders still use the established
+navigation exclusions and obstacle posts.
+
+## Moving skies
+
+Every region uses its own panorama with a level-local clock. Cold skies drift slowly.
+Foundry clouds move faster, with a counter-moving veil and distant expanding cloud
+glows. These are visual atmosphere, not damaging explosions. There is no lightning.
+Animation pauses with gameplay, resumes on unpause and starts fresh with a new level.
+The cubemap branch uses a cheap static sample to keep reflections stable. The shader
+follows [Godot's sky shader reference](https://docs.godotengine.org/en/stable/tutorials/shaders/shader_reference/sky_shader.html).
+
+## Assets
 
 | Saved asset | Consumption |
 | --- | --- |
-| [`afternoon_sky.png`](../assets/dreamscape/afternoon_sky.png) | PanoramaSkyMaterial |
-| [`porcelain.png`](../assets/dreamscape/porcelain.png) | Shared ceramic material detail |
-| [`vacant_chair.png`](../assets/dreamscape/vacant_chair.png) | Framed world mural |
+| [`alpine_sky.png`](../assets/dreamscape/alpine_sky.png) | Cold starting areas and highlands |
+| [`alpine_slate.png`](../assets/dreamscape/alpine_slate.png) | Painted stone, mountains and snow blending |
+| [`nightmare_sky.png`](../assets/dreamscape/nightmare_sky.png) | Foundry sky and the magical suitcase windows |
+| [`afternoon_sky.png`](../assets/dreamscape/afternoon_sky.png) | Spillway's prepared sky |
+| [`porcelain.png`](../assets/dreamscape/porcelain.png) | Ceramic detail in surreal regions, enemies and equipment |
+| [`vacant_chair.png`](../assets/dreamscape/vacant_chair.png) | Framed mural in surreal regions |
 
-[Exact generation prompts](../assets/dreamscape/PROMPTS.md) are retained for revision.
-`scripts/dreamscape.gd` builds the new 3D scenery with the existing material batches.
-`shaders/dream_floor.gdshader` combines the generated material with a world-space checker.
-These are actual game resources, not concept art displayed in place of a working level.
+The built-in image generation tool created these textures. The project-local PNGs
+are unchanged copies of its outputs. [Exact prompts](../assets/dreamscape/PROMPTS.md)
+are retained. Models are generated in GDScript; painted textures complement real geometry.
 
 ## Validation and reproduction
 
-The off-screen capture tool does not load or write a profile:
+Off-screen capture tools do not load or write the player's profile:
 
 ```powershell
-& '.tools/godot/Godot_v4.7.2-stable_win64_console.exe' --path . --position 20000,20000 --resolution 1280x720 --script res://tests/dreamscape_preview.gd
+& '.tools/godot/Godot_v4.7.2-stable_win64_console.exe' --path . --position 20000,20000 --resolution 1280x720 --script res://tests/level_preview.gd -- --level=valley
+& '.tools/godot/Godot_v4.7.2-stable_win64_console.exe' --path . --position 20000,20000 --resolution 1280x720 --script res://tests/level_preview.gd -- --level=l04
+& '.tools/godot/Godot_v4.7.2-stable_win64_console.exe' --path . --position 20000,20000 --resolution 800x450 --script res://tests/storm_preview.gd
 ```
 
-Add `--rendering-method gl_compatibility` for the mobile rendering path. Captures go to
-`.tools/captures/dreamscape/`, with the renderer in each filename. Spawn views, an overview,
-and an enemy lineup are captured. The title screen can be checked with `tests/ui_preview.gd`.
+Add `--rendering-method gl_compatibility` for the mobile rendering path. Storm preview
+records the Foundry at 15 fps; `--start=<seconds> --frames=<count> --out=<folder>` can
+capture a short section. [Animated Foundry preview](images/nightmare-storm.gif).
 
-Rendered Compatibility validation at 1280 x 720 measured 155 draw calls / 23,366 scene
-triangles for Sluice Gate and 62 / 8,810 for Practice Range at the test's spawn cameras.
-These are desktop GPU observations, not a physical Android performance certification;
-other viewpoints and active effects can cost more. Both levels passed the 65 placement,
-navigation, catalog, label and light checks. Only one sun is added by the art pass.
+Validation: **69 scripts parsed; all 12 headless suites passed**. World integration
+checks include 125 assertions, including matching mountain geometry/collision and
+keeping it outside the route navigation bake. The dream animation tests now use
+Foundry levels; the title-flow check expects the snowy valley. Sky pause/resume and
+independent level clocks pass. Forward+ and Compatibility captures were reviewed.
+The title capture used a disposable `.tools` profile, never the player's save.
 
-The full quality gate is `powershell -ExecutionPolicy Bypass -File tests/run_all.ps1`.
-Final result: **48 scripts parsed, all nine suites passed, QUALITY GATE: PASSED**.
-Forward+ and Compatibility captures were visually inspected. Checker edges use
-derivative filtering and fade at subpixel sizes. Title preview reported zero problems.
-During validation, existing drone fixtures were corrected to use arena-local coordinates
-and place flying drones in their hover band; the double arena offset had prevented the
-tests from exercising shots and blast damage. Gameplay damage assertions were retained.
+Final Compatibility valley capture: 49 draw calls / 2,492,196 rendered triangles at
+the spawn camera on the desktop GPU. This includes shadow rendering; it is not a
+physical Android frame-rate measurement. The nature meshes stay in MultiMesh batches.
 
-![Porcelain inhabitants](images/dreamscape-inhabitants.png)
+![Snowy title backdrop](images/alpine-title.png)
+![The later Foundry contrast](images/foundry-nightmare.png)

@@ -4,11 +4,12 @@ First-person movement action for PC (Steam: Windows, Linux, Steam Deck) and Andr
 Your legs are slow and the ground is hostile. Your one real tool is a fishing rod that casts
 impossibly heavy weights: cast, lock the spool, and the weight drags you into the sky. Reel in, cut
 loose, recast in mid-air. Raid an impossible public works department for salvage, outfly porcelain
-tea hounds, clockwork sentries and drones, and extract beneath a painted afternoon sky.
+tea hounds, clockwork sentries and drones, and extract through a campaign of contrasting worlds.
 
-The visual direction is **The Department of Unfinished Gravity**, an absurdist dreamscape of
-vacant chairs, suspended doors and ceremonial machinery. See [the art notes](docs/DREAMSCAPE.md)
-for the research, generated assets, screenshots and reproduction commands.
+The starting look is a cold alpine landscape: snow, slate, frozen lakes and irregular pines.
+The later Foundry levels enter **The Department of Unfinished Gravity**, with nightmare skies,
+bright dream palettes and impossible furniture. The softer painted sky is reserved for the
+Spillway. See [the art notes](docs/DREAMSCAPE.md) for research, assets and capture commands.
 
 **Status:** a playable prototype (one level, the full raid loop, rod physics, two enemy kinds,
 touch controls) with a working release pipeline. Version 1.0 is being built task by task:

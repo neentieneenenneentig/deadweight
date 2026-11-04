@@ -36,6 +36,7 @@ signal enemy_killed(kind: String, by: String)
 
 const EnemyScript = preload("res://scripts/enemy.gd")
 const FX = preload("res://scripts/fx.gd")
+const Alpine = preload("res://scripts/world/alpine.gd")
 const Dreamscape = preload("res://scripts/dreamscape.gd")
 const DreamProps = preload("res://scripts/dream_props.gd")
 const TrapsScript = preload("res://scripts/world/traps.gd")
@@ -85,47 +86,51 @@ const WATER_DPS := 25.0                              # deep water damage per sec
 ## Per-zone look. "colors" must define every material key (CONTRACT 4.11).
 const ZONES := {
 	"floodworks": {
-		"sky_top": "628d88", "sky_horizon": "e9cba8", "ground_bottom": "536663", "ground_horizon": "c3c6af",
-		"ambient": "b7c9ce", "ambient_energy": 0.48, "fog": "b6c4b9", "fog_density": 0.0018,
-		"sun": "ffe0b2", "sun_energy": 1.15, "sun_rotation": Vector3(-24, -32, 0),
+		"sky": "alpine", "natural": true,
+		"sky_top": "090315", "sky_horizon": "37105a", "ground_bottom": "090315", "ground_horizon": "200b39",
+		"ambient": "c5d9ee", "ambient_energy": 0.43, "fog": "a5bfd3", "fog_density": 0.0019,
+		"sun": "e4f2ff", "sun_energy": 0.88, "sun_rotation": Vector3(-24, -32, 0),
 		"colors": {
-			"concrete": "d6c9b0", "light_concrete": "e2dac6", "dark": "473c52", "rust": "bd8380",
-			"metal": "819c96", "yellow": "c5a264", "stripe": "473c52", "glass": "b3cfc3", "water": "668a82",
-			"cyan": "5ad6c8", "amber": "ffc46b", "red": "ef654e", "orange": "f08a3c", "white": "c5d0bc",
+			"concrete": "c6d5de", "light_concrete": "e0e9eb", "dark": "334858", "rust": "735c4e",
+			"metal": "617b8b", "yellow": "c3aa6d", "stripe": "374755", "glass": "88bac8", "water": "32657d",
+			"cyan": "68d7e6", "amber": "edc16c", "red": "ed6159", "orange": "e99c5a", "white": "e8f1f4",
 		},
 	},
 	"foundry": {
-		"sky_top": "0d0f12", "sky_horizon": "4a3226", "ground_bottom": "0a0b0d", "ground_horizon": "2e2420",
-		"ambient": "b3a6c2", "ambient_energy": 0.45, "fog": "ad8b9b", "fog_density": 0.0028,
-		"sun": "ffc599", "sun_energy": 1.0, "sun_rotation": Vector3(-20, 40, 0),
+		"sky": "nightmare",
+		"sky_top": "090315", "sky_horizon": "37105a", "ground_bottom": "090315", "ground_horizon": "200b39",
+		"ambient": "b487f2", "ambient_energy": 0.42, "fog": "300824", "fog_density": 0.003,
+		"sun": "b9caff", "sun_energy": 0.82, "sun_rotation": Vector3(-20, 40, 0),
 		"colors": {
-			"concrete": "c7a99c", "light_concrete": "e1cbb5", "dark": "46344c", "rust": "ac777e",
-			"metal": "8b8b9e", "yellow": "c5a264", "stripe": "47394c", "glass": "b4a8c8", "water": "70576e",
-			"cyan": "5ad6c8", "amber": "ffb347", "red": "ff5a40", "orange": "ff7a1a", "white": "e8e0d0",
+			"concrete": "a552de", "light_concrete": "ed35b6", "dark": "1b0a2b", "rust": "b61563",
+			"metal": "3553af", "yellow": "aaff18", "stripe": "190d32", "glass": "8e4eff", "water": "410b63",
+			"cyan": "16ffe1", "amber": "c4ff18", "red": "ff2855", "orange": "ff2dc2", "white": "c9d0ff",
 		},
 	},
 	# W1: open highland valley. "natural" materials are plain and painterly, without the porcelain patina.
 	"highlands": {
 		"natural": true,
 		"shadow_distance": 160.0,        # thousands of trees: keep sun shadows close (W6)
-		"sky_top": "6f9fd0", "sky_horizon": "e8e4cf", "ground_bottom": "5d7a45", "ground_horizon": "b9cf9a",
-		"ambient": "c9d8e6", "ambient_energy": 0.38, "fog": "c4d6e4", "fog_density": 0.0008,
-		"sun": "fff1d6", "sun_energy": 1.25, "sun_rotation": Vector3(-38, -35, 0),
+		"sky": "alpine",
+		"sky_top": "090315", "sky_horizon": "37105a", "ground_bottom": "090315", "ground_horizon": "200b39",
+		"ambient": "bbd1e6", "ambient_energy": 0.38, "fog": "b7cbdc", "fog_density": 0.0008,
+		"sun": "ebf4ff", "sun_energy": 0.78, "sun_rotation": Vector3(-38, -35, 0),
 		"colors": {
-			"concrete": "c9c2ad", "light_concrete": "e6e0cc", "dark": "4c4038", "rust": "8b5d3c",
-			"metal": "8f9a9c", "yellow": "e8bf4a", "stripe": "4c4038", "glass": "c2e4ef", "water": "4f9bb0",
-			"cyan": "5ad6c8", "amber": "ffc46b", "red": "ef654e", "orange": "f08a3c", "white": "f3f5f8",
-			"grass": "7fb24a", "snow": "eef2f6", "fur": "a3714a", "fur_dark": "6e4a30",
+			"concrete": "aebec9", "light_concrete": "e0eaee", "dark": "35424b", "rust": "6c5141",
+			"metal": "6e8795", "yellow": "d1b563", "stripe": "3a4148", "glass": "8ebdce", "water": "3b7897",
+			"cyan": "68d7e6", "amber": "edc16c", "red": "ed6159", "orange": "e99c5a", "white": "e8f1f4",
+			"grass": "7c9195", "snow": "e2edf2", "fur": "a9896c", "fur_dark": "6d5141",
 		},
 	},
 	"spillway": {
-		"sky_top": "5f8fb8", "sky_horizon": "dce6ea", "ground_bottom": "9db0b6", "ground_horizon": "cfdadb",
-		"ambient": "c8d9da", "ambient_energy": 0.55, "fog": "c7d6ce", "fog_density": 0.0017,
-		"sun": "fff4e0", "sun_energy": 1.1, "sun_rotation": Vector3(-34, -30, 0),
+		"sky": "afternoon",
+		"sky_top": "090315", "sky_horizon": "37105a", "ground_bottom": "090315", "ground_horizon": "200b39",
+		"ambient": "b8cbd0", "ambient_energy": 0.5, "fog": "bbc9c0", "fog_density": 0.0017,
+		"sun": "f4e9cd", "sun_energy": 0.95, "sun_rotation": Vector3(-34, -30, 0),
 		"colors": {
-			"concrete": "dce0cf", "light_concrete": "e9e5d4", "dark": "47576c", "rust": "ad8b9e",
-			"metal": "8faea6", "yellow": "c9b079", "stripe": "47576c", "glass": "b8d8d3", "water": "749c9b",
-			"cyan": "5ad6c8", "amber": "ffc46b", "red": "ef654e", "orange": "f08a3c", "white": "eef2ee",
+			"concrete": "c5cbb8", "light_concrete": "e0ddca", "dark": "485666", "rust": "a57991",
+			"metal": "789c98", "yellow": "b8a26a", "stripe": "485666", "glass": "add0c8", "water": "568d8e",
+			"cyan": "68d7e6", "amber": "edc16c", "red": "ed6159", "orange": "e99c5a", "white": "e8f1f4",
 		},
 	},
 }
@@ -165,6 +170,8 @@ var _stage: Node3D                                   # pending static meshes, me
 var _pending: Array[MeshInstance3D] = []
 var _body: StaticBody3D                              # every solid primitive's collider
 var _extract_ring: MeshInstance3D
+var _sky_material: ShaderMaterial
+var _storm_time: float = 0.0
 var _environment: Environment
 var _sun: DirectionalLight3D
 var _fog_base: float = 0.0
@@ -1171,12 +1178,14 @@ static func _basis_with_up(up: Vector3) -> Basis:
 # --- Build internals ----------------------------------------------------------------------------
 
 func _finish_build() -> void:
-	if dreamscape:
+	if dreamscape and zone in ["foundry", "spillway"]:
 		var dream := Dreamscape.new()
 		dream.name = "DreamAtmosphere"
 		add_child(dream)
 		dream.dress(self)
 	_build_outer_world()
+	if zone == "floodworks" and not info.is_empty():
+		Alpine.dress(self, _footprint, _ground_low)
 	_pending_count = _pending.size()
 	_merge_statics()
 	_build_environment()
@@ -1303,6 +1312,12 @@ func _part(frame: Transform3D, local_position: Vector3, size: Vector3, material:
 
 
 func _box_at(placement: Transform3D, size: Vector3, material: String, solid: bool) -> MeshInstance3D:
+	if zone in ["floodworks", "highlands"] and material in ["concrete", "light_concrete", "dark"] and minf(size.x, minf(size.y, size.z)) > 0.6 and size.length() < 22.0:
+		var stone: ArrayMesh = Alpine.block_mesh(size)
+		var block_view: MeshInstance3D = _stage_mesh(stone, placement, material)
+		if solid:
+			_add_collider(stone.create_convex_shape(true, false), placement)
+		return block_view
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	var instance := _stage_mesh(mesh, placement, material)
@@ -1376,15 +1391,32 @@ func _merge_statics() -> void:
 		add_child(merged)
 
 
+# A level-local clock makes the sky pause with gameplay and resets it on restart.
+func _process(delta: float) -> void:
+	if _sky_material != null:
+		_storm_time += delta
+		_sky_material.set_shader_parameter("storm_time", _storm_time)
+
+
 func _build_environment() -> void:
 	var preset: Dictionary = ZONES[zone]
 	_environment = Environment.new()
 	_environment.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
-	var sky_material := PanoramaSkyMaterial.new()
-	sky_material.panorama = Dreamscape.SKY
-	sky_material.energy_multiplier = 0.72 if zone == "foundry" else 1.0
-	sky.sky_material = sky_material
+	_sky_material = ShaderMaterial.new()
+	_sky_material.shader = preload("res://shaders/nightmare_sky.gdshader")
+	var sky_kind: String = str(preset.get("sky", "alpine"))
+	var texture: Texture2D = Alpine.SKY
+	if sky_kind == "nightmare":
+		texture = Dreamscape.SKY
+	elif sky_kind == "afternoon":
+		texture = preload("res://assets/dreamscape/afternoon_sky.png")
+	_sky_material.set_shader_parameter("panorama", texture)
+	_sky_material.set_shader_parameter("cloud_speed", 0.0018 if sky_kind == "nightmare" else 0.00025)
+	_sky_material.set_shader_parameter("effects_strength", 1.0 if sky_kind == "nightmare" else 0.0)
+	_sky_material.set_shader_parameter("sky_energy", 0.85 if zone == "foundry" else 1.0)
+	sky.process_mode = Sky.PROCESS_MODE_REALTIME
+	sky.sky_material = _sky_material
 	_environment.sky = sky
 	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	_environment.ambient_light_color = Color(str(preset["ambient"]))
@@ -1392,9 +1424,9 @@ func _build_environment() -> void:
 	_environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	_environment.fog_enabled = true
 	_environment.fog_light_color = Color(str(preset["fog"]))
-	_environment.fog_light_energy = 0.65
+	_environment.fog_light_energy = 0.4
 	# Sky fog defaults to fully opaque; retain the generated cloud painting.
-	_environment.fog_sky_affect = 0.12
+	_environment.fog_sky_affect = 0.04
 	_fog_base = float(preset["fog_density"])
 	_environment.fog_density = _fog_base
 	var holder := WorldEnvironment.new()
@@ -1485,12 +1517,16 @@ static func _zone_materials(zone_name: String) -> Dictionary:
 
 ## Plain painterly materials for natural zones (W1): no porcelain patina, soft and matte.
 static func _make_natural_material(key: String, color: Color) -> Material:
+	if key in ["concrete", "light_concrete", "dark", "stripe", "snow"]:
+		return Alpine.surface_material(color)
 	if key == "water":
 		var water := StandardMaterial3D.new()
 		water.albedo_color = Color(color, 0.82)
 		water.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		water.roughness = 0.06
 		water.metallic = 0.15
+		water.emission_enabled = true
+		water.emission = color * 0.035
 		return water
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
@@ -1523,6 +1559,9 @@ static func _make_material(key: String, color: Color) -> Material:
 		material.emission = color
 		material.emission_energy_multiplier = 1.0
 		return material
+	if key in ["yellow", "rust", "light_concrete"]:
+		material.emission_enabled = true
+		material.emission = color * 0.16
 	if GRIME_KEYS.has(key):
 		# Generated ceramic patina, world projected so large surfaces retain their scale.
 		material.albedo_texture = Dreamscape.PORCELAIN

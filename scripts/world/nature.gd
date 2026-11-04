@@ -6,17 +6,25 @@ extends RefCounted
 ## Usage: Nature.scatter(level, land, seed, keep_clear) after the terrain is generated, where
 ## keep_clear is an Array[Vector3] of (x, z, radius) spots that stay open (spawn, pads, paths).
 
+const Alpine = preload("res://scripts/world/alpine.gd")
+static var _pine_model: ArrayMesh
+static var _pine_hulls: Array[Shape3D] = []
+static var _rock_model: ArrayMesh
+static var _rock_hull: Shape3D
+static var _oak_model: ArrayMesh
+static var _oak_parts: Array[Array] = []
+
 const Terrain = preload("res://scripts/world/terrain.gd")
 
-const PINE_TRUNK := Color("6b4a32")
-const PINE_LEAF := Color("3f6f3a")
-const PINE_LEAF_LIGHT := Color("5a8c45")
-const OAK_TRUNK := Color("775338")
-const OAK_LEAF := Color("6ea443")
-const OAK_LEAF_LIGHT := Color("94c25a")
-const ROCK := Color("9a968a")
-const GRASS := Color("8cbd52")
-const FLOWERS := [Color("f4e27a"), Color("f2f2f2"), Color("e98bb0"), Color("9ab8f2")]
+const PINE_TRUNK := Color("514b48")
+const PINE_LEAF := Color("294b50")
+const PINE_LEAF_LIGHT := Color("4b7472")
+const OAK_TRUNK := Color("65594d")
+const OAK_LEAF := Color("4e7170")
+const OAK_LEAF_LIGHT := Color("82a09a")
+const ROCK := Color("8295a5")
+const GRASS := Color("818d86")
+const FLOWERS := [Color("b6c4c8"), Color("d9e6ea"), Color("8ca5b5"), Color("adb9bf")]
 
 const TREE_SPACING := 9.0            # metres between scatter candidates
 const ROCK_SPACING := 26.0
@@ -76,6 +84,11 @@ static func scatter(level: Node3D, land: Terrain, seed_value: int, keep_clear: A
 				continue
 			rocks.append(Transform3D(tilt.scaled(Vector3.ONE * s), Vector3(px, h - s * 0.35, pz)))
 		x += ROCK_SPACING
+	for landmark: Vector3 in [Vector3(-34, 3.8, 39), Vector3(-39, 2.3, 34), Vector3(38, 4.2, 16), Vector3(43, 2.0, 21)]:
+		if not _blocked(landmark.x, landmark.z, keep_clear):
+			var h: float = land.height_at(landmark.x, landmark.z)
+			var frame := Basis.from_euler(Vector3(0.1, landmark.x * 0.2, -0.15)).scaled(Vector3.ONE * landmark.y)
+			rocks.append(Transform3D(frame, Vector3(landmark.x, h - landmark.y * 0.25, landmark.z)))
 	_add_multimesh(level, "Pines", _pine_mesh(), pines, rng, 0.12)
 	_add_multimesh(level, "Oaks", _oak_mesh(), oaks, rng, 0.14)
 	_add_multimesh(level, "Rocks", _rock_mesh(), rocks, rng, 0.08)
@@ -87,9 +100,7 @@ static func scatter(level: Node3D, land: Terrain, seed_value: int, keep_clear: A
 	for placement: Transform3D in oaks:
 		_oak_colliders(body, placement)
 	for placement: Transform3D in rocks:
-		var ball := SphereShape3D.new()
-		ball.radius = placement.basis.get_scale().x * 0.95
-		_shape(body, ball, Transform3D(Basis.IDENTITY, placement.origin))
+		_shape(body, _rock_hull, placement)
 	level.call("adopt_world_body", body)
 	# The bake skips these shapes; trunks carve round posts in the navmesh instead (crowns are overhead).
 	var posts: Array[Vector4] = level.get("nav_posts")
@@ -112,35 +123,122 @@ static func _blocked(x: float, z: float, keep_clear: Array[Vector3]) -> bool:
 # --- Meshes (unit size; instances scale them) ----------------------------------------------------
 
 static func _pine_mesh() -> ArrayMesh:
+	if _pine_model != null:
+		return _pine_model
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_append(tool, _cylinder(0.22, 0.28, 2.0, 6), Transform3D(Basis.IDENTITY, Vector3(0, 1.0, 0)), PINE_TRUNK)
-	_append(tool, _cylinder(0.0, 2.2, 3.2, 8), Transform3D(Basis.IDENTITY, Vector3(0, 3.1, 0)), PINE_LEAF)
-	_append(tool, _cylinder(0.0, 1.7, 2.8, 8), Transform3D(Basis.IDENTITY, Vector3(0, 4.5, 0)), PINE_LEAF.lerp(PINE_LEAF_LIGHT, 0.5))
-	_append(tool, _cylinder(0.0, 1.1, 2.4, 8), Transform3D(Basis.IDENTITY, Vector3(0, 5.8, 0)), PINE_LEAF_LIGHT)
-	return tool.commit()
+	_append(tool, _cylinder(0.18, 0.3, 2.5, 7), Transform3D(Basis.IDENTITY, Vector3(0, 1.25, 0)), PINE_TRUNK)
+	# Unequal, drooping skirts with notched rims; each tier has a separate solid hull.
+	for tier in range(3):
+		var radius: float = 2.3 - float(tier) * 0.62
+		var height: float = 2.7 - float(tier) * 0.25
+		var origin := Vector3(sin(float(tier) * 2.1) * 0.24, 1.45 + float(tier) * 1.65, cos(float(tier)) * 0.16)
+		var rings: Array[PackedVector3Array] = []
+		var all_points := PackedVector3Array()
+		var profile: Array[Vector2] = [Vector2(0.05, 1.0), Vector2(0.48, 0.62), Vector2(1.0, 0.10), Vector2(0.64, 0.0)]
+		for ring in range(profile.size()):
+			var row := PackedVector3Array()
+			for spoke in range(12):
+				var angle: float = float(spoke) * TAU / 12.0 + float(tier) * 0.47
+				var jag: float = 0.92 + sin(float(spoke * 7 + tier * 13)) * 0.16 + (0.18 if spoke % 2 == 0 else -0.22)
+				var r: float = radius * profile[ring].x * jag
+				var droop: float = sin(angle * 3.0 + float(tier)) * 0.32 * profile[ring].x
+				var point: Vector3 = origin + Vector3(cos(angle) * r, height * profile[ring].y + droop, sin(angle) * r)
+				row.append(point)
+				all_points.append(point)
+			rings.append(row)
+		for ring in range(3):
+			for spoke in range(12):
+				var next: int = (spoke + 1) % 12
+				_facet(tool, rings[ring][spoke], rings[ring + 1][spoke], rings[ring][next], origin + Vector3.UP * 0.6, PINE_LEAF, true)
+				_facet(tool, rings[ring][next], rings[ring + 1][spoke], rings[ring + 1][next], origin + Vector3.UP * 0.6, PINE_LEAF, true)
+		for spoke in range(12):
+			var next: int = (spoke + 1) % 12
+			_facet(tool, origin + Vector3.UP * height, rings[0][spoke], rings[0][next], origin, PINE_LEAF_LIGHT, true)
+			_facet(tool, origin, rings[3][next], rings[3][spoke], origin + Vector3.UP, PINE_LEAF, false)
+		var hull := ConvexPolygonShape3D.new()
+		hull.points = all_points
+		_pine_hulls.append(hull)
+	_pine_model = tool.commit()
+	return _pine_model
 
 
 static func _oak_mesh() -> ArrayMesh:
+	if _oak_model != null:
+		return _oak_model
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_append(tool, _cylinder(0.26, 0.36, 3.2, 6), Transform3D(Basis.IDENTITY, Vector3(0, 1.6, 0)), OAK_TRUNK)
-	_append(tool, _sphere(2.4), Transform3D(Basis.IDENTITY, Vector3(0, 4.4, 0)), OAK_LEAF)
-	_append(tool, _sphere(1.8), Transform3D(Basis.IDENTITY, Vector3(1.5, 3.8, 0.6)), OAK_LEAF_LIGHT)
-	_append(tool, _sphere(1.7), Transform3D(Basis.IDENTITY, Vector3(-1.3, 4.0, -0.7)), OAK_LEAF.lerp(OAK_LEAF_LIGHT, 0.5))
-	return tool.commit()
+	# Winter broadleaf: bent wood and forked branches instead of three spheres.
+	_branch(tool, Vector3.ZERO, Vector3(0.16, 1.8, 0.1), 0.38, 0.28)
+	_branch(tool, Vector3(0.16, 1.8, 0.1), Vector3(-0.25, 3.5, 0.0), 0.28, 0.18)
+	_branch(tool, Vector3(-0.25, 3.5, 0.0), Vector3(0.3, 5.5, 0.2), 0.18, 0.035)
+	for i in range(5):
+		var angle: float = float(i) * 2.39996
+		var start := Vector3(0, 1.7 + float(i) * 0.45, 0)
+		var joint: Vector3 = start + Vector3(cos(angle) * 1.15, 0.45, sin(angle) * 1.15)
+		var tip: Vector3 = joint + Vector3(cos(angle + 0.3) * 0.95, 1.2, sin(angle + 0.3) * 0.95)
+		_branch(tool, start, joint, 0.15 - float(i) * 0.015, 0.09)
+		_branch(tool, joint, tip, 0.09, 0.025)
+		_branch(tool, joint, joint + Vector3(cos(angle - 0.7) * 0.8, 0.7, sin(angle - 0.7) * 0.8), 0.065, 0.015)
+	_oak_model = tool.commit()
+	return _oak_model
+
+
+static func _branch(tool: SurfaceTool, a: Vector3, b: Vector3, bottom: float, top: float) -> void:
+	var delta: Vector3 = b - a
+	var frame := Transform3D(Basis(Quaternion(Vector3.UP, delta.normalized())), (a + b) * 0.5)
+	var branch_mesh: CylinderMesh = _cylinder(top, bottom, delta.length(), 6)
+	_append(tool, branch_mesh, frame, OAK_TRUNK)
+	_oak_parts.append([branch_mesh.create_convex_shape(true, false), frame])
 
 
 static func _rock_mesh() -> ArrayMesh:
+	if _rock_model != null:
+		return _rock_model
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var sphere := SphereMesh.new()
 	sphere.radius = 1.0
 	sphere.height = 2.0
-	sphere.radial_segments = 7
-	sphere.rings = 4
-	_append(tool, sphere, Transform3D.IDENTITY, ROCK)
-	return tool.commit()
+	sphere.radial_segments = 9
+	sphere.rings = 5
+	var arrays: Array = sphere.get_mesh_arrays()
+	var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	for i in range(points.size()):
+		var v: Vector3 = points[i]
+		var chip: float = 1.0 + sin(v.dot(Vector3(5.3, 7.1, 3.7))) * 0.14 + sin(v.dot(Vector3(13.1, 4.7, 9.3))) * 0.07
+		v *= chip
+		v.y = minf(v.y, 0.67 + sin(v.x * 4.0) * 0.12)
+		v.x += v.y * 0.19
+		points[i] = v
+	for i in range(0, indices.size(), 3):
+		_facet(tool, points[indices[i]], points[indices[i + 1]], points[indices[i + 2]], Vector3.ZERO, ROCK, true)
+	_rock_model = tool.commit()
+	_rock_hull = _rock_model.create_convex_shape(true, false)
+	return _rock_model
+
+
+## Broad painted facets rather than smooth primitive shading. Snow rests on upper planes.
+static func _facet(tool: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, centre: Vector3, color: Color, snowy: bool) -> void:
+	var normal: Vector3 = (b - a).cross(c - a)
+	if normal.length_squared() < 0.000001:
+		return
+	normal = normal.normalized()
+	if normal.dot((a + b + c) / 3.0 - centre) < 0.0:
+		var swap: Vector3 = b
+		b = c
+		c = swap
+		normal = -normal
+	var brush: float = 0.5 + sin((a.x + c.z) * 4.7 + b.y * 2.1) * 0.5
+	var painted: Color = color * (0.85 + brush * 0.25)
+	if snowy:
+		painted = painted.lerp(Color("d8e7ee"), smoothstep(0.35, 0.8, normal.y + brush * 0.1))
+	tool.set_color(painted)
+	tool.set_normal(normal)
+	tool.add_vertex(a)
+	tool.add_vertex(c)
+	tool.add_vertex(b)
 
 
 static func _cylinder(top: float, bottom: float, height: float, sides: int) -> CylinderMesh:
@@ -190,7 +288,7 @@ static func _add_multimesh(level: Node3D, title: String, mesh: ArrayMesh, placem
 	var view := MultiMeshInstance3D.new()
 	view.name = title
 	view.multimesh = multi
-	view.material_override = _vertex_material()
+	view.material_override = Alpine.surface_material(Color("dce9ef"), true) if title == "Rocks" else _vertex_material()
 	level.add_child(view)
 
 
@@ -205,34 +303,17 @@ static func _vertex_material() -> StandardMaterial3D:
 # --- Colliders: what looks solid is solid ---------------------------------------------------------
 
 static func _pine_colliders(body: StaticBody3D, placement: Transform3D) -> void:
-	var s: float = placement.basis.get_scale().x
 	var trunk := CylinderShape3D.new()
-	trunk.radius = 0.28 * s
-	trunk.height = 2.0 * s
-	_shape(body, trunk, Transform3D(Basis.IDENTITY, placement.origin + Vector3.UP * s))
-	# The three foliage tiers as one hull: from the widest ring up to the tip.
-	var points := PackedVector3Array()
-	for k in range(8):
-		var a: float = float(k) * TAU / 8.0
-		points.append(Vector3(cos(a) * 2.2, 1.5, sin(a) * 2.2) * s)
-	points.append(Vector3(0.0, 7.0, 0.0) * s)
-	var crown := ConvexPolygonShape3D.new()
-	crown.points = points
-	_shape(body, crown, Transform3D(Basis.IDENTITY, placement.origin))
+	trunk.radius = 0.3
+	trunk.height = 2.5
+	_shape(body, trunk, placement * Transform3D(Basis.IDENTITY, Vector3.UP * 1.25))
+	for hull: Shape3D in _pine_hulls:
+		_shape(body, hull, placement)
 
 
 static func _oak_colliders(body: StaticBody3D, placement: Transform3D) -> void:
-	var s: float = placement.basis.get_scale().x
-	var trunk := CylinderShape3D.new()
-	trunk.radius = 0.32 * s
-	trunk.height = 3.2 * s
-	_shape(body, trunk, Transform3D(Basis.IDENTITY, placement.origin + Vector3.UP * 1.6 * s))
-	var spots: Array[Vector4] = [Vector4(0, 4.4, 0, 2.4), Vector4(1.5, 3.8, 0.6, 1.8), Vector4(-1.3, 4.0, -0.7, 1.7)]
-	for spot: Vector4 in spots:
-		var ball := SphereShape3D.new()
-		ball.radius = spot.w * s
-		var offset: Vector3 = placement.basis * Vector3(spot.x, spot.y, spot.z)
-		_shape(body, ball, Transform3D(Basis.IDENTITY, placement.origin + offset))
+	for part: Array in _oak_parts:
+		_shape(body, part[0], placement * (part[1] as Transform3D))
 
 
 static func _shape(body: StaticBody3D, shape: Shape3D, placement: Transform3D) -> void:

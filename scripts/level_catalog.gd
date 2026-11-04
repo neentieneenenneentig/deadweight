@@ -5,10 +5,10 @@ extends RefCounted
 ## Usage: const Catalog = preload("res://scripts/level_catalog.gd"); Catalog.create("l01")
 
 const ZONES := {
-	"floodworks": {"title": "FLOODWORKS", "accent": Color("5ad6c8")},
-	"foundry": {"title": "FOUNDRY", "accent": Color("f08a3c")},
+	"floodworks": {"title": "FLOODWORKS", "accent": Color("8cbdd2")},
+	"foundry": {"title": "FOUNDRY", "accent": Color("d353c9")},
 	"spillway": {"title": "SPILLWAY", "accent": Color("8fbccb")},
-	"highlands": {"title": "HIGHLANDS", "accent": Color("9ccf5a")},
+	"highlands": {"title": "HIGHLANDS", "accent": Color("accdda")},
 }
 
 ## Campaign order, then the practice range. "practice" is known here too so the profile can tell

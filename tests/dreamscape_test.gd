@@ -9,7 +9,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var player := Node3D.new()
 	root.add_child(player)
-	var level: Node3D = Catalog.create("l01")
+	var level: Node3D = Catalog.create("l04")
 	root.add_child(level)
 	level.call("build", player, true)
 	var dream: Node3D = level.get_node("DreamAtmosphere")
@@ -27,7 +27,7 @@ func _run() -> void:
 	paused = false
 	await _frames(10)
 	_check(not is_equal_approx(held, pendulum.rotation.z), "animation resumes after pause")
-	var second: Node3D = Catalog.create("range")
+	var second: Node3D = Catalog.create("l05")
 	root.add_child(second)
 	second.call("build", player, true)
 	var other_water: ShaderMaterial = (second.get("_materials") as Dictionary)["water"]

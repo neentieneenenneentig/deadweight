@@ -6,7 +6,7 @@ extends Node3D
 ## navmesh leaves out. Only the thin orbit ring and the paper forms are visual. No floating text.
 ## Animation inherits scene-tree pause.
 const PORCELAIN = preload("res://assets/dreamscape/porcelain.png")
-const SKY = preload("res://assets/dreamscape/afternoon_sky.png")
+const SKY = preload("res://assets/dreamscape/nightmare_sky.png")
 const PORTRAIT = preload("res://assets/dreamscape/vacant_chair.png")
 const FLOOR = preload("res://shaders/dream_floor.gdshader")
 const WATER = preload("res://shaders/dream_water.gdshader")
@@ -31,7 +31,7 @@ static func floor_material(color: Color) -> ShaderMaterial:
 	material.shader = FLOOR
 	material.set_shader_parameter("porcelain", PORCELAIN)
 	material.set_shader_parameter("chalk", color)
-	material.set_shader_parameter("ink", Color("526264"))
+	material.set_shader_parameter("ink", Color("240b42"))
 	return material
 
 func dress(level: Node3D) -> void:
@@ -121,7 +121,7 @@ func _make_papers(bounds: AABB) -> void:
 	view.name = "UnfiledForms"
 	view.multimesh = _papers
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color("eee0c5")
+	material.albedo_color = Color("5cffd7")
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.roughness = 1.0
 	view.material_override = material
@@ -263,6 +263,7 @@ func _portrait(at: Vector3, size: float, yaw: float) -> void:
 	view.transform = frame
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = PORTRAIT
+	material.albedo_color = Color("e54aff")
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	view.material_override = material

@@ -43,7 +43,7 @@ const RESTART_LOADING_SECONDS: float = 0.15
 const SAVE_DELAY_SECONDS: float = 0.6
 const BASE_LOOK_SENSITIVITY: float = 0.0024
 const DAMAGE_SCALE := [0.5, 1.0, 1.5]
-const TITLE_LEVEL := "l01"
+const TITLE_LEVEL := "valley"
 const DEFAULT_CAPTURE_FRAMES: int = 90
 ## Right stick turn rate in rad/s at full deflection and gamepad_sensitivity 1.0 (G8).
 const STICK_LOOK_SPEED: float = 3.0
@@ -1164,8 +1164,8 @@ func _follow_menu_state() -> void:
 
 func _place_attract() -> void:
 	var t: float = _attract_time
-	_attract.global_position = Vector3(4.0 + sin(t * 0.11) * 5.0, 4.5 + sin(t * 0.07) * 0.8, 2.0 - (1.0 - cos(t * 0.05)) * 9.0)
-	_attract.look_at(Vector3(6.0 + sin(t * 0.09) * 6.0, 3.0, -60.0), Vector3.UP)
+	_attract.global_position = level.spawn_position + Vector3(12.0 + sin(t * 0.04) * 8.0, 12.0 + sin(t * 0.03), 18.0)
+	_attract.look_at(level.spawn_position + Vector3(-60.0, 25.0, -170.0), Vector3.UP)
 
 
 # --- Input map ---------------------------------------------------------------------------------

@@ -4,25 +4,25 @@ extends RefCounted
 ## Every font is the engine's built-in fallback font (Open Sans SemiBold) shaped with
 ## FontVariation: heavier weight, wide tracking and horizontal stretch for display text.
 
-# Palette (CONTRACT section 8). Red = danger, cyan = information, amber = primary/salvage.
-const INK := Color("211c2d")
-const PANEL := Color(0.10, 0.08, 0.14, 0.93)
-const PAPER := Color("f2e6cf")
-const MUTED := Color("b6b2ba")
-const AMBER := Color("e8bd80")
-const CYAN := Color("a3d5ca")
-const RED := Color("ed7263")
+# Palette (CONTRACT section 8). Red = danger, cyan = information, brass = primary/salvage.
+const INK := Color("101e2a")
+const PANEL := Color(0.035, 0.065, 0.095, 0.93)
+const PAPER := Color("e1edf2")
+const MUTED := Color("a8bdca")
+const AMBER := Color("dcc28a")
+const CYAN := Color("8fd6e3")
+const RED := Color("ed716b")
 # Derived tones.
-const AMBER_BRIGHT := Color("ffd391")
-const AMBER_DEEP := Color("cf8d3e")
-const CYAN_DEEP := Color("2f8f8c")
-const DIM := Color("5f7576")
-const FAINT := Color(0.58, 0.67, 0.66, 0.35)
-const LINE := Color(0.404, 0.835, 0.824, 0.16)
-const LINE_STRONG := Color(0.404, 0.835, 0.824, 0.32)
-const PANEL_SOFT := Color(0.10, 0.08, 0.14, 0.76)
-const PANEL_RAISED := Color(0.18, 0.14, 0.22, 0.94)
-const SHADE := Color(0.06, 0.035, 0.08, 0.48)
+const AMBER_BRIGHT := Color("f4dfb3")
+const AMBER_DEEP := Color("a88b52")
+const CYAN_DEEP := Color("437f99")
+const DIM := Color("617d90")
+const FAINT := Color(0.45, 0.59, 0.68, 0.35)
+const LINE := Color(0.49, 0.75, 0.85, 0.16)
+const LINE_STRONG := Color(0.49, 0.75, 0.85, 0.32)
+const PANEL_SOFT := Color(0.035, 0.065, 0.095, 0.76)
+const PANEL_RAISED := Color(0.065, 0.11, 0.15, 0.94)
+const SHADE := Color(0.02, 0.04, 0.07, 0.48)
 # Medal colours: index = medal value (0 none, 1 bronze, 2 silver, 3 gold).
 const MEDAL_COLORS := [Color("51656a"), Color("c98552"), Color("c4d1d3"), Color("f2c14e")]
 const MEDAL_NAMES := ["NO MEDAL", "BRONZE", "SILVER", "GOLD"]

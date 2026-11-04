@@ -75,11 +75,7 @@ func _build_ground() -> void:
 	var view := MeshInstance3D.new()
 	view.name = "Terrain"
 	view.mesh = land.build_mesh()
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.vertex_color_is_srgb = true
-	material.roughness = 0.95
-	view.material_override = material
+	view.material_override = Alpine.surface_material(Color("dce9ef"), true)
 	add_child(view)
 	var shape := ConcavePolygonShape3D.new()
 	shape.set_faces(land.collision_faces())

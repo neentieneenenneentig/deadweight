@@ -112,7 +112,7 @@ func _test_framework() -> void:
 				triangles += (node.mesh as Mesh).get_faces().size() / 3
 		elif node is Label3D:
 			labels += 1
-		elif node is StaticBody3D and node.name != "Scenery" and node.name != "PendulumBall":
+		elif node is StaticBody3D and node.name not in ["Scenery", "PendulumBall", "AlpineRidgesBody"]:
 			bodies += 1   # the scenery bodies (S1) are separate on purpose: the navmesh bake skips them
 		elif node is CollisionShape3D:
 			shapes += 1
@@ -122,6 +122,10 @@ func _test_framework() -> void:
 	_check(triangles <= 250000, "level stays inside the triangle budget")
 	_check(labels <= 60, "level stays inside the Label3D budget")
 	_check(bodies == 1 and shapes > 100, "all solid primitives share one static body")
+	var ridges: MeshInstance3D = _world.get_node("AlpineRidges")
+	var ridge_body: StaticBody3D = _world.get_node("AlpineRidgesBody")
+	var ridge_shape: ConcavePolygonShape3D = (ridge_body.get_child(0) as CollisionShape3D).shape
+	_check(ridge_shape.get_faces() == ridges.mesh.get_faces() and ridge_body in _world.get("nav_skip_bodies"), "mountains have an exact solid surface outside the route navmesh")
 	_check(int(_world.get("_pending_count")) > 300, "the prototype's primitives were staged before merging")
 	for quality in [0, 1, 2, 5]:
 		_world.call("apply_quality", quality)
@@ -301,10 +305,16 @@ func _test_features() -> void:
 	var space: PhysicsDirectSpaceState3D = _range.get_world_3d().direct_space_state
 	var mid_z: float = RangeScript.FLOOR_CENTER.z
 	var edge_x: float = RangeScript.FLOOR_SIZE.x * 0.5
-	var side_hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(0.0, 200.0, mid_z), Vector3(edge_x + 50.0, 200.0, mid_z), 1))
+	# The earlier Sluice Gate fixture shares this physics space. Its mountain scenery
+	# must not masquerade as a wall in the independently built practice range.
+	var excluded: Array[RID] = []
+	for body: Node in _world.find_children("*", "CollisionObject3D", true, false):
+		excluded.append((body as CollisionObject3D).get_rid())
+	var side_query := PhysicsRayQueryParameters3D.create(Vector3(0.0, 200.0, mid_z), Vector3(edge_x + 50.0, 200.0, mid_z), 1, excluded)
+	var side_hit: Dictionary = space.intersect_ray(side_query)
 	_check(side_hit.is_empty(), "no invisible wall stands above the range's visible wall")
 	var outside := Vector3(edge_x + 40.0, 0.0, mid_z)
-	var plain_hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(outside + Vector3.UP * 20.0, outside + Vector3.DOWN * 20.0, 1))
+	var plain_hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(outside + Vector3.UP * 20.0, outside + Vector3.DOWN * 20.0, 1, excluded))
 	_check(not plain_hit.is_empty() and absf(float(plain_hit["position"].y)) < 0.05, "solid ground goes on past the walls, flush with the floor")
 	var down_hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(0.0, -2.0, mid_z), Vector3(0.0, -60.0, mid_z), 1))
 	_check(not down_hit.is_empty() and float(down_hit["position"].y) < float(_range.get("kill_y")), "bedrock lies below kill_y under the floor")
@@ -570,11 +580,12 @@ func _test_dummies() -> void:
 
 	# A sidearm hit flashes the body pale cyan, and the flash fades within a third of a second.
 	var body: StandardMaterial3D = first.get("_body_material") as StandardMaterial3D
+	var resting_color: Color = body.albedo_color
 	var hit: bool = _shoot_dummy(range_level, first, 10.0)
 	await _frames(2)
-	_check(hit and body.albedo_color != Color("e8ddc7"), "a dummy flashes when a sidearm shot hits it")
+	_check(hit and body.albedo_color != resting_color, "a dummy flashes when a sidearm shot hits it")
 	await _frames(30)
-	_check(body.albedo_color == Color("e8ddc7"), "the dummy's hit flash fades back to porcelain")
+	_check(body.albedo_color == resting_color, "the dummy's hit flash fades back to porcelain")
 
 	# A lethal shot fires died once and the level relays it. The dummy stays down for the refill time.
 	_deaths = 0
