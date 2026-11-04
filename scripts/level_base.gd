@@ -102,6 +102,19 @@ const ZONES := {
 			"cyan": "5ad6c8", "amber": "ffb347", "red": "ff5a40", "orange": "ff7a1a", "white": "e8e0d0",
 		},
 	},
+	# W1: open highland valley. "natural" materials are plain and painterly, without the porcelain patina.
+	"highlands": {
+		"natural": true,
+		"sky_top": "6f9fd0", "sky_horizon": "e8e4cf", "ground_bottom": "5d7a45", "ground_horizon": "b9cf9a",
+		"ambient": "c9d8e6", "ambient_energy": 0.38, "fog": "c4d6e4", "fog_density": 0.0008,
+		"sun": "fff1d6", "sun_energy": 1.25, "sun_rotation": Vector3(-38, -35, 0),
+		"colors": {
+			"concrete": "c9c2ad", "light_concrete": "e6e0cc", "dark": "4c4038", "rust": "8b5d3c",
+			"metal": "8f9a9c", "yellow": "e8bf4a", "stripe": "4c4038", "glass": "c2e4ef", "water": "4f9bb0",
+			"cyan": "5ad6c8", "amber": "ffc46b", "red": "ef654e", "orange": "f08a3c", "white": "f3f5f8",
+			"grass": "7fb24a", "snow": "eef2f6", "fur": "a3714a", "fur_dark": "6e4a30",
+		},
+	},
 	"spillway": {
 		"sky_top": "5f8fb8", "sky_horizon": "dce6ea", "ground_bottom": "9db0b6", "ground_horizon": "cfdadb",
 		"ambient": "c8d9da", "ambient_energy": 0.55, "fog": "c7d6ce", "fog_density": 0.0017,
@@ -170,9 +183,23 @@ var _footprint: Rect2                                # all ground() slabs merged
 ## props. Everything that looks solid is solid, but these stay out of the navmesh (bake_navigation).
 var _scenery_body: StaticBody3D
 var _scenery_extra: Array[CollisionObject3D] = []    # moving scenery bodies (the pendulum), also kept out of the navmesh
+var _extra_bodies: Array[StaticBody3D] = []          # add_world_body() bodies, freed on rebuild
+## Set in _design. NAN puts the outer plain at the lowest ground slab; a terrain level sets its border height.
+var outer_top: float = NAN
+var outer_material: String = "concrete"
+## False skips the Department dreamscape props (open-world levels have their own scenery).
+var dreamscape: bool = true
 ## Navmesh cell size in metres. A level with a very large floor may raise it to keep the bake fast;
 ## the map follows it, so the server never sees a mismatch.
 var nav_cell_size: float = NAV_CELL_SIZE
+## Open-world levels bake only this box (empty = everything): the slopes beyond it are mountains.
+var nav_bounds: AABB = AABB()
+## Open-world levels can swap heavy colliders for cheap stand-ins in the bake: the bodies here are
+## left out of the parse, nav_extra_faces (a triangle soup) is baked instead, and every nav_posts
+## entry (x, ground y, z; w = radius) carves a round obstruction such as a tree trunk.
+var nav_skip_bodies: Array[CollisionObject3D] = []
+var nav_extra_faces: PackedVector3Array = PackedVector3Array()
+var nav_posts: Array[Vector4] = []
 var _nav_region: NavigationRegion3D                  # holds the level's navmesh; child of the level
 var _pending_nav_mesh: NavigationMesh                # threaded bake in flight, applied when it ends
 
@@ -220,9 +247,16 @@ func _reset_build_state() -> void:
 	_ground_rects.clear()
 	_ground_low = INF
 	_footprint = Rect2()
+	outer_top = NAN
+	outer_material = "concrete"
+	dreamscape = true
 	if is_instance_valid(_scenery_body):
 		_scenery_body.free()
 	_scenery_extra.clear()
+	for body: StaticBody3D in _extra_bodies:
+		if is_instance_valid(body):
+			body.free()
+	_extra_bodies.clear()
 	_light_count = 0
 	_label_count = 0
 	_has_extraction = false
@@ -603,6 +637,7 @@ func bake_navigation(synchronous: bool = true) -> void:
 	# Scenery bodies leave layer 1 for the parse only. The outer plain and the props would widen the
 	# baked volume and shift the voxel grid, and that can break narrow joins such as ramp tops.
 	var scenery: Array[CollisionObject3D] = _scenery_extra.duplicate()
+	scenery.append_array(nav_skip_bodies)
 	if is_instance_valid(_scenery_body):
 		scenery.append(_scenery_body)
 	for body: CollisionObject3D in scenery:
@@ -612,6 +647,14 @@ func bake_navigation(synchronous: bool = true) -> void:
 	for body: CollisionObject3D in scenery:
 		if is_instance_valid(body):
 			body.collision_layer = LAYER_WORLD
+	if not nav_extra_faces.is_empty():
+		geometry.add_faces(nav_extra_faces, Transform3D.IDENTITY)
+	for post: Vector4 in nav_posts:
+		var ring := PackedVector3Array()
+		for k in range(6):
+			var angle: float = float(k) * TAU / 6.0
+			ring.append(Vector3(post.x + cos(angle) * post.w, 0.0, post.z + sin(angle) * post.w))
+		geometry.add_projected_obstruction(ring, post.y - 1.0, 6.0, true)
 	# Both bake paths read this geometry, so the hazard carve applies to sync and threaded bakes alike.
 	_add_hazard_obstructions(geometry)
 	if synchronous:
@@ -660,6 +703,8 @@ func _new_navigation_mesh() -> NavigationMesh:
 	mesh.agent_height = NAV_AGENT_HEIGHT
 	mesh.agent_max_climb = NAV_MAX_CLIMB
 	mesh.agent_max_slope = NAV_MAX_SLOPE
+	if nav_bounds.has_volume():
+		mesh.filter_baking_aabb = nav_bounds
 	return mesh
 
 
@@ -1090,10 +1135,11 @@ static func _basis_with_up(up: Vector3) -> Basis:
 # --- Build internals ----------------------------------------------------------------------------
 
 func _finish_build() -> void:
-	var dream := Dreamscape.new()
-	dream.name = "DreamAtmosphere"
-	add_child(dream)
-	dream.dress(self)
+	if dreamscape:
+		var dream := Dreamscape.new()
+		dream.name = "DreamAtmosphere"
+		add_child(dream)
+		dream.dress(self)
 	_build_outer_world()
 	_pending_count = _pending.size()
 	_merge_statics()
@@ -1114,7 +1160,8 @@ func _build_outer_world() -> void:
 		_footprint = _footprint.merge(rect)
 	var area: Rect2 = _footprint
 	var reach: float = OUTER_REACH
-	var y: float = _ground_low - OUTER_THICKNESS * 0.5
+	var top: float = _ground_low if is_nan(outer_top) else outer_top
+	var y: float = top - OUTER_THICKNESS * 0.5
 	var wide: float = area.size.x + reach * 2.0
 	# North and south run the full width, so they cover the corners; west and east fill between them.
 	var slabs: Array[Array] = [
@@ -1124,10 +1171,44 @@ func _build_outer_world() -> void:
 		[Vector3(area.end.x + reach * 0.5, y, area.get_center().y), Vector3(reach, OUTER_THICKNESS, area.size.y)],
 	]
 	for slab: Array in slabs:
-		scenery_box(Transform3D(Basis.IDENTITY, slab[0]), slab[1], "concrete")
+		scenery_box(Transform3D(Basis.IDENTITY, slab[0]), slab[1], outer_material)
 	var bedrock_top: float = kill_y - BEDROCK_BELOW_KILL
 	var center: Vector2 = area.get_center()
 	scenery_box(Transform3D(Basis.IDENTITY, Vector3(center.x, bedrock_top - 1.0, center.y)), Vector3(area.size.x, 2.0, area.size.y), "dark")
+
+
+## For levels without ground() slabs (terrain): declares the playable x/z area and its lowest floor.
+func set_footprint(area: Rect2, lowest: float) -> void:
+	_ground_rects.append(area)
+	_ground_low = minf(_ground_low, lowest)
+
+
+## A solid collider on the level's main body: it stops the player and the line, and the navmesh
+## bakes it. For terrain, trees and rocks, whose meshes the level draws itself.
+func add_world_collider(shape: Shape3D, placement: Transform3D) -> void:
+	_add_collider(shape, placement)
+
+
+## A big shape (a terrain mesh) on a body of its own: Jolt cannot fit a mesh of that many triangles
+## into a compound with thousands of other shapes. Same layer as the main body, and baked the same.
+func add_world_body(shape: Shape3D, placement: Transform3D, title: String) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.name = title
+	var collision := CollisionShape3D.new()
+	collision.shape = shape
+	collision.transform = placement
+	body.add_child(collision)
+	adopt_world_body(body)
+	return body
+
+
+## Adds a body that was filled with shapes before it entered the tree (much faster for thousands
+## of shapes: Jolt rebuilds a body's compound shape each time one is added in the tree).
+func adopt_world_body(body: StaticBody3D) -> void:
+	body.collision_layer = LAYER_WORLD
+	body.collision_mask = 0
+	add_child(body)
+	_extra_bodies.append(body)
 
 
 ## True when position is over the ground() footprint (or within BOUNDS_MARGIN of it). A bare arena
@@ -1347,11 +1428,38 @@ static func _zone_materials(zone_name: String) -> Dictionary:
 	if _material_cache.has(zone_name):
 		return _material_cache[zone_name]
 	var colors: Dictionary = ZONES[zone_name]["colors"]
+	var natural: bool = bool(ZONES[zone_name].get("natural", false))
 	var result: Dictionary = {}
 	for key: String in colors:
-		result[key] = _make_material(key, Color(str(colors[key])))
+		result[key] = _make_natural_material(key, Color(str(colors[key]))) if natural else _make_material(key, Color(str(colors[key])))
 	_material_cache[zone_name] = result
 	return result
+
+
+## Plain painterly materials for natural zones (W1): no porcelain patina, soft and matte.
+static func _make_natural_material(key: String, color: Color) -> Material:
+	if key == "water":
+		var water := StandardMaterial3D.new()
+		water.albedo_color = Color(color, 0.82)
+		water.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		water.roughness = 0.06
+		water.metallic = 0.15
+		return water
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = 0.9
+	if GLOW_KEYS.has(key):
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.emission_enabled = true
+		material.emission = color
+	elif key == "glass":
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.albedo_color = Color(color, 0.45)
+		material.roughness = 0.1
+	elif key == "metal":
+		material.metallic = 0.3
+		material.roughness = 0.4
+	return material
 
 
 static func _make_material(key: String, color: Color) -> Material:

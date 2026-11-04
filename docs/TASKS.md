@@ -306,6 +306,41 @@ The rescale must also follow the owner's rules from the range: no floating or bi
 (the tutorial and l01, l02 and l06 still have billboard labels), and no non-solid prop that looks
 solid (the per-level teacups, bathtub and kiln chimneys are still visual only).
 
+### W — v2 direction: the open highlands (owner, 2026-11-04)
+**Why:** owner playtest: "the current world feels like alpha level", the ground is safe so running
+and shooting beats the rod ("game is boring"), and the absurdism is tame. Owner asks for a green
+palette, trees and nature, one big open world in a stylised fantasy look (a forest start zone, or a
+snowy mountain valley with patches of green), the floor-is-lava feeling, and absurd objectives
+("a capybara in a hot tub is the princess you save"). The look must be our own: stylised low-poly
+fantasy, not a copy of any existing game's zones, art or names.
+Owner picks for "floor is lava": cracking floor, rising flood, landmines, rolling boulders. For
+combat: hounds outrun the player on foot, speed kills, air-time score multiplier. (Not picked: a
+gun that is only accurate in the air.)
+
+**W1 — Open-world tech preview (done, lead, 2026-11-04).** `scripts/world/terrain.gd` (seeded
+height field: meadows, lakes, forest patches, a ring of snowy ridged mountains; mesh, exact
+collider and a coarse navmesh stand-in), `scripts/world/nature.gd` (pines, broad trees, rocks as
+MultiMeshes with solid trunk, crown and boulder colliders; grass and flowers), zone "highlands"
+(plain painterly materials), and the practice level `valley` (1.4 km, Princess Capybara's hot tub,
+a house-sized rubber duck in the west lake). `tools/run.ps1 -Level valley` starts it.
+Bake 0.8 s, build 0.9 s on desktop. Not yet measured on a phone.
+
+**W2 — The floor is lava.** All four, as level-base builders:
+- cracking ground: plates that crack under the player and break after about 1.5 s (thin ice on the
+  lakes, porcelain paving on ruins), regrowing later; hard landings crack wider;
+- rising water: a flood that climbs during a run, with the exit high up;
+- landmines: teacup mines with a beep-and-flash tell, set off by the player or by the weight;
+- rolling boulders: giant marbles released down slopes and channels by triggers.
+**W3 — Air beats ground.** Hounds faster than the run speed; speed kills (weight or body at speed
+kills, air kills drop ammo and health); an air-time score multiplier on the HUD and result screen.
+**W4 — Absurd objectives.** Quests replace "salvage cases": the princess's duck, then her towel,
+then the hot tub is getting cold (bring firewood from the peaks), and so on. Every absurd image is
+part of an objective, never a floating picture.
+**W5 — The world plan (owner decision).** One big world split into quest regions, with the
+campaign levels becoming quests that start in different places, or separate open levels. Lead
+recommends one world with quest starts: menus, saves and pars keep working.
+**W6 — Open world on phones.** Chunked terrain, visibility ranges on trees and grass, shadow
+distance, and a draw-call and triangle budget for Q1.
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
 department, and added three AI-generated textures. The store text, press kit, rating answers and

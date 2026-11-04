@@ -597,3 +597,16 @@ Template:
   gantry beam, slalom and updraft boards) and distance numbers painted on the floor.
 - Tests: world (no wall above the visible one, the outer plain, in-bounds, no billboard text, the
   bite tell and stand-off), dreamscape (solid props, no notices). Gate: PASSED.
+## 2026-11-04: W1 open-world tech preview (the highlands)
+- Model: Claude Opus 5.5 (lead). Owner set the v2 direction (TASKS W): green open world, floor is
+  lava, absurd objectives.
+- New: scripts/world/terrain.gd, scripts/world/nature.gd, scripts/levels/valley.gd (catalog id
+  "valley", practice). Zone "highlands" in level_base with natural materials.
+- scripts/level_base.gd: `set_footprint()`, `add_world_collider()`, `add_world_body()` and
+  `adopt_world_body()` (a terrain mesh shape needs its own Jolt body; thousands of tree shapes are
+  added before the body enters the tree), `outer_top` and `outer_material` for the plain,
+  `dreamscape` to skip the Department props, and navmesh stand-ins (`nav_bounds`,
+  `nav_skip_bodies`, `nav_extra_faces`, `nav_posts`). Valley bake 0.8 s (3.8 s parsing the full
+  mesh), build 0.9 s (5.6 s before the prebuilt body and the bounded flatten loops).
+- tools/run.ps1: `-Level <id>`. world_test: the catalog now lists twelve levels.
+- Gate: PASSED.

@@ -8,6 +8,7 @@ const ZONES := {
 	"floodworks": {"title": "FLOODWORKS", "accent": Color("5ad6c8")},
 	"foundry": {"title": "FOUNDRY", "accent": Color("f08a3c")},
 	"spillway": {"title": "SPILLWAY", "accent": Color("8fbccb")},
+	"highlands": {"title": "HIGHLANDS", "accent": Color("9ccf5a")},
 }
 
 ## Campaign order, then the practice range. "practice" is known here too so the profile can tell
@@ -24,6 +25,7 @@ const LEVELS := [
 	{"id": "l08", "script": "res://scripts/levels/l08_damwall.gd"},
 	{"id": "l09", "script": "res://scripts/levels/l09_headwater.gd"},
 	{"id": "range", "script": "res://scripts/levels/range.gd", "practice": true},
+	{"id": "valley", "script": "res://scripts/levels/valley.gd", "practice": true},
 ]
 
 
