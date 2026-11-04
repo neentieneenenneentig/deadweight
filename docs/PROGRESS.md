@@ -654,3 +654,19 @@ Template:
 - h02: route 1202 m, pars 340/195, bake 437 ms, build 955 ms; Forward+ spawn 135 draw calls.
 - Gate: PASSED (12 suites).
 - Valley practice preview: a practice geyser on a warm patch west of the spawn, with a sign.
+## 2026-11-05: W6 tree and rock LOD, cheap tree shadows
+- Model: Claude Opus 5.5 (lead), owner away ("continue").
+- nature.gd: every Pines/Oaks/Rocks cell gets a far twin (`PinesFar_x_z` etc.: six-sided pine
+  tiers, 36 triangles instead of 328; three-sided oak limbs; a coarser chipped rock) that takes over
+  past LOD_RANGE 420 m from the cell centre, with 40 m hysteresis and no shadow. Near cells cast
+  no shadow themselves; a shadow-only caster (`PinesShadow_x_z`) draws the far shape into the
+  cascades. Nothing is culled, so everything solid is always drawn. Groves stay single, near-only.
+- level_base.apply_quality calls `Nature.apply_lod`: the switch is at 252 / 357 / 420 m on
+  Low / Medium / High.
+- Captures at 1280x720 (draw calls / triangles at the spawn, before -> after):
+  Forward+ h01 212 / 1.48 M -> 209 / 0.67 M; h02 135 / 1.44 M -> 132 / 0.65 M;
+  valley 101 / 0.65 M after. Compatibility h01 222 / 1.13 M -> 220 / 0.61 M. The spawn view looks
+  the same; overviews show the far pines reading as pines.
+- world_test: near/far/caster triplets per cell, the far pine is under a sixth of the triangles,
+  the switch is seamless and moves in with quality.
+- Gate: PASSED (12 suites).

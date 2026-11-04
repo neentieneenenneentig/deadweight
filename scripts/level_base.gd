@@ -785,6 +785,8 @@ func apply_quality(value: int) -> void:
 		_environment.glow_enabled = quality >= 2
 		_environment.ssao_enabled = quality >= 2 and RenderingServer.get_current_rendering_method() == "forward_plus"
 		_environment.fog_density = _fog_base * [1.25, 1.0, 1.0][quality]
+	# W6: trees and rocks switch to their far meshes sooner on lower quality.
+	load("res://scripts/world/nature.gd").call("apply_lod", self, quality)
 	if _snow != null:
 		_snow.emitting = quality >= 1
 		_snow.visible = quality >= 1

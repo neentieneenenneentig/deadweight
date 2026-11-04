@@ -370,6 +370,11 @@ solid pine groves between the compact works and their ridges, Pines/Oaks/Rocks M
 into 350 m cells and no terrain shadow pass (h01 spawn: 4.03 M → 1.48 M rendered triangles, 179 →
 212 draw calls on Forward+), title camera far plane 1500 m. Still open for W6: visibility ranges and
 a phone measurement (Q1).
+**W6a — Tree and rock LOD (done, lead, 2026-11-05).** Each nature cell swaps to a far mesh past
+420 m (357 m Medium, 252 m Low) and draws its shadows from that cheap shape: h01 spawn 1.48 M ->
+0.67 M triangles on Forward+, 1.13 M -> 0.61 M on Compatibility, draw calls unchanged. Still open
+for W6: a phone measurement (Q1); grass is one 52 k-triangle batch and could be chunked if the
+phone needs it.
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
 department, and added three AI-generated textures. The store text, press kit, rating answers and

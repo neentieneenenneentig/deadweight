@@ -13,6 +13,9 @@ static var _rock_model: ArrayMesh
 static var _rock_hull: Shape3D
 static var _oak_model: ArrayMesh
 static var _oak_parts: Array[Array] = []
+static var _pine_far: ArrayMesh
+static var _oak_far: ArrayMesh
+static var _rock_far: ArrayMesh
 
 const Terrain = preload("res://scripts/world/terrain.gd")
 
@@ -32,6 +35,13 @@ const ROCK_SPACING := 26.0
 const GRASS_RADIUS := 220.0          # tufts only grow this close to the centre of keep_clear[0]
 const GRASS_COUNT := 9000           # candidates; only those on thawed ground grow
 const CHUNK := 350.0                 # metres per MultiMesh cell, so culling and shadow cascades can skip cells
+## W6: a cell whose centre is further than this from the camera swaps to a far mesh with about a
+## tenth of the triangles and no shadow. Scaled by quality (level_base.apply_quality). The margin
+## is hysteresis, so a cell on the line does not flicker. Nothing is culled: every tree and rock
+## that is solid is always drawn, near or far.
+const LOD_RANGE := 420.0
+const LOD_MARGIN := 40.0
+const LOD_SCALE := [0.6, 0.85, 1.0]
 
 
 static func scatter(level: Node3D, land: Terrain, seed_value: int, keep_clear: Array[Vector3]) -> void:
@@ -91,9 +101,9 @@ static func scatter(level: Node3D, land: Terrain, seed_value: int, keep_clear: A
 			var h: float = land.height_at(landmark.x, landmark.z)
 			var frame := Basis.from_euler(Vector3(0.1, landmark.x * 0.2, -0.15)).scaled(Vector3.ONE * landmark.y)
 			rocks.append(Transform3D(frame, Vector3(landmark.x, h - landmark.y * 0.25, landmark.z)))
-	_add_multimesh(level, "Pines", _pine_mesh(), pines, rng, 0.12)
-	_add_multimesh(level, "Oaks", _oak_mesh(), oaks, rng, 0.14)
-	_add_multimesh(level, "Rocks", _rock_mesh(), rocks, rng, 0.08)
+	_add_multimesh(level, "Pines", _pine_mesh(), pines, rng, 0.12, CHUNK, _pine_far_mesh())
+	_add_multimesh(level, "Oaks", _oak_mesh(), oaks, rng, 0.14, CHUNK, _oak_far_mesh())
+	_add_multimesh(level, "Rocks", _rock_mesh(), rocks, rng, 0.08, CHUNK, _rock_far_mesh())
 	# Shapes go on a body outside the tree first, then the body joins the level in one step.
 	var body := StaticBody3D.new()
 	body.name = "Nature"
@@ -204,6 +214,54 @@ static func _pine_mesh() -> ArrayMesh:
 	return _pine_model
 
 
+## The far pine: the same three tiers as six-sided cones, no trunk (36 triangles, not 328).
+static func _pine_far_mesh() -> ArrayMesh:
+	if _pine_far != null:
+		return _pine_far
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for tier in range(3):
+		var radius: float = 2.3 - float(tier) * 0.62
+		var height: float = 2.7 - float(tier) * 0.25
+		var origin := Vector3(sin(float(tier) * 2.1) * 0.24, 1.45 + float(tier) * 1.65, cos(float(tier)) * 0.16)
+		var tip: Vector3 = origin + Vector3.UP * height
+		for spoke in range(6):
+			var a: float = float(spoke) * TAU / 6.0 + float(tier) * 0.47
+			var b: float = float(spoke + 1) * TAU / 6.0 + float(tier) * 0.47
+			var rim_a: Vector3 = origin + Vector3(cos(a) * radius * 0.95, height * 0.1, sin(a) * radius * 0.95)
+			var rim_b: Vector3 = origin + Vector3(cos(b) * radius * 0.95, height * 0.1, sin(b) * radius * 0.95)
+			_facet(tool, tip, rim_a, rim_b, origin, PINE_LEAF, true)
+			_facet(tool, origin, rim_b, rim_a, origin + Vector3.UP, PINE_LEAF, false)
+	_pine_far = tool.commit()
+	return _pine_far
+
+
+## The far broadleaf: the bent trunk and the five main limbs, three-sided, no twigs.
+static func _oak_far_mesh() -> ArrayMesh:
+	if _oak_far != null:
+		return _oak_far
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var limbs: Array[Array] = [
+		[Vector3.ZERO, Vector3(0.16, 1.8, 0.1), 0.38, 0.28],
+		[Vector3(0.16, 1.8, 0.1), Vector3(-0.25, 3.5, 0.0), 0.28, 0.18],
+		[Vector3(-0.25, 3.5, 0.0), Vector3(0.3, 5.5, 0.2), 0.18, 0.035],
+	]
+	for i in range(5):
+		var angle: float = float(i) * 2.39996
+		var start := Vector3(0, 1.7 + float(i) * 0.45, 0)
+		var joint: Vector3 = start + Vector3(cos(angle) * 1.15, 0.45, sin(angle) * 1.15)
+		var tip: Vector3 = joint + Vector3(cos(angle + 0.3) * 0.95, 1.2, sin(angle + 0.3) * 0.95)
+		limbs.append([start, tip, 0.15 - float(i) * 0.015, 0.025])
+	for limb: Array in limbs:
+		var a: Vector3 = limb[0]
+		var b: Vector3 = limb[1]
+		var frame := Transform3D(Basis(Quaternion(Vector3.UP, (b - a).normalized())), (a + b) * 0.5)
+		_append(tool, _cylinder(limb[3], limb[2], (b - a).length(), 3), frame, OAK_TRUNK)
+	_oak_far = tool.commit()
+	return _oak_far
+
+
 static func _oak_mesh() -> ArrayMesh:
 	if _oak_model != null:
 		return _oak_model
@@ -236,13 +294,26 @@ static func _branch(tool: SurfaceTool, a: Vector3, b: Vector3, bottom: float, to
 static func _rock_mesh() -> ArrayMesh:
 	if _rock_model != null:
 		return _rock_model
+	_rock_model = _chipped_rock(9, 5)
+	_rock_hull = _rock_model.create_convex_shape(true, false)
+	return _rock_model
+
+
+## The far rock: the same chipped boulder from a coarser sphere.
+static func _rock_far_mesh() -> ArrayMesh:
+	if _rock_far == null:
+		_rock_far = _chipped_rock(5, 2)
+	return _rock_far
+
+
+static func _chipped_rock(segments: int, rings: int) -> ArrayMesh:
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var sphere := SphereMesh.new()
 	sphere.radius = 1.0
 	sphere.height = 2.0
-	sphere.radial_segments = 9
-	sphere.rings = 5
+	sphere.radial_segments = segments
+	sphere.rings = rings
 	var arrays: Array = sphere.get_mesh_arrays()
 	var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
@@ -255,9 +326,7 @@ static func _rock_mesh() -> ArrayMesh:
 		points[i] = v
 	for i in range(0, indices.size(), 3):
 		_facet(tool, points[indices[i]], points[indices[i + 1]], points[indices[i + 2]], Vector3.ZERO, ROCK, true)
-	_rock_model = tool.commit()
-	_rock_hull = _rock_model.create_convex_shape(true, false)
-	return _rock_model
+	return tool.commit()
 
 
 ## Broad painted facets rather than smooth primitive shading. Snow rests on upper planes.
@@ -314,8 +383,8 @@ static func _append(tool: SurfaceTool, mesh: PrimitiveMesh, placement: Transform
 		tool.add_vertex(placement * vertices[index])
 
 
-static func _add_multimesh(level: Node3D, title: String, mesh: ArrayMesh, placements: Array[Transform3D], rng: RandomNumberGenerator, tint: float, chunk: float = CHUNK) -> void:
-	# chunk <= 0: a single MultiMesh.
+static func _add_multimesh(level: Node3D, title: String, mesh: ArrayMesh, placements: Array[Transform3D], rng: RandomNumberGenerator, tint: float, chunk: float = CHUNK, far: ArrayMesh = null) -> void:
+	# chunk <= 0: a single MultiMesh. far: a cheap mesh each cell swaps to past LOD_RANGE.
 	if placements.is_empty():
 		return
 	# One MultiMesh per CHUNK cell: a single valley-wide AABB would be drawn whole in the main
@@ -326,7 +395,7 @@ static func _add_multimesh(level: Node3D, title: String, mesh: ArrayMesh, placem
 		if not cells.has(key):
 			cells[key] = [] as Array[Transform3D]
 		(cells[key] as Array[Transform3D]).append(placement)
-	var material: Material = Alpine.surface_material(Color("dce9ef"), true) if title == "Rocks" else _vertex_material()
+	var material: Material = Alpine.surface_material(Color("dce9ef"), true) if title.begins_with("Rocks") else _vertex_material()
 	var keys: Array = cells.keys()
 	keys.sort()
 	for key: Vector2i in keys:
@@ -336,15 +405,68 @@ static func _add_multimesh(level: Node3D, title: String, mesh: ArrayMesh, placem
 		multi.use_colors = true
 		multi.mesh = mesh
 		multi.instance_count = group.size()
+		# The far twin gets the same transforms and tints, so the swap only changes the shape.
+		var far_multi: MultiMesh = null
+		if far != null:
+			far_multi = MultiMesh.new()
+			far_multi.transform_format = MultiMesh.TRANSFORM_3D
+			far_multi.use_colors = true
+			far_multi.mesh = far
+			far_multi.instance_count = group.size()
 		for i in range(group.size()):
-			multi.set_instance_transform(i, group[i])
 			var v: float = 1.0 + rng.randf_range(-tint, tint)
-			multi.set_instance_color(i, Color(v, v * rng.randf_range(0.97, 1.03), v * 0.98))
+			var tint_color := Color(v, v * rng.randf_range(0.97, 1.03), v * 0.98)
+			multi.set_instance_transform(i, group[i])
+			multi.set_instance_color(i, tint_color)
+			if far_multi != null:
+				far_multi.set_instance_transform(i, group[i])
+				far_multi.set_instance_color(i, tint_color)
 		var view := MultiMeshInstance3D.new()
 		view.name = title if key == keys[0] else "%s_%d_%d" % [title, key.x, key.y]
 		view.multimesh = multi
 		view.material_override = material
 		level.add_child(view)
+		if far_multi == null:
+			continue
+		var far_view := MultiMeshInstance3D.new()
+		far_view.name = "%sFar_%d_%d" % [title, key.x, key.y]
+		far_view.multimesh = far_multi
+		far_view.material_override = material
+		far_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		level.add_child(far_view)
+		# Near cells cast their shadows from the far shape: in every cascade it is the same cone
+		# silhouette for a ninth of the triangles. Shadow-only, so it is never seen itself.
+		view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var caster := MultiMeshInstance3D.new()
+		caster.name = "%sShadow_%d_%d" % [title, key.x, key.y]
+		caster.multimesh = far_multi
+		caster.material_override = material
+		caster.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+		level.add_child(caster)
+		for near: GeometryInstance3D in [view, caster]:
+			near.set_meta("lod", "near")
+			set_lod_range(near, LOD_RANGE)
+		far_view.set_meta("lod", "far")
+		set_lod_range(far_view, LOD_RANGE)
+
+
+## Moves every near/far switch under level to the range for a quality (0 Low, 1 Medium, 2 High).
+static func apply_lod(level: Node, quality: int) -> void:
+	var range_m: float = LOD_RANGE * float(LOD_SCALE[clampi(quality, 0, LOD_SCALE.size() - 1)])
+	for child: Node in level.get_children():
+		if child is GeometryInstance3D and child.has_meta("lod"):
+			set_lod_range(child as GeometryInstance3D, range_m)
+
+
+## Puts a near or far cell's switch at range metres (W6). Views without "lod" meta are left alone.
+static func set_lod_range(view: GeometryInstance3D, range_m: float) -> void:
+	match str(view.get_meta("lod", "")):
+		"near":
+			view.visibility_range_end = range_m
+			view.visibility_range_end_margin = LOD_MARGIN
+		"far":
+			view.visibility_range_begin = range_m
+			view.visibility_range_begin_margin = LOD_MARGIN
 
 
 static func _vertex_material() -> StandardMaterial3D:

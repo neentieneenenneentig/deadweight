@@ -70,6 +70,7 @@ func _run() -> void:
 	await _test_threat()
 	await _test_sentry_tracking()
 	_test_thaw()
+	_test_nature_lod()
 	_scene.queue_free()
 	await _frames(3)
 	print("WORLD TEST: %d checks, %d failures" % [_checks, _failures])
@@ -866,3 +867,48 @@ func _test_thaw() -> void:
 			elif snow:
 				snowy += 1
 	_check(thawed > 80 and snowy > thawed and both == 0, "the valley is mostly snow with thawed hollows (%d thawed, %d snow)" % [thawed, snowy])
+
+
+## W6: every tree and rock cell has a near view, a far view with a cheaper mesh, and a shadow-only
+## caster from the far mesh. The switch moves in with quality, and never leaves a gap.
+func _test_nature_lod() -> void:
+	var Nature: GDScript = load("res://scripts/world/nature.gd")
+	var holder := Node3D.new()
+	_scene.add_child(holder)
+	var rng := RandomNumberGenerator.new()
+	var placements: Array[Transform3D] = []
+	for i in range(12):
+		placements.append(Transform3D(Basis.IDENTITY, Vector3(float(i) * 70.0 - 400.0, 0.0, 10.0)))
+	var near_mesh: ArrayMesh = Nature.call("_pine_mesh")
+	var far_mesh: ArrayMesh = Nature.call("_pine_far_mesh")
+	Nature.call("_add_multimesh", holder, "Pines", near_mesh, placements, rng, 0.1, 350.0, far_mesh)
+	var near: Array[MultiMeshInstance3D] = []
+	var far: Array[MultiMeshInstance3D] = []
+	var casters: Array[MultiMeshInstance3D] = []
+	var instances: int = 0
+	for child: Node in holder.get_children():
+		var view := child as MultiMeshInstance3D
+		if view.name.contains("Shadow"):
+			casters.append(view)
+		elif view.name.contains("Far"):
+			far.append(view)
+		else:
+			near.append(view)
+			instances += view.multimesh.instance_count
+	_check(near.size() >= 2 and near.size() == far.size() and near.size() == casters.size() and instances == placements.size(), "each tree cell has a near view, a far view and a shadow caster (%d cells)" % near.size())
+	var near_tris: int = near_mesh.get_faces().size() / 3
+	var far_tris: int = far_mesh.get_faces().size() / 3
+	_check(far_tris * 6 < near_tris, "the far pine is a fraction of the near one (%d vs %d triangles)" % [far_tris, near_tris])
+	var shadows_ok: bool = true
+	var seamless: bool = true
+	for i in range(near.size()):
+		shadows_ok = shadows_ok and near[i].cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and far[i].cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and casters[i].cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+		seamless = seamless and is_equal_approx(near[i].visibility_range_end, far[i].visibility_range_begin) and near[i].visibility_range_end > 0.0 and far[i].multimesh.instance_count == near[i].multimesh.instance_count
+	_check(shadows_ok, "only the cheap caster draws tree shadows")
+	_check(seamless, "the near view ends where the far view begins, with the same trees")
+	Nature.call("apply_lod", holder, 0)
+	var low: float = near[0].visibility_range_end
+	Nature.call("apply_lod", holder, 2)
+	var high: float = near[0].visibility_range_end
+	_check(low < high and is_equal_approx(far[0].visibility_range_begin, high) and is_equal_approx(casters[0].visibility_range_end, high), "lower quality swaps to far trees sooner (%.0f m vs %.0f m)" % [low, high])
+	holder.queue_free()
