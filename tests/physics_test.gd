@@ -90,7 +90,7 @@ func _run() -> void:
 	_check(player.grounded, "rigid player settles on ground")
 	player.pitch = 0.6
 	player.apply_look(Vector2.ZERO)
-	tether.assist_strength = 14500.0
+	tether.assist_strength = Tether.DEFAULT_ASSIST_STRENGTH
 	tether._cast(1.0)
 	await _frames(18)
 	tether.toggle_lock()
@@ -104,6 +104,9 @@ func _run() -> void:
 	_check(max_speed > 8.0 and max_speed < 70.0, "cast provides useful, bounded travel speed")
 	_check(player.global_position.is_finite() and player.linear_velocity.is_finite(), "high-load catch remains numerically finite")
 	print("FLIGHT max_height=", max_height, " max_speed=", max_speed)
+	# Landing damage (S1): none up to 14 m/s, 50 at 22 m/s, lethal 100 at 30 m/s and more beyond.
+	_check(Player.landing_damage(13.9) == 0.0 and is_equal_approx(Player.landing_damage(22.0), 50.0), "landing damage starts above 14 m/s and scales with speed")
+	_check(is_equal_approx(Player.landing_damage(30.0), 100.0) and Player.landing_damage(40.0) > 100.0, "a 30 m/s landing kills a stock player")
 	tether.clear()
 	arena.queue_free()
 	await process_frame

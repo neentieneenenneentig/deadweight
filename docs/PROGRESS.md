@@ -566,3 +566,16 @@ Template:
   tests/world_test.gd now reads the case spot and the updraft width from the range constants.
 - Gate: PASSED (59 scripts, 10 suites). The campaign rescale waits for owner feedback on the range
   (TASKS S1).
+## 2026-11-04: S1 rod power, landing damage, containment, range 400 × 1000 m
+- Model: Claude Opus 5.5 (lead). Owner asked for bigger maps, about half the rod power, fall
+  damage, and no way to fall off the map.
+- scripts/tether.gd and upgrades.gd: rod power is 0.6× (0.5× quartered the carry to 35 m). The
+  measured carry is 50–60 m to the first landing, at 27–30 m/s.
+- scripts/player.gd: `landing_damage()` runs from 0 at 14 m/s to 100 at 30 m/s, with no cap. The
+  source is "impact". main names the cause, and result_screen has its text and tip.
+- scripts/level_base.gd: `_contain()` adds invisible walls and bedrock on a separate "Containment" body.
+  bake_navigation drops that body from layer 1 while parsing; including it shifted the voxel grid
+  and broke l01's gantry-ramp join. `nav_cell_size` is now per level.
+- scripts/levels/range.gd: 400 × 1000 m. Tests updated: physics (landing damage), world
+  (containment rays, the bodies count), meta (assist per kg) and flow (the impact cause).
+- Gate: PASSED. The campaign rescale is next (TASKS S1).

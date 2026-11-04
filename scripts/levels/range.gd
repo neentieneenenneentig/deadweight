@@ -4,8 +4,9 @@ extends "res://scripts/level_base.gd"
 ## slalom, three training dummies (E3), and one case by the extraction. Repeatable: an extraction banks the
 ## case and main calls reset_cases() so the run starts again.
 ##
-## Scale: a full cast carries the player 95 to 170 m before the first landing, at up to 45 to 65 m/s
-## (measured on open ground, 2026-11-04). The range is 320 x 720 m so that takes several casts.
+## Scale (S1): a full cast carries the player 50 to 60 m to the first landing, at 27 to 30 m/s, and
+## about 90 m in 8 s (measured on open ground on 2026-11-04). The range is 400 x 1000 m, so crossing
+## it takes a dozen casts.
 
 const INFO := {
 	"title": "PRACTICE RANGE",
@@ -22,45 +23,47 @@ const INFO := {
 }
 
 const SPAWN := Vector3(0.0, 0.0, 40.0)
-## Floor centre and size. The floor runs from z = +60 behind the spawn to z = -660.
-const FLOOR_CENTER := Vector3(0.0, 0.0, -300.0)
-const FLOOR_SIZE := Vector2(320.0, 720.0)
-## Walls high enough that a full swing (peak about 38 m) stays inside the range.
+## Floor centre and size. The floor runs from z = +70 behind the spawn to z = -930.
+const FLOOR_CENTER := Vector3(0.0, 0.0, -430.0)
+const FLOOR_SIZE := Vector2(400.0, 1000.0)
+## Visible walls. Invisible containment (level_base) reaches far higher, so the range cannot be left.
 const WALL_HEIGHT := 60.0
 ## Centre of the welcome hint zone. Tests use it to check that the zone fires once.
 const HINT_ZONE_CENTER := Vector3(0.0, 1.2, 30.0)
-const UPDRAFT_BASE := Vector3(100.0, 0.0, -350.0)
+const UPDRAFT_BASE := Vector3(130.0, 0.0, -480.0)
 const UPDRAFT_SIZE := Vector3(12.0, 60.0, 12.0)
-const GANTRY_Z := -230.0
-const GANTRY_HEIGHT := 40.0
-## The beam's underside is at 39.4 m. A 0.12 m plate centred at 39.34 hangs flush against it.
-const ANCHOR_Y := 39.34
+const GANTRY_Z := -300.0
+const GANTRY_HEIGHT := 30.0
+## The beam's underside is at 29.4 m. A 0.12 m plate centred at 29.34 hangs flush against it.
+const ANCHOR_Y := 29.34
 ## Distance is measured from spawn along -Z. Sides alternate so the centre lane stays open.
 const PLATFORMS := [
 	{"distance": 25, "height": 5.0, "x": -30.0},
-	{"distance": 50, "height": 10.0, "x": 30.0},
-	{"distance": 100, "height": 20.0, "x": -30.0},
-	{"distance": 150, "height": 30.0, "x": 30.0},
-	{"distance": 200, "height": 45.0, "x": -30.0},
+	{"distance": 50, "height": 8.0, "x": 30.0},
+	{"distance": 100, "height": 12.0, "x": -30.0},
+	{"distance": 150, "height": 15.0, "x": 30.0},
+	{"distance": 200, "height": 30.0, "x": -30.0},
 ]
-const MARKER_DISTANCES := [25, 50, 100, 150, 200, 300, 400, 500, 600]
+const MARKER_DISTANCES := [25, 50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 900]
 const SLALOM_HEIGHT := 30.0
 const SLALOM := [
-	Vector2(-25.0, -290.0), Vector2(25.0, -330.0), Vector2(-25.0, -370.0),
-	Vector2(25.0, -410.0), Vector2(-25.0, -450.0), Vector2(25.0, -490.0),
+	Vector2(-30.0, -380.0), Vector2(30.0, -430.0), Vector2(-30.0, -480.0),
+	Vector2(30.0, -530.0), Vector2(-30.0, -580.0), Vector2(30.0, -630.0),
 ]
 ## Training dummies on open floor beside the slalom, off the centre lane, clear of the gantry legs, the
 ## updraft tower's hint zone and the case and extraction on the far side.
-const DUMMY_SPOTS := [Vector3(-60.0, 0.0, -300.0), Vector3(55.0, 0.0, -320.0), Vector3(-65.0, 0.0, -460.0)]
-const CASE_SPOT := Vector3(60.0, 0.0, -600.0)
-const EXTRACTION_SPOT := Vector3(-60.0, 0.0, -620.0)
+const DUMMY_SPOTS := [Vector3(-80.0, 0.0, -400.0), Vector3(75.0, 0.0, -430.0), Vector3(-85.0, 0.0, -600.0)]
+const CASE_SPOT := Vector3(80.0, 0.0, -860.0)
+const EXTRACTION_SPOT := Vector3(-80.0, 0.0, -880.0)
 ## Labels here are read from much further away than in a raid level.
-const FAR_LABEL_RANGE := 450.0
+const FAR_LABEL_RANGE := 500.0
 
 
 func _design() -> void:
 	set_zone("floodworks")
 	set_spawn(SPAWN)
+	# 400 x 1000 m of floor: half-metre navmesh cells keep the bake near half a second. Only the dummies stand here.
+	nav_cell_size = 0.5
 	ground(FLOOR_CENTER, FLOOR_SIZE)
 	# Walls keep the player on the range; there is no drop-off to learn from here.
 	perimeter(FLOOR_CENTER, FLOOR_SIZE - Vector2.ONE, WALL_HEIGHT)
@@ -85,9 +88,9 @@ func reset_cases() -> void:
 ## non-solid and merge into the static geometry.
 func _build_grid() -> void:
 	var half: Vector2 = FLOOR_SIZE * 0.5 - Vector2.ONE
-	for x: int in range(-150, 151, 25):
+	for x: int in range(-175, 176, 25):
 		box(Vector3(float(x), 0.015, FLOOR_CENTER.z), Vector3(0.12, 0.03, FLOOR_SIZE.y - 2.0), "light_concrete", false)
-	for z: int in range(50, -651, -25):
+	for z: int in range(50, -926, -25):
 		box(Vector3(0.0, 0.015, float(z)), Vector3(half.x * 2.0, 0.03, 0.12), "light_concrete", false)
 	box(Vector3(0.0, 0.017, FLOOR_CENTER.z), Vector3(0.4, 0.03, FLOOR_SIZE.y - 2.0), "yellow", false)
 
@@ -115,14 +118,14 @@ func _build_platforms() -> void:
 		_far_label("%d M  /  %d M UP" % [int(entry["distance"]), int(height)], top + Vector3(0.0, 3.0, 0.0), 36, Color("e4ddbd"), 0.035)
 
 
-## Anchor gantry: a beam 40 m up with cyan plates under it. Weights latch to the plates from below.
+## Anchor gantry: a beam 30 m up with cyan plates under it. Weights latch to the plates from below.
 func _build_gantry() -> void:
-	for x: float in [-65.0, 65.0]:
+	for x: float in [-70.0, 70.0]:
 		box(Vector3(x, GANTRY_HEIGHT * 0.5, GANTRY_Z), Vector3(2.5, GANTRY_HEIGHT, 2.5), "rust")
-	box(Vector3(0.0, GANTRY_HEIGHT, GANTRY_Z), Vector3(135.0, 1.2, 3.0), "rust")
+	box(Vector3(0.0, GANTRY_HEIGHT, GANTRY_Z), Vector3(145.0, 1.2, 3.0), "rust")
 	for x: float in [-45.0, -15.0, 15.0, 45.0]:
 		anchor(Vector3(x, ANCHOR_Y, GANTRY_Z), Vector3.DOWN)
-	_far_label("ANCHOR GANTRY  /  40 M", Vector3(0.0, GANTRY_HEIGHT + 4.0, GANTRY_Z), 48, Color("67d5d2"), 0.09)
+	_far_label("ANCHOR GANTRY  /  30 M", Vector3(0.0, GANTRY_HEIGHT + 4.0, GANTRY_Z), 48, Color("67d5d2"), 0.09)
 
 
 ## Pillar slalom: tall pillars that force a zig-zag, so swings and wraps have things to hit.
@@ -166,4 +169,4 @@ func _build_extraction() -> void:
 
 ## Distant city ring, well outside the perimeter walls.
 func _build_dressing() -> void:
-	skyline(4411, FLOOR_CENTER, 420.0, 600.0, 32)
+	skyline(4411, FLOOR_CENTER, 580.0, 780.0, 32)

@@ -66,7 +66,12 @@ const NO_SHADOW_KEYS := ["cyan", "amber", "red", "orange", "white", "water", "gl
 const GRIME_KEYS := ["concrete", "light_concrete", "dark", "rust", "metal", "stripe"]
 const GRIME_SCALE := 0.08
 
-const MAX_LIGHTS := 6                                # lights cost draw calls and shader work on mobile
+## Containment (S1): the invisible boundary walls are CONTAIN_WALL m thick and reach CONTAIN_TOP m
+## up. The bedrock top sits BEDROCK_BELOW_KILL m under kill_y.
+const CONTAIN_WALL := 1.0
+const CONTAIN_TOP := 600.0
+const BEDROCK_BELOW_KILL := 4.0
+const MAX_LIGHTS := 6                               # lights cost draw calls and shader work on mobile
 const HAZARD_KINDS := ["electric", "heat", "water"]
 const HAZARD_ZAP_INTERVAL := 0.5                     # seconds between hazard_zap sounds
 const WATER_DPS := 25.0                              # deep water damage per second (before damage_scale)
@@ -154,6 +159,11 @@ var _hint_zones: Array[Dictionary] = []              # {box, text, duration, fir
 var _light_count: int = 0
 var _zap_time: float = -10.0                         # clock time of the last hazard_zap
 var _in_water: bool = false                          # inside a deep-water volume; the splash plays on entry (A4)
+var _ground_rects: Array[Rect2] = []                 # x/z footprint of every ground() slab, for _contain()
+var _bounds_body: StaticBody3D                       # containment walls and bedrock (S1), kept out of the navmesh
+## Navmesh cell size in metres. A level with a very large floor may raise it to keep the bake fast;
+## the map follows it, so the server never sees a mismatch.
+var nav_cell_size: float = NAV_CELL_SIZE
 var _nav_region: NavigationRegion3D                  # holds the level's navmesh; child of the level
 var _pending_nav_mesh: NavigationMesh                # threaded bake in flight, applied when it ends
 
@@ -198,6 +208,9 @@ func _reset_build_state() -> void:
 	_hazards.clear()
 	_updrafts.clear()
 	_hint_zones.clear()
+	_ground_rects.clear()
+	if is_instance_valid(_bounds_body):
+		_bounds_body.free()
 	_light_count = 0
 	_label_count = 0
 	_has_extraction = false
@@ -249,6 +262,7 @@ func set_kill_y(y: float) -> void:
 
 ## A flat slab whose top surface is at center.y.
 func ground(center: Vector3, size: Vector2, material: String = "concrete", thickness: float = 1.2) -> void:
+	_ground_rects.append(Rect2(center.x - size.x * 0.5, center.z - size.y * 0.5, size.x, size.y))
 	_box_at(Transform3D(Basis.IDENTITY, center - Vector3.UP * (thickness * 0.5)), Vector3(size.x, thickness, size.y), material, true)
 
 
@@ -573,7 +587,14 @@ func bake_navigation(synchronous: bool = true) -> void:
 	var mesh: NavigationMesh = _new_navigation_mesh()
 	var geometry := NavigationMeshSourceGeometryData3D.new()
 	# Parsing reads the scene tree, so it always runs here on the main thread; only the bake is threaded.
+	# The containment body leaves layer 1 for the parse only. The walls and bedrock would widen the
+	# baked volume and shift the voxel grid, and that can break narrow joins such as ramp tops.
+	var bounds_valid: bool = is_instance_valid(_bounds_body)
+	if bounds_valid:
+		_bounds_body.collision_layer = 0
 	NavigationServer3D.parse_source_geometry_data(mesh, geometry, self)
+	if bounds_valid:
+		_bounds_body.collision_layer = LAYER_WORLD
 	# Both bake paths read this geometry, so the hazard carve applies to sync and threaded bakes alike.
 	_add_hazard_obstructions(geometry)
 	if synchronous:
@@ -612,11 +633,11 @@ func get_nav_path(from: Vector3, to: Vector3) -> PackedVector3Array:
 
 ## Settings for a new level navmesh. Parsing takes static colliders (not mesh instances), so the
 ## dressing that has no collision (grid lines, water, skyline, hazard shells) never blocks a path.
-static func _new_navigation_mesh() -> NavigationMesh:
+func _new_navigation_mesh() -> NavigationMesh:
 	var mesh := NavigationMesh.new()
 	mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
 	mesh.geometry_collision_mask = LAYER_WORLD
-	mesh.cell_size = NAV_CELL_SIZE
+	mesh.cell_size = nav_cell_size
 	mesh.cell_height = NAV_CELL_HEIGHT
 	mesh.agent_radius = NAV_AGENT_RADIUS
 	mesh.agent_height = NAV_AGENT_HEIGHT
@@ -651,7 +672,7 @@ func _ensure_navigation_region() -> NavigationRegion3D:
 	add_child(_nav_region)
 	# Match the level's cell size to the map so the server does not warn about a mismatch.
 	var map: RID = _nav_region.get_navigation_map()
-	NavigationServer3D.map_set_cell_size(map, NAV_CELL_SIZE)
+	NavigationServer3D.map_set_cell_size(map, nav_cell_size)
 	NavigationServer3D.map_set_cell_height(map, NAV_CELL_HEIGHT)
 	# By default the server syncs maps on worker threads, a few physics frames late. Syncing on the
 	# calling thread makes map_force_update finish before it returns, so a sync bake is usable at once.
@@ -1052,10 +1073,51 @@ func _finish_build() -> void:
 	dream.name = "DreamAtmosphere"
 	add_child(dream)
 	dream.dress(self)
+	_contain()
 	_pending_count = _pending.size()
 	_merge_statics()
 	_build_environment()
 	apply_quality(quality)
+
+
+## No level can be left (S1). Invisible walls stand on the edges of the ground() footprint, from
+## below the bedrock to CONTAIN_TOP. A visible bedrock slab under the whole footprint gives every
+## pit a floor, so nothing falls forever. kill_y is above it, so the fall respawn still fires
+## first. Built after the dreamscape, so its play-bounds scan does not see these colliders. They live on their own body,
+## which bake_navigation leaves out.
+func _contain() -> void:
+	if _ground_rects.is_empty():
+		return
+	var area: Rect2 = _ground_rects[0]
+	for rect: Rect2 in _ground_rects:
+		area = area.merge(rect)
+	var bedrock_top: float = kill_y - BEDROCK_BELOW_KILL
+	var bottom: float = bedrock_top - 4.0
+	var height: float = CONTAIN_TOP - bottom
+	var mid_y: float = bottom + height * 0.5
+	var center: Vector2 = area.get_center()
+	var half: Vector2 = area.size * 0.5 + Vector2.ONE * CONTAIN_WALL * 0.5
+	var walls: Array[Array] = [
+		[Vector3(center.x, mid_y, center.y - half.y), Vector3(area.size.x + CONTAIN_WALL * 2.0, height, CONTAIN_WALL)],
+		[Vector3(center.x, mid_y, center.y + half.y), Vector3(area.size.x + CONTAIN_WALL * 2.0, height, CONTAIN_WALL)],
+		[Vector3(center.x - half.x, mid_y, center.y), Vector3(CONTAIN_WALL, height, area.size.y)],
+		[Vector3(center.x + half.x, mid_y, center.y), Vector3(CONTAIN_WALL, height, area.size.y)],
+	]
+	var bedrock := Transform3D(Basis.IDENTITY, Vector3(center.x, bedrock_top - 1.0, center.y))
+	walls.append([bedrock.origin, Vector3(area.size.x, 2.0, area.size.y)])
+	_bounds_body = StaticBody3D.new()
+	_bounds_body.name = "Containment"
+	_bounds_body.collision_layer = LAYER_WORLD
+	_bounds_body.collision_mask = 0
+	add_child(_bounds_body)
+	for wall: Array in walls:
+		var shape := BoxShape3D.new()
+		shape.size = wall[1]
+		var collision := CollisionShape3D.new()
+		collision.shape = shape
+		collision.position = wall[0]
+		_bounds_body.add_child(collision)
+	_box_at(bedrock, Vector3(area.size.x, 2.0, area.size.y), "dark", false)
 
 
 func _frame(origin: Vector3, yaw_degrees: float) -> Transform3D:

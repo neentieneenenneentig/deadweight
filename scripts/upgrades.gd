@@ -6,7 +6,7 @@ extends RefCounted
 const ORDER := ["spool", "reel", "weight", "plating", "quickdraw", "sidearm"]
 const COSTS := [30, 55, 85, 120]
 ## Cast assist force per kilogram of sinker: heavier weights keep the same launch feel.
-const ASSIST_PER_KG := 100.0
+const ASSIST_PER_KG := 60.0   # cut from 100 on 2026-11-04 (S1), along with tether's cast impulse
 
 ## "values" holds one entry per tier (0..4). Tracks that drive two stats store pairs in the
 ## order of their "stats" list. "stats" names the 5.1 keys a track changes.

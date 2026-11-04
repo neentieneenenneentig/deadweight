@@ -16,7 +16,12 @@ const DEFAULT_WEIGHT_MASS: float = 145.0    # kg
 const DEFAULT_MAX_LINE: float = 48.0        # m of line on the spool
 const DEFAULT_REEL_FORCE: float = 16000.0   # N; the reel stalls when line load reaches this
 const DEFAULT_REEL_SPEED: float = 11.0      # m/s of line taken in at full reel and no load
-const DEFAULT_ASSIST_STRENGTH: float = 14500.0
+## Rod power was cut to 0.6x on 2026-11-04 (S1). A full cast used to carry the player 95-170 m at
+## 46-66 m/s. Now it carries 50-60 m to the first landing at 27-30 m/s, which is about half the speed.
+const DEFAULT_ASSIST_STRENGTH: float = 8700.0
+## Launch impulse (N s) at zero and full charge. The player gets the opposite impulse as recoil.
+const CAST_IMPULSE_MIN: float = 120.0
+const CAST_IMPULSE_MAX: float = 318.0
 const DEFAULT_CHARGE_TIME: float = 0.8      # s to a full-power cast
 const CAST_COOLDOWN: float = 0.18           # s before another cast or charge
 const CAST_START_DISTANCE: float = 1.35     # m in front of the camera where the weight starts
@@ -191,7 +196,7 @@ func _cast(power: float) -> void:
 	get_parent().add_child(weight)
 	weight.global_position = start
 	weight.linear_velocity = player.linear_velocity
-	var impulse: Vector3 = direction * lerpf(200.0, 530.0, power)
+	var impulse: Vector3 = direction * lerpf(CAST_IMPULSE_MIN, CAST_IMPULSE_MAX, power)
 	weight.apply_central_impulse(impulse)
 	player.apply_central_impulse(-impulse)
 	_assist_direction = direction

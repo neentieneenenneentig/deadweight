@@ -16,8 +16,14 @@ const COYOTE_TIME: float = 0.12
 const JUMP_BUFFER_TIME: float = 0.12
 const JUMP_SPEED: float = 5.0
 const GROUND_SPEED: float = 5.8
-## Downward speed above which a landing costs health.
-const FALL_DAMAGE_SPEED: float = 20.0
+## Landing damage (S1). It grows linearly with downward speed, from 0 at FALL_DAMAGE_SPEED to
+## FALL_LETHAL_DAMAGE at FALL_LETHAL_SPEED, and keeps growing past it.
+## 14 m/s is about a 10 m drop, and 30 m/s about a 46 m drop.
+## A taut line turns the fall into a swing, so it is the way to land safely. Water stops a fall
+## without damage.
+const FALL_DAMAGE_SPEED: float = 14.0
+const FALL_LETHAL_SPEED: float = 30.0
+const FALL_LETHAL_DAMAGE: float = 100.0
 ## Contact normals above this height count as ground (about 57 degrees).
 const GROUND_NORMAL_MIN_Y: float = 0.55
 ## Air control adds at most this acceleration (m/s^2) while steering...
@@ -149,7 +155,7 @@ func _ready() -> void:
 	camera = Camera3D.new()
 	camera.fov = 80.0
 	camera.near = 0.06
-	camera.far = 1000.0                 # the practice range is 720 m long; raid levels sit well inside this
+	camera.far = 1500.0                 # the practice range is 1 km long, with its skyline beyond it
 	camera.current = true
 	view_pivot.add_child(camera)
 	_build_viewmodel()
@@ -213,8 +219,16 @@ func _touchdown() -> void:
 	_landing_dip = maxf(_landing_dip, minf(0.12, impact * 0.01))
 	if impact > 6.0:
 		add_shake(minf(0.6, impact * 0.03))
-	if active and _previous_fall_speed < -FALL_DAMAGE_SPEED:
-		take_damage.call_deferred(minf(65.0, (impact - FALL_DAMAGE_SPEED) * 3.0), "fall", Vector3.INF)
+	var damage: float = landing_damage(impact)
+	if active and damage > 0.0:
+		take_damage.call_deferred(damage, "impact", Vector3.INF)
+
+
+## Health lost when landing at impact m/s of downward speed (S1).
+static func landing_damage(impact: float) -> float:
+	if impact <= FALL_DAMAGE_SPEED:
+		return 0.0
+	return (impact - FALL_DAMAGE_SPEED) / (FALL_LETHAL_SPEED - FALL_DAMAGE_SPEED) * FALL_LETHAL_DAMAGE
 
 
 func _jump(state: PhysicsDirectBodyState3D) -> void:

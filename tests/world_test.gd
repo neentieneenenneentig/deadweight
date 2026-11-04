@@ -111,8 +111,8 @@ func _test_framework() -> void:
 				triangles += (node.mesh as Mesh).get_faces().size() / 3
 		elif node is Label3D:
 			labels += 1
-		elif node is StaticBody3D:
-			bodies += 1
+		elif node is StaticBody3D and node.name != "Containment":
+			bodies += 1   # the containment body (S1) is separate on purpose: the navmesh bake skips it
 		elif node is CollisionShape3D:
 			shapes += 1
 	print("LEVEL l01: %d staged primitives merged into %d meshes, %d triangles, %d labels, %d collision shapes" % [int(_world.get("_pending_count")), statics, triangles, labels, shapes])
@@ -292,6 +292,15 @@ func _test_features() -> void:
 	await _frames(3)
 	var anchors: Array[Node] = get_nodes_in_group("anchor")
 	_check(anchors.size() == 4 and _all_static_bodies(anchors), "anchors are in group anchor as StaticBody3D plates")
+	# Containment (S1): an invisible wall stands at the floor's edge far above the visible wall,
+	# and bedrock lies under the floor.
+	var space: PhysicsDirectSpaceState3D = _range.get_world_3d().direct_space_state
+	var mid_z: float = RangeScript.FLOOR_CENTER.z
+	var edge_x: float = RangeScript.FLOOR_SIZE.x * 0.5
+	var side_hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(0.0, 200.0, mid_z), Vector3(edge_x + 50.0, 200.0, mid_z), 1))
+	_check(not side_hit.is_empty() and absf(float(side_hit["position"].x) - edge_x) < 1.5, "an invisible wall stops anything at the range's edge, 200 m up")
+	var down_hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(0.0, -2.0, mid_z), Vector3(0.0, -60.0, mid_z), 1))
+	_check(not down_hit.is_empty() and float(down_hit["position"].y) < float(_range.get("kill_y")), "bedrock lies below kill_y under the floor")
 	var range_info: Dictionary = _range.get("info")
 	_check(bool(range_info["repeatable"]) and bool(range_info["practice"]) and _range.has_method("reset_cases"), "range INFO is repeatable practice and it can reset its cases")
 

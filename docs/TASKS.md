@@ -273,13 +273,26 @@ overlay), scripts/settings.gd and scripts/level_base.gd (quality presets only), 
 full cast carries the player 95–170 m before the first landing and over 200 m in 8 s, at peaks of
 45–65 m/s and 24–38 m. Every level is about 60 × 150 m, so one cast crosses a whole level and
 flies over its walls.
-**Done so far (lead):** the practice range is now 320 × 720 m with 60 m walls, platforms at 25 to 200 m
-(5 to 45 m up), a 40 m anchor gantry, a 60 m updraft tower and 30 m slalom pillars. Camera far
-is 1000 m (was 350).
-**Next, once the owner has flown the new range:** rescale the tutorial and l01–l06 to match, about
-4–5× in length. Anchors must be spaced for a 48 m line. Then rerun the pars, enemy ranges
-(THREAT_RANGE 45, SHOT_RANGE 160), label distances (85 m), the draw-call budget on phone (Q1) and
-the store screenshots (R6).
+**Done so far (lead, 2026-11-04):**
+- Rod power is cut to 0.6× (assist 8700 N, impulse 120–318 N s, ASSIST_PER_KG 60). A full cast now
+  carries 50–60 m to the first landing (about 90 m in 8 s), peaking at 27–30 m/s and 8 m up.
+- Landing damage: none up to 14 m/s (about a 10 m drop), 100 at 30 m/s (about 46 m), and more
+  past that. The cause is "impact" (HIT THE GROUND TOO HARD).
+- Containment: invisible walls up to 600 m stand on every level's ground() footprint, with
+  bedrock under it. They sit on their own body, which the navmesh bake leaves out. The map can't be
+  left.
+- The practice range is 400 × 1000 m: platforms at 25 to 200 m out (5 to 30 m up), a 30 m gantry,
+  a 60 m updraft tower and 30 m slalom pillars. Navmesh cells are 0.5 m there. Camera far is 1500 m.
+
+**Next, once the owner has flown the new range:** rescale the tutorial and l01–l06 to the same
+scale, about 5× in length, so each level takes 10–15 casts. Anchors must be spaced for a 48 m
+line, and tall drops must be lockable so they don't kill. Then redo:
+- the pars;
+- the enemy ranges (THREAT_RANGE 45, SHOT_RANGE 160);
+- the label distances (85 m);
+- `nav_cell_size` for large floors (the bake budget is 2 s);
+- the draw-call budget on phone (Q1);
+- the store screenshots (R6).
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
 department, and added three AI-generated textures. The store text, press kit, rating answers and

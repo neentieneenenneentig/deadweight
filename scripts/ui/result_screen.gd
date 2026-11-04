@@ -8,6 +8,7 @@ const CAUSES := {
 	"sentry": "SHOT BY A SENTRY",
 	"drone": "DOWNED BY A DRONE",
 	"fall": "FELL OUT OF THE LEVEL",
+	"impact": "HIT THE GROUND TOO HARD",
 	"hazard": "KILLED BY A HAZARD",
 }
 const TRY_THIS := {
@@ -15,6 +16,7 @@ const TRY_THIS := {
 	"sentry": "A red laser means the shot is coming. Break line of sight, or move after the aim locks.",
 	"drone": "Drones are fragile. One fast weight smash brings one down.",
 	"fall": "Falling out of the level costs health. Cut the line and land on solid ground.",
+	"impact": "Drops of more than about 10 m hurt, and 45 m kills. Lock the line before you land: a taut swing turns the fall into forward speed.",
 	"hazard": "Glowing floors and water hurt. Cross them in the air.",
 }
 const TRY_THIS_DEFAULT := "Spend banked salvage in the Workshop: a longer spool and stronger plating make every raid easier."
