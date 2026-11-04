@@ -653,4 +653,4 @@ Template:
   throw peaks about 46 m above the vent, the landing is soft; mud is a hazard and hurts.
 - h02: route 1202 m, pars 340/195, bake 437 ms, build 955 ms; Forward+ spawn 135 draw calls.
 - Gate: PASSED (12 suites).
-
+- Valley practice preview: a practice geyser on a warm patch west of the spawn, with a sign.

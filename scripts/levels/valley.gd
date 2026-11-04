@@ -21,7 +21,19 @@ const INFO := {
 }
 
 
+## A practice geyser west of the spawn, on a small warm patch, to learn the ride safely.
+const PRACTICE_GEYSER := Vector2(-42.0, 28.0)
+
+
+func _design() -> void:
+	extra_spots = [Vector3(PRACTICE_GEYSER.x, PRACTICE_GEYSER.y, 9.0)]
+	hot_springs = [Vector3(PRACTICE_GEYSER.x, PRACTICE_GEYSER.y, 9.0)]
+	super()
+
+
 func _populate() -> void:
+	traps().call("geyser", _floor(PRACTICE_GEYSER), 7.0, 0.0, 22.0)
+	_sign("PRACTICE GEYSER\nSTAND ON THE VENT WHEN IT HISSES\n(IT LANDS YOU SOFTLY)", _floor(PRACTICE_GEYSER + Vector2(8.0, 6.0)), Vector2(5.6, 2.0), 50.0)
 	# A practice minefield beside the spawn, east of the path north, with a sign at its edge.
 	scatter_mines(Rect2(40.0, -60.0, 70.0, 90.0), 10, 55)
 	_sign("TEACUP MINEFIELD\nTHEY BEEP, THEN THEY DO NOT\n(TRY THROWING THE WEIGHT IN)", _floor(Vector2(34.0, 30.0)), Vector2(5.6, 2.0))
