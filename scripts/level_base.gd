@@ -107,6 +107,7 @@ const ZONES := {
 	# W1: open highland valley. "natural" materials are plain and painterly, without the porcelain patina.
 	"highlands": {
 		"natural": true,
+		"shadow_distance": 160.0,        # thousands of trees: keep sun shadows close (W6)
 		"sky_top": "6f9fd0", "sky_horizon": "e8e4cf", "ground_bottom": "5d7a45", "ground_horizon": "b9cf9a",
 		"ambient": "c9d8e6", "ambient_energy": 0.38, "fog": "c4d6e4", "fog_density": 0.0008,
 		"sun": "fff1d6", "sun_energy": 1.25, "sun_rotation": Vector3(-38, -35, 0),
@@ -1413,6 +1414,8 @@ func _build_environment() -> void:
 		_sun.shadow_bias = 0.5
 		_sun.shadow_reverse_cull_face = true
 	_sun.shadow_enabled = true
+	if preset.has("shadow_distance"):
+		_sun.directional_shadow_max_distance = float(preset["shadow_distance"])
 	_sun.add_to_group("sun")
 	add_child(_sun)
 

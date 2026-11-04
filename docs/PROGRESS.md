@@ -610,3 +610,16 @@ Template:
   mesh), build 0.9 s (5.6 s before the prebuilt body and the bounded flatten loops).
 - tools/run.ps1: `-Level <id>`. world_test: the catalog now lists twelve levels.
 - Gate: PASSED.
+## 2026-11-04: W2–W4 first pass: floor is lava, air beats ground, the princess's duck (h01)
+- Model: Claude Opus 5.5 (lead), owner away ("full creative freedom").
+- W3 (8e7a8ea): hound CHASE_SPEED 7.2 (player runs 5.8); player body slam (`slam_damage`, from
+  11 m/s, enemy contacts never count as ground); style score and air multiplier in main (HUD line
+  under the speed, STYLE chip on the result screen instead of CASTS); air/smash/slam kills give
+  15 health and 6 rounds.
+- W2 (d9ac309): scripts/world/traps.gd and tests/traps_test.gd (11 checks). level_base gained
+  traps(), hazard_box(), nav_max_climb (1 m cells made every hill unwalkable at 0.25) and path
+  queries with a 40000-polygon budget (long routes were cut at the default 4096).
+  highlands_base.gd now holds the valley; valley.gd is the practice preview (a small minefield, one
+  marble, the ice) and h01_the_duck.gd the raid. Deaths by mine, boulder and flood have causes and tips.
+- W4 (cd9ad2f): objective wording from INFO, duck/towel/firewood pickup models.
+- Shadows reach 160 m in the highlands. Gate: PASSED (11 suites).

@@ -325,6 +325,16 @@ MultiMeshes with solid trunk, crown and boulder colliders; grass and flowers), z
 a house-sized rubber duck in the west lake). `tools/run.ps1 -Level valley` starts it.
 Bake 0.8 s, build 0.9 s on desktop. Not yet measured on a phone.
 
+**Done (lead, 2026-11-04, while the owner was out):** W2 traps (`scripts/world/traps.gd`:
+crack fields, teacup mines, marbles, the flood; `tests/traps_test.gd`), W3 (hounds 7.2 m/s, body
+slam from 11 m/s, style score with an air multiplier up to x5, air kills heal and give rounds), and
+the first W4 objectives (INFO loot_label/mission/deliver, duck/towel/firewood pickups). New raid
+**h01 "The Princess's Duck"** (campaign slot after l06; `tools/run.ps1 -Level h01`): duck and
+firewood, the towel on the giant duck as a rod-only bonus, 45 mines, frozen lakes, three marbles,
+eight hounds, and the meltwater rises once she has both. Shared layout in
+`scripts/levels/highlands_base.gd`. Next: owner playtest of h01 for tuning (crack time, mine
+density, flood speed, hound speed), then more quests and W5.
+
 **W2 — The floor is lava.** All four, as level-base builders:
 - cracking ground: plates that crack under the player and break after about 1.5 s (thin ice on the
   lakes, porcelain paving on ruins), regrowing later; hard landings crack wider;
