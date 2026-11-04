@@ -81,7 +81,7 @@ func _test_framework() -> void:
 	var campaign: Array[String] = Catalog.campaign_ids()
 	_check(campaign.has("l01") and not campaign.has("l09") and not campaign.has("range"), "catalog lists only the campaign levels that exist")
 	var ids: Array[String] = Catalog.all_ids()
-	_check(ids.size() == 13 and ids[7] == "h01" and ids[11] == "range" and ids[12] == "valley", "catalog lists all thirteen levels: h01 after l06, then the range and the highlands preview last")
+	_check(ids.size() == 14 and ids[7] == "h01" and ids[8] == "h02" and ids[12] == "range" and ids[13] == "valley", "catalog lists all fourteen levels: h01 and h02 after l06, then the range and the highlands preview last")
 	var details: Dictionary = Catalog.info("l01")
 	_check(details["available"] and details["title"] == "SLUICE GATE" and details["zone"] == "floodworks", "catalog merges the level INFO")
 	_check(not Catalog.info("l09")["available"], "levels without a script are unavailable")

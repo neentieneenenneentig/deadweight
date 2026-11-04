@@ -27,6 +27,11 @@ var land: Terrain
 var keep_clear: Array[Vector3] = []
 ## Extra flat, tree-free spots (x, z, radius) a subclass sets before calling super._design().
 var extra_spots: Array[Vector3] = []
+## Hot-spring ground (x, z, radius): bare warm crust with no snow, set before super._design().
+var hot_springs: Array[Vector3] = []
+## What the spawn hint and the sign by the tub say; a subclass with another errand changes them.
+var intro_hint: String = "THE HIGHLANDS  /  find the princess's rubber duck in the far forest, then bring it to her hot tub on the eastern hill"
+var tub_sign: String = "PRINCESS CAPYBARA\nIS NOT TO BE DISTURBED\n(UNLESS YOU HAVE THE DUCK)"
 
 
 func _design() -> void:
@@ -44,6 +49,8 @@ func _design() -> void:
 	land.flatten(DUCK_XZ, 6.0)
 	for spot: Vector3 in extra_spots:
 		land.flatten(Vector2(spot.x, spot.y), spot.z)
+	for hot: Vector3 in hot_springs:
+		land.spring(Vector2(hot.x, hot.y), hot.z)
 	land.lake(Vector2(WEST_LAKE.x, WEST_LAKE.y), WEST_LAKE.z)
 	land.lake(Vector2(EAST_LAKE.x, EAST_LAKE.y), EAST_LAKE.z)
 	land.generate()
@@ -59,9 +66,9 @@ func _design() -> void:
 	set_spawn(spawn_floor)
 	_build_hot_tub()
 	_build_big_duck()
-	case_at(_floor(DUCK_XZ), "01 / THE RUBBER DUCK", "duck")
+	_place_objectives()
 	extraction(_floor(PAD_XZ))
-	hint_zone(spawn_floor + Vector3(0.0, 1.2, -6.0), Vector3(16.0, 3.0, 10.0), "THE HIGHLANDS  /  find the princess's rubber duck in the far forest, then bring it to her hot tub on the eastern hill", 9.0)
+	hint_zone(spawn_floor + Vector3(0.0, 1.2, -6.0), Vector3(16.0, 3.0, 10.0), intro_hint, 9.0)
 	_freeze_lakes()
 	_populate()
 
@@ -109,7 +116,7 @@ func _build_hot_tub() -> void:
 	block(base + Vector3(0.0, 2.27, 0.95), Vector3(0.5, 0.18, 0.5), "yellow")
 	for x: float in [-0.18, 0.0, 0.18]:
 		block(base + Vector3(x, 2.45, 1.18), Vector3(0.08, 0.2, 0.06), "yellow")
-	_sign("PRINCESS CAPYBARA\nIS NOT TO BE DISTURBED\n(UNLESS YOU HAVE THE DUCK)", base + Vector3(-5.0, 0.0, 4.5), Vector2(5.4, 2.0))
+	_sign(tub_sign, base + Vector3(-5.0, 0.0, 4.5), Vector2(5.4, 2.0))
 	light(base + Vector3(0.0, 4.0, 0.0), Color("ffe3b0"), 1.2, 18.0)
 
 
@@ -136,17 +143,25 @@ func _ball(center: Vector3, radius: float, material: String) -> void:
 
 
 ## A wooden board on two posts with text on its front (+z) face. Nothing floats.
-func _sign(text: String, base: Vector3, size: Vector2) -> void:
+## yaw (degrees) turns the board about its base; 0 faces +z.
+func _sign(text: String, base: Vector3, size: Vector2, yaw: float = 0.0) -> void:
+	var turn := Basis(Vector3.UP, deg_to_rad(yaw))
 	var center: Vector3 = base + Vector3(0.0, 1.2 + size.y * 0.5, 0.0)
-	box(center, Vector3(size.x, size.y, 0.15), "rust")
+	box(center, Vector3(size.x, size.y, 0.15), "rust", true, yaw)
 	for side: float in [-1.0, 1.0]:
-		box(Vector3(center.x + side * (size.x * 0.5 - 0.3), base.y + 0.9, center.z - 0.1), Vector3(0.18, 1.8 + size.y * 0.5, 0.18), "dark")
-	var face: Label3D = label(text, center + Vector3(0.0, 0.0, 0.1), 36, Color("fff4dc"), 0.012)
+		var post: Vector3 = turn * Vector3(side * (size.x * 0.5 - 0.3), 0.0, -0.1)
+		box(Vector3(center.x + post.x, base.y + 0.9, center.z + post.z), Vector3(0.18, 1.8 + size.y * 0.5, 0.18), "dark", true, yaw)
+	var face: Label3D = label(text, center + turn * Vector3(0.0, 0.0, 0.1), 36, Color("fff4dc"), 0.012, false, yaw)
 	face.double_sided = false
 
 ## The top of the giant duck's head, where something small and absurd can be left for the rod.
 func big_duck_head() -> Vector3:
 	return Vector3(BIG_DUCK_XZ.x, Terrain.WATER_Y + 13.7, BIG_DUCK_XZ.y + 3.5)
+
+
+## Override: the errand's pickups. By default the rubber duck in the far forest.
+func _place_objectives() -> void:
+	case_at(_floor(DUCK_XZ), "01 / THE RUBBER DUCK", "duck")
 
 
 ## Override: traps, hostiles and the flood for this version of the valley.

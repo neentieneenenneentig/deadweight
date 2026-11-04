@@ -32,6 +32,8 @@ func _run() -> void:
 	await _test_plates()
 	await _test_mine()
 	await _test_boulder()
+	await _test_geyser()
+	await _test_mud()
 	await _test_flood()
 	_scene.queue_free()
 	await _frames(3)
@@ -78,6 +80,52 @@ func _test_boulder() -> void:
 	_traps.call("boulder", Vector3(0.0, 2.6, -12.0), 2.5, trigger, Vector3(0.0, 0.0, 16.0))
 	await _seconds(2.0)
 	_check(float(_player.get("health")) < 100.0, "a released boulder that rolls into the player hurts them")
+
+
+func _test_geyser() -> void:
+	_player.set("health", 100.0)
+	var period: float = 14.0             # long enough to come down before the next eruption
+	# Phase it so the hiss starts in about 0.3 s and the column 1.4 s after that.
+	var now: float = float(_traps.get("_clock"))
+	var top: Vector3 = _traps.call("geyser", Vector3(12.0, 0.0, -12.0), period, period - 4.1 - fmod(now, period) + period, 24.0)
+	await _place(top + Vector3(0.0, 1.0, 0.0))
+	await _seconds(0.3)
+	_check(bool(_player.get("grounded")), "the player can stand on a geyser's solid mound")
+	var hissed: bool = false
+	var peak: float = -INF
+	var was_up: bool = false
+	var landed_at: float = -1.0
+	var health_after: float = -1.0
+	var tick: float = 1.0 / float(Engine.physics_ticks_per_second)
+	for i in range(int(14.0 / tick)):
+		await physics_frame
+		var states: Array = _traps.call("geyser_states")
+		if int(states[0]) == 1 and peak < top.y + 3.0:
+			hissed = true
+		peak = maxf(peak, _player.global_position.y)
+		if _player.global_position.y > top.y + 10.0:
+			was_up = true
+		if was_up and landed_at < 0.0 and bool(_player.get("grounded")):
+			landed_at = float(i) * tick
+		if landed_at >= 0.0 and float(i) * tick > landed_at + 0.2:
+			health_after = float(_player.get("health"))
+			break
+	_check(hissed, "a geyser hisses before it erupts")
+	_check(peak > top.y + 15.0, "the eruption throws the player high into the air (peak %.1f m above the vent)" % (peak - top.y))
+	_check(landed_at > 0.0 and health_after >= 100.0, "a geyser ride lands softly: no fall damage from its own throw (%.0f health)" % health_after)
+	_traps.call("set_geyser_tempo", 0.1)
+	await _place(Vector3(0.0, 0.95, 0.0))
+
+
+func _test_mud() -> void:
+	_player.set("health", 100.0)
+	_traps.call("mud_pool", Vector3(12.0, 0.04, 12.0), 4.0)
+	_check(bool(_level.call("is_hazard_at", Vector3(12.0, 0.5, 12.0))), "boiling mud counts as a hazard (no safe-ground respawn in it)")
+	await _place(Vector3(12.0, 0.95, 12.0))
+	await _seconds(1.0)
+	var health: float = float(_player.get("health"))
+	_check(health < 80.0 and health > 40.0, "wading in boiling mud hurts steadily (%.0f health after 1 s)" % health)
+	await _place(Vector3(0.0, 0.95, 0.0))
 
 
 func _test_flood() -> void:

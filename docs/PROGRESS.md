@@ -637,3 +637,20 @@ Template:
   floating rocks). main.gd attract camera far 1500 m.
 - world_test: groves solid and off the navmesh, snowfall present, the valley keeps thawed hollows.
 - Gate: PASSED (12 suites).
+## 2026-11-04: H02 The Bath Salts, geysers and boiling mud
+- Model: Claude Opus 5.5 (lead), owner away ("continue").
+- scripts/world/traps.gd: `geyser()` (sinter mound, 1.4 s hiss, 2.4 s column; anything over the
+  vent is held at the throw speed while inside the column, so a ride goes far higher than
+  power^2/2g; hounds in it die), `mud_pool()` (35 dps to the player, 60 to hounds, a zero-damage
+  heat box keeps it off the navmesh and out of respawns), `set_geyser_tempo()`, `geyser_states()`.
+  shaders/geyser_steam.gdshader: streaky, translucent steam that fades at both ends.
+- scripts/player.gd: `cushion_landing(ceiling, seconds)`: the landing after a geyser throw takes
+  no fall damage unless the player climbs above the throw's reach on their own.
+- highlands_base: `_place_objectives()`, `intro_hint`, `tub_sign`, `hot_springs`; `_sign()` takes
+  a yaw. terrain.gd `spring()`: sinter crust and thawed turf, no snow. New pickup looks "salts" and
+  "sponge". Death cause "mud".
+- Catalog: h02 after h01 (14 entries). traps_test: geyser mound is solid, it hisses first, the
+  throw peaks about 46 m above the vent, the landing is soft; mud is a hazard and hurts.
+- h02: route 1202 m, pars 340/195, bake 437 ms, build 955 ms; Forward+ spawn 135 draw calls.
+- Gate: PASSED (12 suites).
+

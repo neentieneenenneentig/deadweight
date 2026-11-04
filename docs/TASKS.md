@@ -351,6 +351,15 @@ campaign levels becoming quests that start in different places, or separate open
 recommends one world with quest starts: menus, saves and pars keep working.
 **W6 — Open world on phones.** Chunked terrain, visibility ranges on trees and grass, shadow
 distance, and a draw-call and triangle budget for Q1.
+**H02 — The Bath Salts (done, lead, 2026-11-04).** Second highland errand
+(`scripts/levels/h02_bath_salts.gd`, campaign slot after h01, `tools/run.ps1 -Level h02`): three
+jars of bath salts from a geyser basin in the south-west, the princess's sea sponge on a 34 m
+basalt stack beside the Kettle geyser (bonus), a chain of vents back toward the tub, 24 mines,
+7 hounds, and the basin boils over (geysers twice as often) once she has all three. New traps:
+`geyser()` (hiss tell, column throws the player and the weight, scalds hounds, soft landing for
+its own throw via `player.cushion_landing()`) and `mud_pool()` (hurts, cooks hounds, off the
+navmesh). Terrain `spring()` makes warm, snow-free sinter ground. Pars 340/195 from the route.
+Needs owner tuning: geyser power, periods and mud damage.
 **V2 — Alpine look (owner via Codex, integrated 2026-11-04, commit 4f2bb3a).** Cold alpine
 baseline for Floodworks and the highlands (alpine sky + slate textures, triplanar slate/snow shader,
 chamfered blocks, mountain ridges around the compact levels), animated nightmare sky for the

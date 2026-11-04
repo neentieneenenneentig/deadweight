@@ -48,7 +48,8 @@ static func _box(surface: SurfaceTool, at: Vector3, size: Vector3) -> void:
 	surface.append_from(shape, 0, Transform3D(Basis.IDENTITY, at))
 
 ## Pickup models for absurd objectives (W4), vertex coloured, centred on the floor point's axis:
-## "duck" (a rubber duck), "towel" (a folded striped towel), "firewood" (a bundle of logs).
+## "duck" (a rubber duck), "towel" (a folded striped towel), "firewood" (a bundle of logs),
+## "salts" (a jar of pink bath salts), "sponge" (a sea sponge, holes and all).
 static var _looks: Dictionary = {}
 
 static func pickup_mesh(look: String) -> ArrayMesh:
@@ -67,6 +68,38 @@ static func pickup_mesh(look: String) -> ArrayMesh:
 			for k in range(4):
 				var stripe: Color = Color("e3e8e5") if k % 2 == 0 else Color("779ea9")
 				_painted(tool, _block(Vector3(0.8, 0.08, 0.5)), Transform3D(Basis.IDENTITY, Vector3(0, -0.15 + float(k) * 0.085, 0)), stripe)
+		"salts":
+			# A squat glass jar, pink crystals inside, a cork lid and a paper label band.
+			var jar := CylinderMesh.new()
+			jar.top_radius = 0.24
+			jar.bottom_radius = 0.27
+			jar.height = 0.5
+			jar.radial_segments = 12
+			_painted(tool, jar, Transform3D(Basis.IDENTITY, Vector3(0, -0.05, 0)), Color("bcd9dd"))
+			var crystals := CylinderMesh.new()
+			crystals.top_radius = 0.255
+			crystals.bottom_radius = 0.275
+			crystals.height = 0.34
+			crystals.radial_segments = 12
+			_painted(tool, crystals, Transform3D(Basis.IDENTITY, Vector3(0, -0.12, 0)), Color("f08fb4"))
+			var cork := CylinderMesh.new()
+			cork.top_radius = 0.17
+			cork.bottom_radius = 0.2
+			cork.height = 0.12
+			cork.radial_segments = 10
+			_painted(tool, cork, Transform3D(Basis.IDENTITY, Vector3(0, 0.26, 0)), Color("b58a5e"))
+			var band := CylinderMesh.new()
+			band.top_radius = 0.28
+			band.bottom_radius = 0.28
+			band.height = 0.1
+			band.radial_segments = 12
+			_painted(tool, band, Transform3D(Basis.IDENTITY, Vector3(0, 0.02, 0)), Color("f4eedd"))
+		"sponge":
+			_painted(tool, _ball(0.34), Transform3D(Basis.from_scale(Vector3(1.25, 0.8, 1.0)), Vector3.ZERO), Color("e3b850"))
+			for k in range(7):
+				var angle: float = float(k) * 2.4
+				var hole := Vector3(cos(angle) * 0.36, sin(float(k) * 1.7) * 0.16, sin(angle) * 0.29)
+				_painted(tool, _ball(0.06), Transform3D(Basis.IDENTITY, hole), Color("8f6a2a"))
 		_:
 			# Two logs below, one on top, tied with a red band.
 			for at: Vector3 in [Vector3(-0.14, -0.1, 0), Vector3(0.14, -0.1, 0), Vector3(0, 0.12, 0)]:

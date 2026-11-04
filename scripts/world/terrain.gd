@@ -32,6 +32,8 @@ const LAKE_BED := Color("35566d")
 const TURF := Color("62785a")
 const TURF_LIGHT := Color("8a9a6c")
 const HEATHER := Color("6e5a63")
+const SINTER := Color("d6c8a2")       # hot-spring crust: pale, mineral, stained orange near vents
+const SINTER_STAIN := Color("c08a52")
 const THAW := 0.32                   # _patches noise above this is bare of snow (soft edge below)
 
 var size: float                      # metres per side, centred on the origin
@@ -45,6 +47,7 @@ var _patches := FastNoiseLite.new()
 var _flats: Array[Vector3] = []      # x, z, radius
 var _lakes: Array[Vector3] = []      # x, z, radius
 var _mounds: Array[Vector4] = []     # x, z, radius, height
+var _springs: Array[Vector3] = []    # x, z, radius: warm ground, no snow
 
 
 func _init(seed_value: int, side: float) -> void:
@@ -73,6 +76,11 @@ func flatten(center: Vector2, radius: float) -> void:
 ## four times the height), for a landmark that must stay walkable.
 func mound(center: Vector2, radius: float, height: float) -> void:
 	_mounds.append(Vector4(center.x, center.y, radius, height))
+
+
+## Warm ground around hot springs: bare sinter crust inside radius, thawed turf around it.
+func spring(center: Vector2, radius: float) -> void:
+	_springs.append(Vector3(center.x, center.y, radius))
 
 
 ## A lake basin: the ground dips below WATER_Y inside radius.
@@ -135,10 +143,15 @@ func is_snow(x: float, z: float, h: float) -> bool:
 
 ## 0 to 1: how bare of snow a sheltered hollow is. Ragged edges, none high on the mountains.
 func thaw_at(x: float, z: float, h: float) -> float:
-	if h > SNOW_LINE + 40.0 or h < WATER_Y + 1.4:
+	if h < WATER_Y + 1.4:
 		return 0.0
+	var warm: float = 0.0
+	for hot: Vector3 in _springs:
+		warm = maxf(warm, smoothstep(hot.z * 1.5, hot.z * 1.1, Vector2(x - hot.x, z - hot.y).length()))
+	if h > SNOW_LINE + 40.0:
+		return warm
 	var n: float = _patches.get_noise_2d(x, z) + _detail.get_noise_2d(x * 2.3, z * 2.3) * 0.06
-	return smoothstep(THAW - 0.05, THAW + 0.04, n) * (1.0 - smoothstep(SNOW_LINE + 25.0, SNOW_LINE + 40.0, h))
+	return maxf(warm, smoothstep(THAW - 0.05, THAW + 0.04, n) * (1.0 - smoothstep(SNOW_LINE + 25.0, SNOW_LINE + 40.0, h)))
 
 
 func _x(index: int) -> float:
@@ -189,7 +202,14 @@ func _color_at(x: float, z: float, h: float, n: Vector3) -> Color:
 	if thaw <= 0.0:
 		return frost
 	var turf: Color = TURF.lerp(TURF_LIGHT, vary).lerp(HEATHER, smoothstep(0.55, 0.9, _detail.get_noise_2d(x * 0.9, z * 0.9) * 0.5 + 0.5))
-	return frost.lerp(turf, thaw)
+	var ground: Color = frost.lerp(turf, thaw)
+	for hot: Vector3 in _springs:
+		var d: float = Vector2(x - hot.x, z - hot.y).length()
+		if d < hot.z * 1.15:
+			var stain: float = smoothstep(0.2, 0.7, _detail.get_noise_2d(x * 3.1, z * 3.1) * 0.5 + 0.5) * 0.6
+			var crust: Color = SINTER.lerp(SINTER_STAIN, stain)
+			ground = ground.lerp(crust, smoothstep(hot.z * 1.15, hot.z * 0.85, d))
+	return ground
 
 
 ## One mesh, vertex coloured. Shared vertices on a regular grid.

@@ -12,6 +12,7 @@ const CAUSES := {
 	"mine": "STEPPED ON A TEACUP",
 	"boulder": "FLATTENED BY A MARBLE",
 	"flood": "WENT UNDER WITH THE MELTWATER",
+	"mud": "BOILED IN THE MUD",
 	"hazard": "KILLED BY A HAZARD",
 }
 const TRY_THIS := {
@@ -23,6 +24,7 @@ const TRY_THIS := {
 	"mine": "Teacups beep before they blow. Throw the weight in first, or lure a hound across them.",
 	"boulder": "A marble rolls when you walk under its slope. Get airborne or get sideways.",
 	"flood": "Once the duck is taken the water rises. Stay on the hills and travel by line, not by foot.",
+	"mud": "Boiling mud hurts to wade through. Ride a geyser over it: stand on the vent while it hisses.",
 	"hazard": "Glowing floors and water hurt. Cross them in the air.",
 }
 const TRY_THIS_DEFAULT := "Spend banked salvage in the Workshop: a longer spool and stronger plating make every raid easier."

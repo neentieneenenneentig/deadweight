@@ -124,6 +124,10 @@ var _coyote_time: float = 0.0
 var _reset_position: Vector3 = Vector3.ZERO
 var _reset_pending: bool = false
 var _previous_fall_speed: float = 0.0
+## A geyser's throw (W2) comes with a soft landing: the next touchdown within _cushion_time takes no
+## fall damage, unless the player climbs above _cushion_ceiling on their own first.
+var _cushion_time: float = 0.0
+var _cushion_ceiling: float = INF
 var _was_grounded: bool = false
 var _bob: float = 0.0
 var _shot_flash: float = 0.0
@@ -186,6 +190,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var most_upright: float = -1.0
 	grounded = false
 	_slam_cooldown = maxf(0.0, _slam_cooldown - step)
+	_update_cushion(step)
 	for index in state.get_contact_count():
 		var other: Object = state.get_contact_collider_object(index)
 		if other is Node and (other as Node).is_in_group("enemies"):
@@ -237,6 +242,9 @@ func _touchdown() -> void:
 	if impact > 6.0:
 		add_shake(minf(0.6, impact * 0.03))
 	var damage: float = landing_damage(impact)
+	if _cushion_time > 0.0:
+		damage = 0.0
+		_cushion_time = 0.0
 	if active and damage > 0.0:
 		take_damage.call_deferred(damage, "impact", Vector3.INF)
 
@@ -257,6 +265,20 @@ static func slam_damage(speed: float) -> float:
 	if speed < SLAM_MIN_SPEED:
 		return 0.0
 	return (speed - SLAM_FREE_SPEED) * SLAM_DAMAGE_PER_MS
+
+
+## The next landing within seconds is soft, as long as the player stays below ceiling (a world y).
+func cushion_landing(ceiling: float, seconds: float = 10.0) -> void:
+	_cushion_time = seconds
+	_cushion_ceiling = ceiling
+
+
+func _update_cushion(step: float) -> void:
+	if _cushion_time <= 0.0:
+		return
+	_cushion_time = maxf(0.0, _cushion_time - step)
+	if global_position.y > _cushion_ceiling:
+		_cushion_time = 0.0
 
 
 ## Health lost when landing at impact m/s of downward speed (S1).

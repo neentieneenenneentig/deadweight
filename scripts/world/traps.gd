@@ -11,6 +11,11 @@ extends Node3D
 ##                then rolls. It hurts on contact at speed, flattens hounds, and resets later.
 ##   flood        water that rises from one height to another once start_flood() is called.
 ##                Under it the player takes FLOOD_DPS and hounds drown.
+##   geyser       a vent on a solid stone mound that erupts on a cycle: it hisses for
+##                GEYSER_WARN, then the column throws anything over the vent high into the air
+##                (the player, the weight) and scalds hounds. A tool, not a damage source.
+##   mud_pool     boiling mud on the ground: it hurts the player who wades in and cooks hounds.
+##                A zero-damage hazard box keeps it off the hounds' navmesh.
 ## Everything is solid where it looks solid, and nothing here floats text.
 
 const FX = preload("res://scripts/fx.gd")
@@ -33,6 +38,13 @@ const BOULDER_DAMAGE := 40.0
 const BOULDER_LIFETIME := 24.0       # seconds rolling before it resets
 const BOULDER_MASS := 3000.0
 
+const GEYSER_WARN := 1.4            # seconds of hissing before an eruption
+const GEYSER_ERUPT := 2.4            # seconds the column stands
+const GEYSER_RADIUS := 1.9           # metres from the vent's axis that the column catches
+const GEYSER_MOUND := 0.7            # mound height above the floor point
+const MUD_DPS := 35.0
+const MUD_ENEMY_DPS := 60.0
+
 const FLOOD_DPS := 30.0
 const FLOOD_DROWN := 1.5             # seconds under the flood before a hound drowns
 
@@ -41,6 +53,10 @@ var _fields: Array[Dictionary] = []
 var _mines: Array[Dictionary] = []
 var _boulders: Array[Dictionary] = []
 var _flood: Dictionary = {}
+var _geysers: Array[Dictionary] = []
+var _muds: Array[Dictionary] = []
+var _clock: float = 0.0
+var _tempo: float = 1.0                # geysers erupt this many times as often (set_geyser_tempo)
 var _scan_clock: float = 0.0
 var _mine_mesh: ArrayMesh
 var _mine_armed: StandardMaterial3D
@@ -180,6 +196,84 @@ func start_flood() -> void:
 	level.emit_signal("hint_requested", "THE MELTWATER IS RISING  /  get high and stay high", 6.0)
 
 
+## A geyser on a solid stone mound at floor_point. It erupts for GEYSER_ERUPT every period seconds,
+## phase seconds into its cycle, throwing what is over the vent up at power m/s (about
+## power^2 / 20 metres of height). Returns the vent top, where the column starts.
+func geyser(floor_point: Vector3, period: float = 7.0, phase: float = 0.0, power: float = 24.0) -> Vector3:
+	var top: Vector3 = floor_point + Vector3.UP * GEYSER_MOUND
+	var mound := CylinderMesh.new()
+	mound.top_radius = GEYSER_RADIUS + 0.4
+	mound.bottom_radius = GEYSER_RADIUS + 1.6
+	mound.height = GEYSER_MOUND + 0.6
+	mound.radial_segments = 12
+	var rim := MeshInstance3D.new()
+	rim.mesh = mound
+	rim.material_override = _sinter_material()
+	rim.position = floor_point + Vector3.UP * (GEYSER_MOUND - 0.6) * 0.5
+	add_child(rim)
+	var body := StaticBody3D.new()
+	body.name = "GeyserMound"
+	body.collision_layer = 1
+	body.collision_mask = 0
+	var shape := CylinderShape3D.new()
+	shape.radius = GEYSER_RADIUS + 1.0
+	shape.height = GEYSER_MOUND + 0.6
+	var collision := CollisionShape3D.new()
+	collision.shape = shape
+	body.add_child(collision)
+	body.position = rim.position
+	add_child(body)
+	# The vent: a dark wet disc just above the mound top.
+	var vent_mesh := CylinderMesh.new()
+	vent_mesh.top_radius = GEYSER_RADIUS * 0.55
+	vent_mesh.bottom_radius = GEYSER_RADIUS * 0.55
+	vent_mesh.height = 0.04
+	vent_mesh.radial_segments = 12
+	var vent := MeshInstance3D.new()
+	vent.mesh = vent_mesh
+	vent.material_override = _vent_material()
+	vent.position = top + Vector3.UP * 0.02
+	add_child(vent)
+	# The column: unit height, scaled while it erupts. Steam is not solid, and does not look it.
+	var column_mesh := CylinderMesh.new()
+	column_mesh.top_radius = 1.5
+	column_mesh.bottom_radius = 0.7
+	column_mesh.height = 1.0
+	column_mesh.radial_segments = 12
+	column_mesh.cap_top = false
+	column_mesh.cap_bottom = false
+	var column := MeshInstance3D.new()
+	column.mesh = column_mesh
+	column.material_override = _steam_material()
+	column.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	column.position = top
+	column.visible = false
+	add_child(column)
+	_geysers.append({
+		"top": top, "period": maxf(period, GEYSER_WARN + GEYSER_ERUPT + 0.5), "phase": phase,
+		"power": power, "column": column, "state": 0, "height": power * power / 20.0,
+	})
+	return top
+
+
+## Boiling mud: a round pool on the ground, surface at center.y. Hurts the player who wades in and
+## cooks hounds. A zero-damage hazard box keeps it off the navmesh and out of safe-ground respawns.
+func mud_pool(center: Vector3, radius: float) -> void:
+	var disc := CylinderMesh.new()
+	disc.top_radius = radius
+	disc.bottom_radius = radius
+	disc.height = 0.08
+	disc.radial_segments = 20
+	var view := MeshInstance3D.new()
+	view.mesh = disc
+	view.material_override = _mud_material()
+	view.position = center
+	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(view)
+	level.call("hazard_box", AABB(center - Vector3(radius, 1.2, radius), Vector3(radius * 2.0, 2.0, radius * 2.0)), "heat", 0.0)
+	_muds.append({"center": center, "radius": radius, "view": view})
+
+
 ## Current flood height, or -INF before it starts.
 func flood_level() -> float:
 	if _flood.is_empty() or not bool(_flood["running"]):
@@ -202,6 +296,9 @@ func _physics_process(delta: float) -> void:
 	_update_mines(player, delta)
 	_update_boulders(player, delta)
 	_update_flood(player, delta)
+	_clock += delta
+	_update_geysers(player)
+	_update_muds(player, delta)
 
 
 func _cell_under(field: Dictionary, point: Vector3) -> Dictionary:
@@ -416,7 +513,134 @@ func _update_flood(player: Node3D, delta: float) -> void:
 			under[hostile.get_instance_id()] = -1000.0
 
 
+func _update_geysers(player: Node3D) -> void:
+	for record: Dictionary in _geysers:
+		var period: float = maxf(float(record["period"]) / _tempo, GEYSER_WARN + GEYSER_ERUPT + 0.6)
+		var t: float = fmod(_clock + float(record["phase"]), period)
+		var erupt_at: float = period - GEYSER_ERUPT
+		var state: int = 2 if t >= erupt_at else (1 if t >= erupt_at - GEYSER_WARN else 0)
+		var top: Vector3 = record["top"]
+		var column: MeshInstance3D = record["column"]
+		if state != int(record["state"]):
+			record["state"] = state
+			if state == 1:
+				_sound("hazard_zap", top, -4.0)
+			elif state == 2:
+				_sound("splash", top, 6.0)
+		var height: float = 1.0
+		match state:
+			0:
+				column.visible = false
+			1:
+				# The tell: a low, swelling plume of steam over the vent.
+				var swell: float = (t - (erupt_at - GEYSER_WARN)) / GEYSER_WARN
+				height = 0.5 + swell * 2.0
+				column.visible = true
+				column.scale = Vector3(0.6 + swell * 0.3, height, 0.6 + swell * 0.3)
+			2:
+				var age: float = t - erupt_at
+				var rise: float = clampf(age / 0.35, 0.0, 1.0) * (1.0 - smoothstep(GEYSER_ERUPT - 0.5, GEYSER_ERUPT, age) * 0.7)
+				height = float(record["height"]) * 0.8 * rise + 1.0
+				column.visible = true
+				column.scale = Vector3(1.0, height, 1.0)
+				_geyser_throw(record, player, height)
+		column.position = top + Vector3.UP * height * 0.5
+
+
+## Bodies over the vent and inside the column are thrown up; hounds are scalded.
+func _geyser_throw(record: Dictionary, player: Node3D, height: float) -> void:
+	var top: Vector3 = record["top"]
+	var power: float = record["power"]
+	var bodies: Array[Node] = [player]
+	bodies.append_array(get_tree().get_nodes_in_group("cast_weight"))
+	for node: Node in bodies:
+		if not (node is RigidBody3D):
+			continue
+		var body := node as RigidBody3D
+		var offset: Vector3 = body.global_position - top
+		if Vector2(offset.x, offset.z).length() > GEYSER_RADIUS or offset.y < -1.0 or offset.y > height:
+			continue
+		body.sleeping = false
+		if body.linear_velocity.y < power:
+			body.linear_velocity.y = power
+		if body == player:
+			if player.has_method("add_shake"):
+				player.call("add_shake", 0.25)
+			# The throw comes with a soft landing, unless the player climbs higher on their own.
+			# Ceiling: the column's reach plus a free climb at the throw speed, and a margin.
+			if player.has_method("cushion_landing"):
+				var gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)) * maxf(body.gravity_scale, 0.1)
+				player.call("cushion_landing", top.y + float(record["height"]) * 0.8 + power * power / (2.0 * gravity) + 5.0)
+	for hostile: Node in (level.get("_enemies") as Array):
+		if not is_instance_valid(hostile) or str(hostile.get("kind")) != "hound":
+			continue
+		var offset: Vector3 = (hostile as Node3D).global_position - top
+		if Vector2(offset.x, offset.z).length() < GEYSER_RADIUS + 0.5 and offset.y > -1.5 and offset.y < height:
+			hostile.call("take_damage", 500.0, "geyser")
+
+
+func _update_muds(player: Node3D, delta: float) -> void:
+	for record: Dictionary in _muds:
+		var center: Vector3 = record["center"]
+		var radius: float = record["radius"]
+		var offset: Vector3 = player.global_position - center
+		if Vector2(offset.x, offset.z).length() < radius and offset.y < 1.3:
+			player.call("take_damage", MUD_DPS * float(level.get("damage_scale")) * delta, "mud", Vector3.INF)
+		for hostile: Node in (level.get("_enemies") as Array):
+			if not is_instance_valid(hostile):
+				continue
+			var at: Vector3 = (hostile as Node3D).global_position - center
+			if Vector2(at.x, at.z).length() < radius and at.y < 1.0:
+				hostile.call("take_damage", MUD_ENEMY_DPS * delta, "mud")
+		# A slow boil: the surface breathes.
+		(record["view"] as MeshInstance3D).scale.y = 1.0 + sin(_clock * 3.0 + center.x) * 0.5
+
+
+## Every geyser erupts tempo times as often (1 is the built rhythm).
+func set_geyser_tempo(tempo: float) -> void:
+	_tempo = maxf(tempo, 0.1)
+
+
+## Current geyser states (0 quiet, 1 hissing, 2 erupting), in build order. For tests.
+func geyser_states() -> Array[int]:
+	var states: Array[int] = []
+	for record: Dictionary in _geysers:
+		states.append(int(record["state"]))
+	return states
+
+
 # --- Looks and sounds ----------------------------------------------------------------------------
+
+func _sinter_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("c9b58f")      # pale sinter crust, stained by minerals
+	material.roughness = 0.95
+	return material
+
+
+func _vent_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("3c6f78")
+	material.roughness = 0.1
+	material.metallic = 0.3
+	return material
+
+
+func _steam_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://shaders/geyser_steam.gdshader")
+	return material
+
+
+func _mud_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("4a3327")
+	material.roughness = 0.6
+	material.emission_enabled = true
+	material.emission = Color("b5532b")
+	material.emission_energy_multiplier = 0.08
+	return material
+
 
 func _plate_color(kind: String, crack: float) -> Color:
 	var base: Color = Color("cfeaf5") if kind == "ice" else Color("cbbfa4")
