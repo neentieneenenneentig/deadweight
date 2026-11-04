@@ -76,6 +76,9 @@ func _build_ground() -> void:
 	view.name = "Terrain"
 	view.mesh = land.build_mesh()
 	view.material_override = Alpine.surface_material(Color("dce9ef"), true)
+	# 157k triangles drawn again in every shadow cascade cost more than the gentle hills' shadows
+	# are worth; trees, rocks and props still cast onto it (V2b).
+	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(view)
 	var shape := ConcavePolygonShape3D.new()
 	shape.set_faces(land.collision_faces())

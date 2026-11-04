@@ -62,6 +62,16 @@ objectives, controls and saves are unchanged. The new mountain surroundings rema
 outside the existing route navmeshes; trees and boulders still use the established
 navigation exclusions and obstacle posts.
 
+### V2b additions (lead, 2026-11-04)
+
+- Sheltered hollows in the highlands thaw to muted turf and heather with ragged edges. Grass
+  tufts and small alpine flowers grow only there, never out of a snowfield.
+- Light snowfall in the alpine zones, as soft round flakes carried along with the camera. It is
+  off on Low quality.
+- Solid pine groves stand on the snow between the compact works and their mountain ridges.
+- Tree and rock batches are split into 350 m cells so culling and shadow cascades skip what is
+  out of view. The terrain no longer casts sun shadows.
+
 ## Moving skies
 
 Every region uses its own panorama with a level-local clock. Cold skies drift slowly.

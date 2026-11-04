@@ -28,6 +28,11 @@ const ROCK := Color("738597")
 const ROCK_DARK := Color("465d74")
 const SNOW := Color("e8f0f3")
 const LAKE_BED := Color("35566d")
+# Thawed hollows (V2b): muted, cold alpine turf and heather where the snow has gone.
+const TURF := Color("62785a")
+const TURF_LIGHT := Color("8a9a6c")
+const HEATHER := Color("6e5a63")
+const THAW := 0.32                   # _patches noise above this is bare of snow (soft edge below)
 
 var size: float                      # metres per side, centred on the origin
 var count: int                       # samples per side
@@ -125,8 +130,15 @@ func forest_at(x: float, z: float) -> float:
 func is_snow(x: float, z: float, h: float) -> bool:
 	var line: float = SNOW_LINE + _detail.get_noise_2d(x * 0.3, z * 0.3) * SNOW_JITTER
 	# Green patches survive in sheltered hollows below the peaks.
-	var patch: bool = _patches.get_noise_2d(x, z) > 0.32 and h < SNOW_LINE + 40.0
-	return h > line and not patch
+	return h > line and thaw_at(x, z, h) < 0.5
+
+
+## 0 to 1: how bare of snow a sheltered hollow is. Ragged edges, none high on the mountains.
+func thaw_at(x: float, z: float, h: float) -> float:
+	if h > SNOW_LINE + 40.0 or h < WATER_Y + 1.4:
+		return 0.0
+	var n: float = _patches.get_noise_2d(x, z) + _detail.get_noise_2d(x * 2.3, z * 2.3) * 0.06
+	return smoothstep(THAW - 0.05, THAW + 0.04, n) * (1.0 - smoothstep(SNOW_LINE + 25.0, SNOW_LINE + 40.0, h))
 
 
 func _x(index: int) -> float:
@@ -168,12 +180,16 @@ func _color_at(x: float, z: float, h: float, n: Vector3) -> Color:
 		return LAKE_BED
 	if h < WATER_Y + 1.4:
 		return SHORE
-	if is_snow(x, z, h) and slope < 0.38:
-		return SNOW.lerp(Color("b3ccdf"), vary * 0.5)
 	if slope > 0.42 or h > TREE_LINE + 25.0:
 		return ROCK.lerp(ROCK_DARK, vary)
-	var grass: Color = MEADOW.lerp(MEADOW_LIGHT, vary)
-	return grass.lerp(FOREST_FLOOR, forest_at(x, z) * 0.8)
+	var frost: Color = SNOW.lerp(Color("b3ccdf"), vary * 0.5)
+	if not is_snow(x, z, h) or slope >= 0.38:
+		frost = MEADOW.lerp(MEADOW_LIGHT, vary).lerp(FOREST_FLOOR, forest_at(x, z) * 0.8)
+	var thaw: float = thaw_at(x, z, h)
+	if thaw <= 0.0:
+		return frost
+	var turf: Color = TURF.lerp(TURF_LIGHT, vary).lerp(HEATHER, smoothstep(0.55, 0.9, _detail.get_noise_2d(x * 0.9, z * 0.9) * 0.5 + 0.5))
+	return frost.lerp(turf, thaw)
 
 
 ## One mesh, vertex coloured. Shared vertices on a regular grid.

@@ -623,3 +623,17 @@ Template:
   marble, the ice) and h01_the_duck.gd the raid. Deaths by mine, boulder and flood have causes and tips.
 - W4 (cd9ad2f): objective wording from INFO, duck/towel/firewood pickup models.
 - Shadows reach 160 m in the highlands. Gate: PASSED (11 suites).
+## 2026-11-04: V2 alpine pass integrated, V2b massage
+- Model: Claude Opus 5.5 (lead). The owner made a visual pass with Codex; integrated as commit
+  4f2bb3a after review (gate green). Fixed em dashes mangled into mojibake in the pickup messages
+  (level_base) and PROMPTS.md, and a stray one in THIRD_PARTY_NOTICES.txt.
+- V2b: terrain.gd `thaw_at()` (turf/heather hollows, ragged edges, never high on the mountains;
+  `is_snow()` uses it); nature.gd grass only on thawed ground, `grove()` for compact levels,
+  MultiMeshes split into CHUNK cells; alpine.gd `snowfall()` (GPU particles that follow the
+  camera, 900/1800 flakes on Medium/High, off on Low); highlands terrain casts no shadow.
+- Forward+ 1280x720 captures: h01 spawn 212 draw calls / 1.48 M triangles (was 179 / 4.03 M);
+  l01 spawn 161 / 201 k (was 158 / 68 k: the grove and snow); Compatibility l01 143 / 125 k.
+- tests/level_preview.gd camera far 1500 m (matches the player; 600 m made distant peaks look like
+  floating rocks). main.gd attract camera far 1500 m.
+- world_test: groves solid and off the navmesh, snowfall present, the valley keeps thawed hollows.
+- Gate: PASSED (12 suites).

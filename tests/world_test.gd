@@ -69,6 +69,7 @@ func _run() -> void:
 	await _test_dummies()
 	await _test_threat()
 	await _test_sentry_tracking()
+	_test_thaw()
 	_scene.queue_free()
 	await _frames(3)
 	print("WORLD TEST: %d checks, %d failures" % [_checks, _failures])
@@ -112,7 +113,7 @@ func _test_framework() -> void:
 				triangles += (node.mesh as Mesh).get_faces().size() / 3
 		elif node is Label3D:
 			labels += 1
-		elif node is StaticBody3D and node.name not in ["Scenery", "PendulumBall", "AlpineRidgesBody"]:
+		elif node is StaticBody3D and node.name not in ["Scenery", "PendulumBall", "AlpineRidgesBody", "Grove"]:
 			bodies += 1   # the scenery bodies (S1) are separate on purpose: the navmesh bake skips them
 		elif node is CollisionShape3D:
 			shapes += 1
@@ -126,6 +127,18 @@ func _test_framework() -> void:
 	var ridge_body: StaticBody3D = _world.get_node("AlpineRidgesBody")
 	var ridge_shape: ConcavePolygonShape3D = (ridge_body.get_child(0) as CollisionShape3D).shape
 	_check(ridge_shape.get_faces() == ridges.mesh.get_faces() and ridge_body in _world.get("nav_skip_bodies"), "mountains have an exact solid surface outside the route navmesh")
+	# V2b: the groves on the snow are solid, like every tree, and stay out of the route navmesh.
+	var grove: StaticBody3D = _world.get_node_or_null("Grove")
+	var pines: MultiMeshInstance3D = _world.get_node_or_null("Pines")
+	_check(grove != null and pines != null and pines.multimesh.instance_count > 20 and grove in _world.get("nav_skip_bodies"), "pine groves stand between the works and the mountains, off the navmesh")
+	if grove != null and grove.get_child_count() > 0:
+		# Headless MultiMesh buffers read back as identity, so take the tree from its trunk collider.
+		var tree: Vector3 = (grove.get_child(0) as Node3D).position
+		await physics_frame
+		var probe := PhysicsRayQueryParameters3D.create(Vector3(tree.x + 0.6, 30.0, tree.z + 0.6), Vector3(tree.x + 0.6, tree.y + 0.5, tree.z + 0.6), 1)
+		var top: Dictionary = _world.get_world_3d().direct_space_state.intersect_ray(probe)
+		_check(not top.is_empty() and top["collider"] == grove and float(top["position"].y) > tree.y + 1.0, "a grove pine's crown is solid")
+	_check(_world.get_node_or_null("Snowfall") is GPUParticles3D, "alpine levels have snowfall")
 	_check(int(_world.get("_pending_count")) > 300, "the prototype's primitives were staged before merging")
 	for quality in [0, 1, 2, 5]:
 		_world.call("apply_quality", quality)
@@ -829,3 +842,27 @@ func _check(condition: bool, description: String) -> void:
 	else:
 		_failures += 1
 		push_error("FAIL: " + description)
+
+
+## V2b: the highlands' snowfields keep bare, thawed hollows; grass grows only there.
+func _test_thaw() -> void:
+	var TerrainScript: GDScript = load("res://scripts/world/terrain.gd")
+	var land: RefCounted = TerrainScript.new(7319, 1400.0)
+	land.call("generate")
+	var thawed: int = 0
+	var snowy: int = 0
+	var both: int = 0
+	for i in range(40):
+		for j in range(40):
+			var x: float = -380.0 + float(i) * 19.0
+			var z: float = -380.0 + float(j) * 19.0
+			var h: float = land.call("height_at", x, z)
+			var t: float = land.call("thaw_at", x, z, h)
+			var snow: bool = land.call("is_snow", x, z, h)
+			if t > 0.6:
+				thawed += 1
+				if snow:
+					both += 1
+			elif snow:
+				snowy += 1
+	_check(thawed > 80 and snowy > thawed and both == 0, "the valley is mostly snow with thawed hollows (%d thawed, %d snow)" % [thawed, snowy])

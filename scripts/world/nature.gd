@@ -23,13 +23,15 @@ const OAK_TRUNK := Color("65594d")
 const OAK_LEAF := Color("4e7170")
 const OAK_LEAF_LIGHT := Color("82a09a")
 const ROCK := Color("8295a5")
-const GRASS := Color("818d86")
-const FLOWERS := [Color("b6c4c8"), Color("d9e6ea"), Color("8ca5b5"), Color("adb9bf")]
+const GRASS := Color("7d9466")
+# Small alpine flowers in the thawed hollows: saxifrage white, gentian blue, cinquefoil, heather.
+const FLOWERS := [Color("e8ecef"), Color("8fa6dc"), Color("d9c46a"), Color("c9a6c8")]
 
 const TREE_SPACING := 9.0            # metres between scatter candidates
 const ROCK_SPACING := 26.0
 const GRASS_RADIUS := 220.0          # tufts only grow this close to the centre of keep_clear[0]
-const GRASS_COUNT := 5000
+const GRASS_COUNT := 9000           # candidates; only those on thawed ground grow
+const CHUNK := 350.0                 # metres per MultiMesh cell, so culling and shadow cascades can skip cells
 
 
 static func scatter(level: Node3D, land: Terrain, seed_value: int, keep_clear: Array[Vector3]) -> void:
@@ -111,6 +113,45 @@ static func scatter(level: Node3D, land: Terrain, seed_value: int, keep_clear: A
 	for placement: Transform3D in rocks:
 		posts.append(Vector4(placement.origin.x, placement.origin.y, placement.origin.z, 0.8 * placement.basis.get_scale().x))
 	_add_grass(level, land, rng, keep_clear)
+
+
+## Pine groves on the flat snow between a compact level and its mountain ring (V2b). Solid like
+## every other tree, on a body the route navmesh skips. ring = (inner, outer) distance from centre;
+## margin keeps the trees that far outside the footprint.
+static func grove(level: Node3D, centre: Vector3, ring: Vector2, footprint: Rect2, margin: float, seed_value: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var clumps := FastNoiseLite.new()
+	clumps.seed = seed_value
+	clumps.frequency = 0.02
+	var keep: Rect2 = footprint.grow(margin)
+	var pines: Array[Transform3D] = []
+	var x: float = centre.x - ring.y
+	while x < centre.x + ring.y:
+		var z: float = centre.z - ring.y
+		while z < centre.z + ring.y:
+			var p := Vector2(x + rng.randf_range(-3.5, 3.5), z + rng.randf_range(-3.5, 3.5))
+			var roll: float = rng.randf()
+			var s: float = rng.randf_range(1.1, 2.3)
+			var yaw: float = rng.randf() * TAU
+			z += TREE_SPACING
+			var d: float = p.distance_to(Vector2(centre.x, centre.z))
+			if d < ring.x or d > ring.y or keep.has_point(p):
+				continue
+			var dense: float = clumps.get_noise_2d(p.x, p.y) * 0.5 + 0.5
+			if roll < smoothstep(0.45, 0.8, dense) * 0.7:
+				pines.append(Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), Vector3(p.x, centre.y - 0.3, p.y)))
+		x += TREE_SPACING
+	if pines.is_empty():
+		return
+	# A grove is small: one MultiMesh is cheaper than cells. Pines only, to spare draw calls.
+	_add_multimesh(level, "Pines", _pine_mesh(), pines, rng, 0.12, 0.0)
+	var body := StaticBody3D.new()
+	body.name = "Grove"
+	for placement: Transform3D in pines:
+		_pine_colliders(body, placement)
+	level.call("adopt_world_body", body)
+	(level.get("nav_skip_bodies") as Array).append(body)
 
 
 static func _blocked(x: float, z: float, keep_clear: Array[Vector3]) -> bool:
@@ -273,23 +314,37 @@ static func _append(tool: SurfaceTool, mesh: PrimitiveMesh, placement: Transform
 		tool.add_vertex(placement * vertices[index])
 
 
-static func _add_multimesh(level: Node3D, title: String, mesh: ArrayMesh, placements: Array[Transform3D], rng: RandomNumberGenerator, tint: float) -> void:
+static func _add_multimesh(level: Node3D, title: String, mesh: ArrayMesh, placements: Array[Transform3D], rng: RandomNumberGenerator, tint: float, chunk: float = CHUNK) -> void:
+	# chunk <= 0: a single MultiMesh.
 	if placements.is_empty():
 		return
-	var multi := MultiMesh.new()
-	multi.transform_format = MultiMesh.TRANSFORM_3D
-	multi.use_colors = true
-	multi.mesh = mesh
-	multi.instance_count = placements.size()
-	for i in range(placements.size()):
-		multi.set_instance_transform(i, placements[i])
-		var v: float = 1.0 + rng.randf_range(-tint, tint)
-		multi.set_instance_color(i, Color(v, v * rng.randf_range(0.97, 1.03), v * 0.98))
-	var view := MultiMeshInstance3D.new()
-	view.name = title
-	view.multimesh = multi
-	view.material_override = Alpine.surface_material(Color("dce9ef"), true) if title == "Rocks" else _vertex_material()
-	level.add_child(view)
+	# One MultiMesh per CHUNK cell: a single valley-wide AABB would be drawn whole in the main
+	# view and again in every shadow cascade.
+	var cells: Dictionary = {}
+	for placement: Transform3D in placements:
+		var key := Vector2i.ZERO if chunk <= 0.0 else Vector2i(floori(placement.origin.x / chunk), floori(placement.origin.z / chunk))
+		if not cells.has(key):
+			cells[key] = [] as Array[Transform3D]
+		(cells[key] as Array[Transform3D]).append(placement)
+	var material: Material = Alpine.surface_material(Color("dce9ef"), true) if title == "Rocks" else _vertex_material()
+	var keys: Array = cells.keys()
+	keys.sort()
+	for key: Vector2i in keys:
+		var group: Array[Transform3D] = cells[key]
+		var multi := MultiMesh.new()
+		multi.transform_format = MultiMesh.TRANSFORM_3D
+		multi.use_colors = true
+		multi.mesh = mesh
+		multi.instance_count = group.size()
+		for i in range(group.size()):
+			multi.set_instance_transform(i, group[i])
+			var v: float = 1.0 + rng.randf_range(-tint, tint)
+			multi.set_instance_color(i, Color(v, v * rng.randf_range(0.97, 1.03), v * 0.98))
+		var view := MultiMeshInstance3D.new()
+		view.name = title if key == keys[0] else "%s_%d_%d" % [title, key.x, key.y]
+		view.multimesh = multi
+		view.material_override = material
+		level.add_child(view)
 
 
 static func _vertex_material() -> StandardMaterial3D:
@@ -346,7 +401,8 @@ static func _add_grass(level: Node3D, land: Terrain, rng: RandomNumberGenerator,
 		var px: float = center.x + cos(angle) * distance
 		var pz: float = center.y + sin(angle) * distance
 		var h: float = land.height_at(px, pz)
-		if h < Terrain.WATER_Y + 1.0 or land.is_snow(px, pz, h):
+		# Tufts grow only where the snow has thawed (V2b); none poke out of a snowfield.
+		if h < Terrain.WATER_Y + 1.0 or land.thaw_at(px, pz, h) < 0.6:
 			continue
 		var s: float = rng.randf_range(0.7, 1.5)
 		placements.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * s), Vector3(px, h, pz)))

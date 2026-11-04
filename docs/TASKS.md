@@ -351,6 +351,16 @@ campaign levels becoming quests that start in different places, or separate open
 recommends one world with quest starts: menus, saves and pars keep working.
 **W6 — Open world on phones.** Chunked terrain, visibility ranges on trees and grass, shadow
 distance, and a draw-call and triangle budget for Q1.
+**V2 — Alpine look (owner via Codex, integrated 2026-11-04, commit 4f2bb3a).** Cold alpine
+baseline for Floodworks and the highlands (alpine sky + slate textures, triplanar slate/snow shader,
+chamfered blocks, mountain ridges around the compact levels), animated nightmare sky for the
+Foundry, slate-blue UI. See docs/DREAMSCAPE.md.
+**V2b — Massage (done, lead, 2026-11-04).** Thawed hollows of turf and heather in the highland
+snow (grass and small alpine flowers grow only there), light snowfall in alpine zones (off on Low),
+solid pine groves between the compact works and their ridges, Pines/Oaks/Rocks MultiMeshes split
+into 350 m cells and no terrain shadow pass (h01 spawn: 4.03 M → 1.48 M rendered triangles, 179 →
+212 draw calls on Forward+), title camera far plane 1500 m. Still open for W6: visibility ranges and
+a phone measurement (Q1).
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
 department, and added three AI-generated textures. The store text, press kit, rating answers and

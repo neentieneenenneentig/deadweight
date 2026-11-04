@@ -115,6 +115,10 @@ static func dress(level: Node3D, footprint: Rect2, floor_y: float) -> void:
 	shape.set_faces(mesh.get_faces())
 	var body: StaticBody3D = level.call("add_world_body", shape, Transform3D.IDENTITY, "AlpineRidgesBody")
 	(level.get("nav_skip_bodies") as Array).append(body)
+	# Pine groves on the snow between the works and the ridges (V2b). Loaded, not preloaded:
+	# nature.gd preloads this script.
+	var nature: GDScript = load("res://scripts/world/nature.gd")
+	nature.call("grove", level, centre + Vector3(0, 0.12, 0), Vector2(18.0, inner + 6.0), footprint, 14.0, 7043)
 
 static func _triangle(tool: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
 	var normal: Vector3 = (b - a).cross(c - a).normalized()
@@ -130,3 +134,57 @@ static func _triangle(tool: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> 
 	tool.add_vertex(a)
 	tool.add_vertex(c)
 	tool.add_vertex(b)
+
+## Light snowfall (V2b): one GPU particle system that main's camera carries along (level_base
+## _process moves it). World-space flakes, so flying through them reads as speed. Visual only.
+const SNOW_BOX := Vector3(70.0, 26.0, 70.0)
+
+static func snowfall() -> GPUParticles3D:
+	var snow := GPUParticles3D.new()
+	snow.name = "Snowfall"
+	snow.local_coords = false
+	snow.lifetime = 12.0
+	snow.preprocess = 12.0
+	snow.fixed_fps = 30
+	snow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	snow.visibility_aabb = AABB(-SNOW_BOX * 0.5 - Vector3(0, 30, 0), SNOW_BOX + Vector3(0, 30, 0))
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = SNOW_BOX * 0.5
+	process.direction = Vector3(0.3, -1.0, 0.15)
+	process.spread = 18.0
+	process.initial_velocity_min = 0.6
+	process.initial_velocity_max = 1.4
+	process.gravity = Vector3(0.25, -0.9, 0.1)
+	process.scale_min = 0.6
+	process.scale_max = 1.4
+	process.turbulence_enabled = true
+	process.turbulence_noise_strength = 0.6
+	process.turbulence_noise_scale = 6.0
+	process.turbulence_influence_min = 0.05
+	process.turbulence_influence_max = 0.12
+	snow.process_material = process
+	var flake := QuadMesh.new()
+	flake.size = Vector2(0.09, 0.09)
+	# A soft round dot, not a square.
+	var dot := Gradient.new()
+	dot.set_color(0, Color(1, 1, 1, 1))
+	dot.set_color(1, Color(1, 1, 1, 0))
+	dot.add_point(0.45, Color(1, 1, 1, 0.9))
+	var disc := GradientTexture2D.new()
+	disc.gradient = dot
+	disc.fill = GradientTexture2D.FILL_RADIAL
+	disc.fill_from = Vector2(0.5, 0.5)
+	disc.fill_to = Vector2(1.0, 0.5)
+	disc.width = 32
+	disc.height = 32
+	var look := StandardMaterial3D.new()
+	look.albedo_texture = disc
+	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	look.albedo_color = Color(0.96, 0.98, 1.0, 0.85)
+	look.disable_receive_shadows = true
+	flake.material = look
+	snow.draw_pass_1 = flake
+	return snow

@@ -44,7 +44,7 @@ func _run() -> void:
 	dummy.global_position = spawn
 	var camera := Camera3D.new()
 	camera.fov = 78.0
-	camera.far = 600.0
+	camera.far = 1500.0                 # as the player camera, so far ridges are not clipped
 	scene.add_child(camera)
 	camera.make_current()
 	var name_part: String = _level_id + (("_" + _tag) if not _tag.is_empty() else "")

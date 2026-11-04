@@ -187,7 +187,7 @@ func _build_nodes() -> void:
 	_set_hud_visible(false)
 	_attract = Camera3D.new()
 	_attract.fov = 70.0
-	_attract.far = 400.0
+	_attract.far = 1500.0                 # the title looks across the valley to its mountains
 	add_child(_attract)
 	_save_timer = Timer.new()
 	_save_timer.one_shot = true

@@ -172,6 +172,7 @@ var _body: StaticBody3D                              # every solid primitive's c
 var _extract_ring: MeshInstance3D
 var _sky_material: ShaderMaterial
 var _storm_time: float = 0.0
+var _snow: GPUParticles3D                            # alpine zones only, follows the camera (V2b)
 var _environment: Environment
 var _sun: DirectionalLight3D
 var _fog_base: float = 0.0
@@ -784,6 +785,12 @@ func apply_quality(value: int) -> void:
 		_environment.glow_enabled = quality >= 2
 		_environment.ssao_enabled = quality >= 2 and RenderingServer.get_current_rendering_method() == "forward_plus"
 		_environment.fog_density = _fog_base * [1.25, 1.0, 1.0][quality]
+	if _snow != null:
+		_snow.emitting = quality >= 1
+		_snow.visible = quality >= 1
+		var flakes: int = [0, 900, 1800][quality]
+		if flakes > 0 and _snow.amount != flakes:
+			_snow.amount = flakes
 
 
 # --- Level features (task F8) -------------------------------------------------------------------
@@ -1186,6 +1193,9 @@ func _finish_build() -> void:
 	_build_outer_world()
 	if zone == "floodworks" and not info.is_empty():
 		Alpine.dress(self, _footprint, _ground_low)
+	if zone in ["floodworks", "highlands"]:
+		_snow = Alpine.snowfall()
+		add_child(_snow)
 	_pending_count = _pending.size()
 	_merge_statics()
 	_build_environment()
@@ -1396,6 +1406,10 @@ func _process(delta: float) -> void:
 	if _sky_material != null:
 		_storm_time += delta
 		_sky_material.set_shader_parameter("storm_time", _storm_time)
+	if _snow != null and _snow.emitting:
+		var view: Camera3D = get_viewport().get_camera_3d()
+		if view != null:
+			_snow.global_position = view.global_position + Vector3(0.0, 6.0, 0.0)
 
 
 func _build_environment() -> void:
