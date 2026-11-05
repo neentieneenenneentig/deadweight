@@ -3,7 +3,8 @@ extends SceneTree
 ## Run windowed but off-screen so nothing pops up on the monitor:
 ##   godot --path . --position 20000,20000 --resolution 1280x720 --script res://tests/level_preview.gd -- --level=l01
 ## Options after "--": --level=<id> (default l01), --tag=<text> (added to the file names),
-## --out=<folder>.
+## --out=<folder>, --shot=<name>:<x>,<y>,<z>:<tx>,<ty>,<tz> (an extra camera at x,y,z looking at
+## tx,ty,tz; repeatable).
 ## Add --rendering-method gl_compatibility to preview the mobile renderer.
 
 const Catalog = preload("res://scripts/level_catalog.gd")
@@ -11,6 +12,7 @@ const Catalog = preload("res://scripts/level_catalog.gd")
 var _level_id: String = "l01"
 var _tag: String = ""
 var _out: String = "res://.tools/captures/F7"
+var _extra_shots: Array = []
 
 
 func _initialize() -> void:
@@ -19,6 +21,12 @@ func _initialize() -> void:
 			_level_id = argument.substr(8)
 		elif argument.begins_with("--tag="):
 			_tag = argument.substr(6)
+		elif argument.begins_with("--shot="):
+			var parts: PackedStringArray = argument.substr(7).split(":")
+			if parts.size() == 3:
+				var eye: PackedStringArray = parts[1].split(",")
+				var target: PackedStringArray = parts[2].split(",")
+				_extra_shots.append([parts[0], Vector3(float(eye[0]), float(eye[1]), float(eye[2])), Vector3(float(target[0]), float(target[1]), float(target[2]))])
 		elif argument.begins_with("--out="):
 			_out = argument.substr(6)
 	_run.call_deferred()
@@ -57,6 +65,7 @@ func _run() -> void:
 		["overview_side", midpoint + Vector3(span * 0.7, span * 0.22, 0), midpoint],
 		["overview_extraction", extraction + Vector3(-12, 9, 22), extraction + Vector3(0, 1.5, 0)],
 	]
+	shots.append_array(_extra_shots)
 	var calls: Array[String] = []
 	for shot: Array in shots:
 		camera.global_position = shot[1]

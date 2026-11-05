@@ -9,6 +9,9 @@ extends Node3D
 ##                throws, and it kills hounds, so luring them over a mine works.
 ##   boulder      a giant marble that waits up a slope until the player enters its trigger box,
 ##                then rolls. It hurts on contact at speed, flattens hounds, and resets later.
+##   marble_run   a hopper of marbles at the top of a built run (H03): every few seconds the next
+##                waiting marble is carried to the gate and rolls down. Same hurt and flatten as
+##                a boulder; each marble goes back to its slot after its share of the cycle.
 ##   flood        water that rises from one height to another once start_flood() is called.
 ##                Under it the player takes FLOOD_DPS and hounds drown.
 ##   geyser       a vent on a solid stone mound that erupts on a cycle: it hisses for
@@ -37,6 +40,8 @@ const BOULDER_HIT_SPEED := 4.0       # relative m/s before a boulder hurts
 const BOULDER_DAMAGE := 40.0
 const BOULDER_LIFETIME := 24.0       # seconds rolling before it resets
 const BOULDER_MASS := 3000.0
+const RUN_LOAD_TIME := 0.6           # seconds a run marble takes from its slot to the gate
+const RUN_SETTLE := 1.2              # seconds a run marble must sit still (after 3 s rolling) to go home
 
 const GEYSER_WARN := 1.4            # seconds of hissing before an eruption
 const GEYSER_ERUPT := 2.4            # seconds the column stands
@@ -52,6 +57,8 @@ var level: Node3D
 var _fields: Array[Dictionary] = []
 var _mines: Array[Dictionary] = []
 var _boulders: Array[Dictionary] = []
+var _runs: Array[Dictionary] = []
+var _run_tempo: float = 1.0            # marble runs release this many times as often (set_run_tempo)
 var _flood: Dictionary = {}
 var _geysers: Array[Dictionary] = []
 var _muds: Array[Dictionary] = []
@@ -134,8 +141,48 @@ func mine(floor_point: Vector3) -> void:
 ## A marble of radius r waiting at rest_point. Entering trigger (an AABB in level space) releases it
 ## with an initial push (m/s).
 func boulder(rest_point: Vector3, radius: float, trigger: AABB, push: Vector3 = Vector3.ZERO) -> void:
+	var body: RigidBody3D = _marble_body(rest_point, radius, "Boulder%d" % _boulders.size())
+	var record := {"body": body, "rest": rest_point, "trigger": trigger, "push": push, "state": 0, "timer": 0.0, "cooldown": 0.0}
+	body.body_entered.connect(_on_boulder_hit.bind(record))
+	_boulders.append(record)
+
+
+## A marble run's hopper (H03). One marble waits frozen at each slot; every period seconds (the
+## first phase seconds in) the next waiting one is carried to gate over RUN_LOAD_TIME and let go
+## with push (m/s). It goes back to its slot once it has come to rest (RUN_SETTLE) or after lifetime
+## seconds, whichever is first; a release with no marble waiting is skipped. Run marbles hurt and
+## flatten like boulders. Returns the run's index.
+func marble_run(slots: Array[Vector3], gate: Vector3, radius: float, period: float, push: Vector3, phase: float = 0.0, lifetime: float = BOULDER_LIFETIME) -> int:
+	var marbles: Array[Dictionary] = []
+	for i in range(slots.size()):
+		var body: RigidBody3D = _marble_body(slots[i], radius, "RunMarble%d_%d" % [_runs.size(), i])
+		var record := {"body": body, "rest": slots[i], "state": 0, "timer": 0.0, "cooldown": 0.0, "still": 0.0}
+		body.body_entered.connect(_on_boulder_hit.bind(record))
+		marbles.append(record)
+	period = maxf(period, RUN_LOAD_TIME + 0.5)
+	_runs.append({"gate": gate, "push": push, "period": period, "clock": fposmod(phase, period), "next": 0, "marbles": marbles, "lifetime": lifetime})
+	return _runs.size() - 1
+
+
+## Every marble run releases tempo times as often (1 is the built rhythm).
+func set_run_tempo(tempo: float) -> void:
+	_run_tempo = maxf(tempo, 0.1)
+
+
+## A run's marble states (0 waiting, 3 loading, 1 rolling), in slot order. For tests.
+func run_states(index: int = 0) -> Array[int]:
+	var states: Array[int] = []
+	if index < 0 or index >= _runs.size():
+		return states
+	for record: Dictionary in (_runs[index]["marbles"] as Array):
+		states.append(int(record["state"]))
+	return states
+
+
+## A frozen marble body with its banded mesh, waiting at rest_point.
+func _marble_body(rest_point: Vector3, radius: float, title: String) -> RigidBody3D:
 	var body := RigidBody3D.new()
-	body.name = "Boulder%d" % _boulders.size()
+	body.name = title
 	body.mass = BOULDER_MASS
 	body.collision_layer = 1
 	body.collision_mask = 1 | 2 | 8
@@ -164,9 +211,7 @@ func boulder(rest_point: Vector3, radius: float, trigger: AABB, push: Vector3 = 
 	body.add_child(view)
 	body.position = rest_point
 	add_child(body)
-	var record := {"body": body, "rest": rest_point, "trigger": trigger, "push": push, "state": 0, "timer": 0.0, "cooldown": 0.0}
-	body.body_entered.connect(_on_boulder_hit.bind(record))
-	_boulders.append(record)
+	return body
 
 
 ## A flood over area (x/z) that will rise from start_y to end_y at speed m/s once started.
@@ -295,6 +340,7 @@ func _physics_process(delta: float) -> void:
 	_update_fields(player, delta)
 	_update_mines(player, delta)
 	_update_boulders(player, delta)
+	_update_runs(delta)
 	_update_flood(player, delta)
 	_clock += delta
 	_update_geysers(player)
@@ -461,6 +507,48 @@ func _update_boulders(player: Node3D, delta: float) -> void:
 				# Waiting to re-arm until the player has left the trigger.
 				if not (record["trigger"] as AABB).has_point(player.global_position):
 					record["state"] = 0
+
+
+func _update_runs(delta: float) -> void:
+	for run: Dictionary in _runs:
+		var marbles: Array = run["marbles"]
+		var period: float = float(run["period"]) / _run_tempo
+		run["clock"] = float(run["clock"]) + delta
+		if float(run["clock"]) >= period:
+			run["clock"] = fmod(float(run["clock"]), period)
+			for k in range(marbles.size()):
+				var index: int = (int(run["next"]) + k) % marbles.size()
+				var waiting: Dictionary = marbles[index]
+				if int(waiting["state"]) == 0:
+					waiting["state"] = 3
+					waiting["timer"] = RUN_LOAD_TIME
+					run["next"] = (index + 1) % marbles.size()
+					break
+		for record: Dictionary in marbles:
+			var body: RigidBody3D = record["body"]
+			record["cooldown"] = maxf(0.0, float(record["cooldown"]) - delta)
+			match int(record["state"]):
+				3:
+					record["timer"] = float(record["timer"]) - delta
+					var t: float = clampf(1.0 - float(record["timer"]) / RUN_LOAD_TIME, 0.0, 1.0)
+					body.global_position = (record["rest"] as Vector3).lerp(run["gate"], smoothstep(0.0, 1.0, t))
+					if float(record["timer"]) <= 0.0:
+						body.freeze = false
+						body.linear_velocity = run["push"]
+						body.angular_velocity = Vector3.ZERO
+						record["state"] = 1
+						record["timer"] = float(run["lifetime"])
+						record["still"] = 0.0
+				1:
+					record["timer"] = float(record["timer"]) - delta
+					var rolled: bool = float(run["lifetime"]) - float(record["timer"]) > 3.0
+					record["still"] = float(record["still"]) + delta if rolled and body.linear_velocity.length() < 0.6 else 0.0
+					if float(record["timer"]) <= 0.0 or float(record["still"]) > RUN_SETTLE or body.global_position.y < float(level.get("kill_y")):
+						body.freeze = true
+						body.linear_velocity = Vector3.ZERO
+						body.angular_velocity = Vector3.ZERO
+						body.global_position = record["rest"]
+						record["state"] = 0
 
 
 func _reset_boulder(record: Dictionary) -> void:

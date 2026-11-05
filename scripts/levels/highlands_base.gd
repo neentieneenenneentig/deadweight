@@ -29,6 +29,13 @@ var keep_clear: Array[Vector3] = []
 var extra_spots: Array[Vector3] = []
 ## Hot-spring ground (x, z, radius): bare warm crust with no snow, set before super._design().
 var hot_springs: Array[Vector3] = []
+## Extra hills (x, z, radius, height), set before super._design().
+var extra_mounds: Array[Vector4] = []
+## Spots (x, z, radius) kept free of trees and rocks without flattening them (a structure's
+## footprint on a slope), set before super._design().
+var clear_spots: Array[Vector3] = []
+## Which way the player faces at the spawn (degrees; 0 looks north, toward -z).
+var spawn_facing: float = 0.0
 ## What the spawn hint and the sign by the tub say; a subclass with another errand changes them.
 var intro_hint: String = "THE HIGHLANDS  /  find the princess's rubber duck in the far forest, then bring it to her hot tub on the eastern hill"
 var tub_sign: String = "PRINCESS CAPYBARA\nIS NOT TO BE DISTURBED\n(UNLESS YOU HAVE THE DUCK)"
@@ -43,6 +50,8 @@ func _design() -> void:
 	set_kill_y(-30.0)
 	land = Terrain.new(SEED, SIZE)
 	land.mound(TUB_XZ, TUB_HILL.x, TUB_HILL.y)
+	for hill: Vector4 in extra_mounds:
+		land.mound(Vector2(hill.x, hill.y), hill.z, hill.w)
 	land.flatten(SPAWN_XZ, 22.0)
 	land.flatten(TUB_XZ, 12.0)
 	land.flatten(PAD_XZ, 9.0)
@@ -61,9 +70,10 @@ func _design() -> void:
 	]
 	for spot: Vector3 in extra_spots:
 		keep_clear.append(Vector3(spot.x, spot.y, spot.z + 2.0))
+	keep_clear.append_array(clear_spots)
 	Nature.scatter(self, land, SEED, keep_clear)
 	var spawn_floor := Vector3(SPAWN_XZ.x, land.height_at(SPAWN_XZ.x, SPAWN_XZ.y), SPAWN_XZ.y)
-	set_spawn(spawn_floor)
+	set_spawn(spawn_floor, spawn_facing)
 	_build_hot_tub()
 	_build_big_duck()
 	_place_objectives()

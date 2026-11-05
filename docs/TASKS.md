@@ -375,6 +375,14 @@ a phone measurement (Q1).
 0.67 M triangles on Forward+, 1.13 M -> 0.61 M on Compatibility, draw calls unchanged. Still open
 for W6: a phone measurement (Q1); grass is one 52 k-triangle batch and could be chunked if the
 phone needs it.
+**H03 — The Yuzu Run (done, lead, 2026-11-05).** Third highland errand
+(`scripts/levels/h03_the_yuzu.gd`, after h02, `tools/run.ps1 -Level h03`): three yuzu from Marble
+Hill, a giant toy marble run whose hopper lets a marble go every 5 s (traps `marble_run()`), two
+yuzu on ledges halfway up the trough and one under the tree inside two rings of teacup mines, the
+golden yuzu on the hopper roof (bonus), and once she has all three the hopper jams (twice as often)
+and the bin's front wall sinks so the marbles roll into the valley. The run is planned from the
+terrain (no piece over 28 degrees, no crest a marble would jump). Pars 330/190 from the route.
+Needs owner tuning: run period, marble speed, mine rings.
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
 department, and added three AI-generated textures. The store text, press kit, rating answers and

@@ -32,6 +32,7 @@ func _run() -> void:
 	await _test_plates()
 	await _test_mine()
 	await _test_boulder()
+	await _test_marble_run()
 	await _test_geyser()
 	await _test_mud()
 	await _test_flood()
@@ -80,6 +81,39 @@ func _test_boulder() -> void:
 	_traps.call("boulder", Vector3(0.0, 2.6, -12.0), 2.5, trigger, Vector3(0.0, 0.0, 16.0))
 	await _seconds(2.0)
 	_check(float(_player.get("health")) < 100.0, "a released boulder that rolls into the player hurts them")
+
+
+func _test_marble_run() -> void:
+	# A hopper of two marbles on a shelf, letting one go every 1.5 s down onto the floor, rolling +x.
+	await _place(Vector3(-15.0, 0.95, 15.0))
+	var slots: Array[Vector3] = [Vector3(-14.0, 2.0, -15.0), Vector3(-10.0, 2.0, -15.0)]
+	var index: int = _traps.call("marble_run", slots, Vector3(-12.0, 2.0, -10.0), 1.5, 1.5, Vector3(6.0, 0.0, 0.0), 0.0, 2.1)
+	var states: Array = _traps.call("run_states", index)
+	_check(states == [0, 0], "a marble run's marbles wait in their slots")
+	await _seconds(1.0)
+	_check(_traps.call("run_states", index) == [0, 0], "nothing leaves before the first period")
+	await _seconds(1.3)
+	var runs: Array = _traps.get("_runs")
+	var first: RigidBody3D = runs[index]["marbles"][0]["body"]
+	_check(int(_traps.call("run_states", index)[0]) == 1 and first.global_position.x > -12.0, "the first marble is carried to the gate and rolls off with its push (x %.1f)" % first.global_position.x)
+	await _seconds(1.5)
+	_check(_traps.call("run_states", index) == [1, 1], "the next marble follows one period later")
+	# Each rolls for its lifetime (2.1 s here), then goes home.
+	var home: bool = false
+	for i in range(int(1.6 * float(Engine.physics_ticks_per_second))):
+		await physics_frame
+		if int(_traps.call("run_states", index)[0]) == 0 and first.global_position.is_equal_approx(slots[0]):
+			home = true
+	_check(home, "a run marble goes back to its slot after its lifetime")
+	_traps.call("set_run_tempo", 3.0)
+	var period: float = float(runs[index]["period"]) / float(_traps.get("_run_tempo"))
+	_check(is_equal_approx(period, 0.5), "a jammed hopper releases tempo times as often")
+	_traps.call("set_run_tempo", 0.1)
+	for record: Dictionary in (runs[index]["marbles"] as Array):
+		var body: RigidBody3D = record["body"]
+		body.freeze = true
+		body.global_position = Vector3(-40.0, -20.0, -40.0)
+		record["state"] = 2
 
 
 func _test_geyser() -> void:

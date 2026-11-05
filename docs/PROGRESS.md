@@ -670,3 +670,31 @@ Template:
 - world_test: near/far/caster triplets per cell, the far pine is under a sixth of the triangles,
   the switch is seamless and moves in with quality.
 - Gate: PASSED (12 suites).
+
+## 2026-11-05: H03 The Yuzu Run
+- Model: Claude Opus 5.5 (lead), owner away ("gogogo").
+- New raid h03 "The Yuzu Run" (`scripts/levels/h03_the_yuzu.gd`, campaign slot after h02,
+  `tools/run.ps1 -Level h03`). The princess wants yuzu in her bath. The tree grows on Marble Hill
+  south of the spawn (a new 36 m mound), beside a giant toy marble run down its north face: a
+  hopper on the summit lets one of six marbles go every 5 s, and they roll the 123 m trough into a
+  bin at the bottom (about 17 s, up to 19 m/s). Two yuzu sit on ledges halfway up the trough, behind
+  wall gaps with a bar a player walks under and a marble cannot pass; the third is under the tree,
+  inside two rings of teacup mines. Bonus: the golden yuzu on the hopper's roof (rod only). Once she
+  has all three, the hopper releases twice as often and the bin's front wall sinks, so marbles
+  spill off the bin's plinth into the valley on the way back.
+- The run is planned from the terrain: 10 m pieces that ride 1.6 m above the ground under the floor,
+  both walls and the ledges, then are only raised, never lowered, until no piece is steeper than 28
+  degrees (walkable) and no crest is sharper than 0.45 m (a marble at full speed would jump the
+  wall). With real physics the marbles stay on the centre line and never rise more than 0.7 m off
+  the floor. The foot came up, so the bin stands on a plinth with a ramp to its door.
+- traps.gd: `marble_run()` (hopper slots, a gate, period, push), `set_run_tempo()`,
+  `run_states()`; run marbles go home once they have settled for RUN_SETTLE or after their lifetime.
+  Boulders and run marbles share `_marble_body()`. dream_props: "yuzu" and "yuzu_gold" pickups.
+  highlands_base: `extra_mounds`, `clear_spots` (tree-free without flattening) and `spawn_facing`.
+  level_preview: `--shot=name:x,y,z:tx,ty,tz` for extra cameras.
+- Navmesh lesson: with 1 m highland cells, a gap needs about 6 m and a bar 3.2 m up before the bake
+  joins both sides (4 m gaps and a 2.6 m bar did not).
+- levels_test: route 1181 m, pars 330 / 190 s (from the suggestion). traps_test: the run releases on
+  its period, marbles roll and go home, tempo. world_test: grade, crests, clearance, lintel, six
+  marbles, and the jammed hopper drops the bin wall. Gate PASSED, 12 suites.
+- Needs owner tuning: run period, marble size and speed, mine rings, the hill's walk.

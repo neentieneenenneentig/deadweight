@@ -49,7 +49,8 @@ static func _box(surface: SurfaceTool, at: Vector3, size: Vector3) -> void:
 
 ## Pickup models for absurd objectives (W4), vertex coloured, centred on the floor point's axis:
 ## "duck" (a rubber duck), "towel" (a folded striped towel), "firewood" (a bundle of logs),
-## "salts" (a jar of pink bath salts), "sponge" (a sea sponge, holes and all).
+## "salts" (a jar of pink bath salts), "sponge" (a sea sponge, holes and all), "yuzu" (a knobbly
+## citrus with a leaf), "yuzu_gold" (the same, gilded).
 static var _looks: Dictionary = {}
 
 static func pickup_mesh(look: String) -> ArrayMesh:
@@ -100,6 +101,16 @@ static func pickup_mesh(look: String) -> ArrayMesh:
 				var angle: float = float(k) * 2.4
 				var hole := Vector3(cos(angle) * 0.36, sin(float(k) * 1.7) * 0.16, sin(angle) * 0.29)
 				_painted(tool, _ball(0.06), Transform3D(Basis.IDENTITY, hole), Color("8f6a2a"))
+		"yuzu", "yuzu_gold":
+			var peel: Color = Color("f0b62f") if look == "yuzu" else Color("ffd24a")
+			var dimple: Color = Color("e09a1f") if look == "yuzu" else Color("f2b31d")
+			_painted(tool, _ball(0.3), Transform3D(Basis.from_scale(Vector3(1.0, 0.86, 1.0)), Vector3.ZERO), peel)
+			# The bumpy rind: a few low knobs around the middle.
+			for k in range(6):
+				var angle: float = float(k) * TAU / 6.0 + 0.3
+				_painted(tool, _ball(0.09), Transform3D(Basis.IDENTITY, Vector3(cos(angle) * 0.27, sin(float(k) * 2.1) * 0.08, sin(angle) * 0.27)), dimple)
+			_painted(tool, _block(Vector3(0.05, 0.1, 0.05)), Transform3D(Basis.IDENTITY, Vector3(0, 0.28, 0)), Color("6b5236"))
+			_painted(tool, _ball(0.12), Transform3D(Basis(Vector3.FORWARD, 0.5).scaled(Vector3(1.6, 0.35, 0.8)), Vector3(0.13, 0.31, 0)), Color("5f8a45"))
 		_:
 			# Two logs below, one on top, tied with a red band.
 			for at: Vector3 in [Vector3(-0.14, -0.1, 0), Vector3(0.14, -0.1, 0), Vector3(0, 0.12, 0)]:

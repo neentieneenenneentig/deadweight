@@ -71,6 +71,7 @@ func _run() -> void:
 	await _test_sentry_tracking()
 	_test_thaw()
 	_test_nature_lod()
+	await _test_yuzu_run()
 	_scene.queue_free()
 	await _frames(3)
 	print("WORLD TEST: %d checks, %d failures" % [_checks, _failures])
@@ -82,7 +83,7 @@ func _test_framework() -> void:
 	var campaign: Array[String] = Catalog.campaign_ids()
 	_check(campaign.has("l01") and not campaign.has("l09") and not campaign.has("range"), "catalog lists only the campaign levels that exist")
 	var ids: Array[String] = Catalog.all_ids()
-	_check(ids.size() == 14 and ids[7] == "h01" and ids[8] == "h02" and ids[12] == "range" and ids[13] == "valley", "catalog lists all fourteen levels: h01 and h02 after l06, then the range and the highlands preview last")
+	_check(ids.size() == 15 and ids[7] == "h01" and ids[8] == "h02" and ids[9] == "h03" and ids[13] == "range" and ids[14] == "valley", "catalog lists all fifteen levels: h01 to h03 after l06, then the range and the highlands preview last")
 	var details: Dictionary = Catalog.info("l01")
 	_check(details["available"] and details["title"] == "SLUICE GATE" and details["zone"] == "floodworks", "catalog merges the level INFO")
 	_check(not Catalog.info("l09")["available"], "levels without a script are unavailable")
@@ -912,3 +913,43 @@ func _test_nature_lod() -> void:
 	var high: float = near[0].visibility_range_end
 	_check(low < high and is_equal_approx(far[0].visibility_range_begin, high) and is_equal_approx(casters[0].visibility_range_end, high), "lower quality swaps to far trees sooner (%.0f m vs %.0f m)" % [low, high])
 	holder.queue_free()
+
+
+## H03: the marble run follows the hill without a crest a marble would jump, stays walkable, and the
+## jammed hopper drops the bin's front wall.
+func _test_yuzu_run() -> void:
+	var holder := Node3D.new()
+	_scene.add_child(holder)
+	var dummy := Node3D.new()
+	holder.add_child(dummy)
+	var level: Node3D = Catalog.create("h03")
+	holder.add_child(level)
+	level.call("build", dummy, false)
+	var script: GDScript = level.get_script()
+	var constants: Dictionary = script.get_script_constant_map()
+	var chain: Array = level.get("_chain")
+	var land: RefCounted = level.get("land")
+	_check(chain.size() >= 10, "the run is planned as a chain of pieces (%d joints)" % chain.size())
+	_check(float(level.call("run_grade")) <= float(constants["MAX_GRADE"]) + 0.05, "no piece of the run is steeper than %.0f degrees (%.1f)" % [float(constants["MAX_GRADE"]), float(level.call("run_grade"))])
+	var worst_bend: float = 0.0
+	var lowest: float = INF
+	for i in range(1, chain.size() - 1):
+		var here: Vector3 = chain[i]
+		worst_bend = maxf(worst_bend, here.y - ((chain[i - 1] as Vector3).y + (chain[i + 1] as Vector3).y) * 0.5)
+		lowest = minf(lowest, here.y - float(land.call("height_at", here.x, here.z)))
+	_check(worst_bend <= float(constants["MAX_BEND"]) + 0.01, "no crest on the run sharp enough to throw a marble (worst %.2f m)" % worst_bend)
+	_check(lowest >= float(constants["CLEARANCE"]) - 0.01, "the run's floor clears the ground at every joint (lowest %.2f m)" % lowest)
+	var lintel: float = constants["LINTEL"]
+	var radius: float = constants["MARBLE_RADIUS"]
+	_check(lintel > LevelBase.NAV_AGENT_HEIGHT + 1.0 and lintel < radius * 2.0 and lintel > radius, "gap bars let a player walk under and stop a marble above its middle")
+	var traps: Node3D = level.call("traps")
+	_check((traps.call("run_states", 0) as Array).size() == 6, "the hopper holds six marbles")
+	var gate: StaticBody3D = level.get_node("BinGate")
+	var shut: float = gate.position.y
+	level.set("collected_loot", int(level.get("total_loot")))
+	level.call("_on_yuzu_taken", "case", 1)
+	_check(is_equal_approx(float(traps.get("_run_tempo")), 2.0), "once she has all three yuzu the hopper lets marbles go twice as often")
+	await create_timer(1.8, true, true).timeout
+	_check(gate.position.y < shut - float(constants["BIN_WALL"]), "and the bin's front wall sinks into the ground")
+	holder.queue_free()
+	await _frames(2)

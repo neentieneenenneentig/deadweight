@@ -442,7 +442,8 @@ func label(text: String, position: Vector3, font_size: int = 32, color: Color = 
 # --- Builder: objectives, extraction, enemies ---------------------------------------------------
 
 ## A required case: all of them must be collected before extraction unlocks.
-## look picks the model (W4): "case" (the salvage case), "duck", "towel", "firewood", "salts" or "sponge".
+## look picks the model (W4): "case" (the salvage case), "duck", "towel", "firewood", "salts", "sponge",
+## "yuzu" or "yuzu_gold".
 func case_at(floor_point: Vector3, title: String, look: String = "case") -> void:
 	total_loot += 1
 	_case_spots.append({"floor_point": floor_point, "title": title, "look": look})

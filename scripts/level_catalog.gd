@@ -23,6 +23,7 @@ const LEVELS := [
 	{"id": "l06", "script": "res://scripts/levels/l06_crucible.gd"},
 	{"id": "h01", "script": "res://scripts/levels/h01_the_duck.gd"},
 	{"id": "h02", "script": "res://scripts/levels/h02_bath_salts.gd"},
+	{"id": "h03", "script": "res://scripts/levels/h03_the_yuzu.gd"},
 	{"id": "l07", "script": "res://scripts/levels/l07_the_steps.gd"},
 	{"id": "l08", "script": "res://scripts/levels/l08_damwall.gd"},
 	{"id": "l09", "script": "res://scripts/levels/l09_headwater.gd"},
