@@ -104,17 +104,17 @@ func _build_wall() -> void:
 		box(_at(WALL_RADIUS, degrees, WALL_HEIGHT * 0.5), Vector3(4.7, WALL_HEIGHT, 1.2), "dark", true, degrees)
 
 
-## The crucible: a solid porcelain teapot at the centre, a 13 m heat pool around it, and a flue
-## (non-solid) running up to the beams. The pool is one hazard volume, so the teapot body stands
+## The crucible: a solid porcelain teapot at the centre, a 13 m heat pool around it, and a solid
+## flue running up to the beams. The pool is one hazard volume, so the teapot body stands
 ## in it and the rim above keeps the route over the top.
 func _build_crucible() -> void:
 	cylinder(CENTER + Vector3(0.0, 1.4, 0.0), 3.0, 2.8, "light_concrete", true)
-	cylinder(CENTER + Vector3(0.0, 2.95, 0.0), 1.3, 0.3, "yellow", false)
-	cylinder(CENTER + Vector3(0.0, 3.4, 0.0), 0.35, 0.4, "yellow", false)
-	pipe(CENTER + Vector3(2.8, 1.3, 0.0), CENTER + Vector3(4.8, 3.2, 0.0), 0.4, "light_concrete", false)
-	pipe(CENTER + Vector3(-2.9, 1.2, 0.0), CENTER + Vector3(-4.2, 2.6, 0.0), 0.36, "light_concrete", false)
-	pipe(CENTER + Vector3(-4.2, 2.6, 0.0), CENTER + Vector3(-2.9, 3.0, 0.0), 0.36, "light_concrete", false)
-	pipe(CENTER + Vector3(0.0, 2.8, 0.0), CENTER + Vector3(0.0, BEAM_Y, 0.0), 0.45, "rust", false)
+	cylinder(CENTER + Vector3(0.0, 2.95, 0.0), 1.3, 0.3, "yellow")
+	cylinder(CENTER + Vector3(0.0, 3.4, 0.0), 0.35, 0.4, "yellow")
+	pipe(CENTER + Vector3(2.8, 1.3, 0.0), CENTER + Vector3(4.8, 3.2, 0.0), 0.4, "light_concrete")
+	pipe(CENTER + Vector3(-2.9, 1.2, 0.0), CENTER + Vector3(-4.2, 2.6, 0.0), 0.36, "light_concrete")
+	pipe(CENTER + Vector3(-4.2, 2.6, 0.0), CENTER + Vector3(-2.9, 3.0, 0.0), 0.36, "light_concrete")
+	pipe(CENTER + Vector3(0.0, 2.8, 0.0), CENTER + Vector3(0.0, BEAM_Y, 0.0), 0.45, "rust")
 	hazard(CENTER + Vector3(0.0, 1.0, 0.0), Vector3(13.0, 2.0, 13.0), "heat", POOL_DPS)
 	box(CENTER + Vector3(0.0, 0.03, 0.0), Vector3(13.0, 0.04, 13.0), "red", false)
 
@@ -124,8 +124,8 @@ func _build_crucible() -> void:
 func _build_rings() -> void:
 	_ring(16.0, 6.0, RING_LOW_TOP, 0.3, 40.0, 140.0, 10.0, "light_concrete")
 	_ring(16.0, 6.0, RING_LOW_TOP, 0.3, 220.0, 320.0, 10.0, "light_concrete")
-	_ring(18.9, 0.2, RING_LOW_TOP + 0.9, 0.9, 50.0, 130.0, 10.0, "yellow", false)
-	_ring(18.9, 0.2, RING_LOW_TOP + 0.9, 0.9, 230.0, 310.0, 10.0, "yellow", false)
+	_ring(18.9, 0.2, RING_LOW_TOP + 0.9, 0.9, 50.0, 130.0, 10.0, "yellow")
+	_ring(18.9, 0.2, RING_LOW_TOP + 0.9, 0.9, 230.0, 310.0, 10.0, "yellow")
 	for degrees: float in [60.0, 120.0, 240.0, 300.0]:
 		pillar(_at(16.0, degrees, 0.0), RING_LOW_TOP - 0.15, 0.7, "rust")
 	_ring(8.0, 5.0, RING_HIGH_TOP, 0.3, 0.0, 350.0, 10.0, "light_concrete")
@@ -164,16 +164,16 @@ func _build_extraction() -> void:
 	label("E X T R A C T I O N", Vector3(0.0, 5.8, -69.1), 38, Color("5ad6c8"), 0.012)
 
 
-## Foundry dressing: the teapot's notice, a deadpan board by the gate, kiln chimneys beyond the
-## perimeter. Everything here is visual only.
+## Foundry dressing: the teapot's notice (on its belly), a deadpan board by the gate, solid kiln
+## chimneys beyond the perimeter.
 func _build_dressing() -> void:
-	label("THE CRUCIBLE\nDO NOT POUR", CENTER + Vector3(0.0, 5.2, 0.0), 30, Color("f6e4c4"), 0.014, true)
+	label("THE CRUCIBLE\nDO NOT POUR", CENTER + Vector3(0.0, 1.5, 3.02), 30, Color("f6e4c4"), 0.01)
 	signboard("06   CRUCIBLE", Vector3(-16.0, 2.1, 4.0), "THE KETTLE IS NOT A KETTLE   /   KEEP OFF", "amber")
 	for z: float in [-18.0, -70.0]:
 		for side: float in [-1.0, 1.0]:
 			var cx: float = side * 36.0
-			cylinder(Vector3(cx, 13.0, z), 2.2, 26.0, "light_concrete", false)
-			cylinder(Vector3(cx, 26.2, z), 2.4, 0.4, "amber", false)
+			cylinder(Vector3(cx, 13.0, z), 2.2, 26.0, "light_concrete")
+			cylinder(Vector3(cx, 26.2, z), 2.4, 0.4, "amber")
 
 
 func _place_objectives() -> void:

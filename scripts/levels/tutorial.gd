@@ -63,13 +63,13 @@ func _build_walk_and_cast() -> void:
 	signboard("INDUCTION", Vector3(-9.0, 2.1, 7.0), "ALL STATIONS ARE COMPULSORY", "cyan")
 	platform(LEDGE_CENTER, Vector2(6.0, 6.0), "dark", true)
 	ramp(Vector3(-8.0, 0.0, 2.0), Vector3(-8.0, 3.5, -9.5), 4.0)
-	label("LEDGE  /  THE WEIGHT IS PERSUADED", LEDGE_CENTER + Vector3(0.0, 2.6, 0.0), 40, Color("67d5d2"), 0.02, true)
+	floor_text("LEDGE\nTHE WEIGHT IS PERSUADED", Vector3(-8.0, 0.0, 4.6), 40, Color("67d5d2"), 0.014)
 
 
 ## Station 3 (lock) and station 4 (reel) and station 5 (cut).
 func _build_lock_reel_cut() -> void:
 	cylinder(Vector3(6.0, 0.0, -22.0), 0.7, 2.4, "yellow")
-	label("POST  /  A WEIGHT WILL WANT IT", Vector3(6.0, 3.2, -22.0), 34, Color("e8d6a8"), 0.018, true)
+	floor_text("POST\nA WEIGHT WILL WANT IT", Vector3(6.0, 0.0, -18.4), 40, Color("e8d6a8"), 0.014)
 	crate(Vector3(-7.0, 0.0, -31.0), Vector3(3.0, 2.3, 3.0))
 	barrier(Vector3(-6.0, 0.0, -41.0), 4.0)
 
@@ -90,10 +90,12 @@ func _build_anchor_swing() -> void:
 	# Plates hang flush under the beam (its underside is at 7.8 m).
 	for x: float in [-3.5, 3.5]:
 		anchor(Vector3(x, 7.74, GANTRY_Z), Vector3.DOWN)
-	label("ANCHOR  /  CYAN PLATES", Vector3(0.0, 9.3, GANTRY_Z), 46, Color("67d5d2"), 0.024, true)
+	# The notice board stands on the beam.
+	box(Vector3(0.0, 8.9, GANTRY_Z), Vector3(10.0, 1.0, 0.2), "dark")
+	label("ANCHOR  /  CYAN PLATES", Vector3(0.0, 8.9, GANTRY_Z + 0.12), 46, Color("67d5d2"), 0.014)
 	platform(SWING_LEDGE, Vector2(6.0, 6.0), "dark", true)
 	ramp(Vector3(10.0, 0.0, -63.0), Vector3(10.0, 3.0, -78.0), 4.0)
-	label("LEDGE  /  NOT A STAIR", SWING_LEDGE + Vector3(0.0, 1.6, 0.0), 38, Color("e4ddbd"), 0.02, true)
+	floor_text("LEDGE\nNOT A STAIR", Vector3(10.0, 0.0, -60.2), 40, Color("e4ddbd"), 0.014)
 
 
 ## Station 9: a 14 m updraft column with a catch platform on top, as in the range.
@@ -101,13 +103,13 @@ func _build_updraft() -> void:
 	updraft(UPDRAFT_BASE, UPDRAFT_SIZE, 26.0)
 	platform(UPDRAFT_BASE + Vector3(0.0, UPDRAFT_SIZE.y, 0.0), Vector2(6.0, 6.0), "dark", true)
 	# Pale, not cyan: cyan disappears against the teal sky behind the column.
-	label("UPDRAFT  /  14 M", UPDRAFT_BASE + Vector3(0.0, UPDRAFT_SIZE.y + 3.4, 0.0), 46, Color("ffe3b0"), 0.024, true)
+	floor_text("UPDRAFT  /  14 M", UPDRAFT_BASE + Vector3(0.0, 0.0, UPDRAFT_SIZE.z * 0.5 + 1.4), 46, Color("ffe3b0"), 0.016)
 
 
 ## Station 10: the sidearm on one training dummy. Dummies never attack and are the only enemy here.
 func _build_sidearm() -> void:
 	enemy("dummy", DUMMY_SPOT)
-	label("TRAINING DUMMY  /  DOES NOT FIGHT BACK", DUMMY_SPOT + Vector3(0.0, 2.6, 0.0), 34, Color("e4ddbd"), 0.016, true)
+	floor_text("TRAINING DUMMY\nDOES NOT FIGHT BACK", DUMMY_SPOT + Vector3(0.0, 0.0, 2.6), 40, Color("e4ddbd"), 0.014)
 
 
 ## Station 11 (one required case, on foot) and station 12 (extraction pad).
@@ -116,7 +118,7 @@ func _build_case_and_extraction() -> void:
 	extraction(EXTRACTION_SPOT)
 	for x: float in [-7.5, 7.5]:
 		box(Vector3(x, 1.6, EXTRACTION_SPOT.z), Vector3(2.5, 3.2, 8.0), "light_concrete")
-	label("EXTRACTION", Vector3(0.0, 4.6, -119.3), 60, Color("5ad6c8"), 0.024)
+	label("EXTRACTION", Vector3(0.0, 3.6, -120.68), 60, Color("5ad6c8"), 0.024)
 
 
 ## Cyan route cues down the centre line. They are flat, non-solid, and skip the open pit.

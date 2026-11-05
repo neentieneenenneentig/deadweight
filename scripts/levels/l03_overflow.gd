@@ -65,8 +65,8 @@ func _build_gate() -> void:
 	for side: float in [-1.0, 1.0]:
 		box(Vector3(side * 8.5, 5.5, 8), Vector3(1.5, 11, 2), "light_concrete")
 	box(Vector3(0, 10.4, 8), Vector3(18.5, 1.8, 2), "dark")
-	box(Vector3(0, 10.3, 9.04), Vector3(15.2, 1.2, 0.1), "rust", false)
-	label("O V E R F L O W", Vector3(0, 10.3, 9.12), 56, Color("f1e4c8"), 0.012)
+	box(Vector3(0, 10.65, 9.04), Vector3(15.2, 1.0, 0.1), "rust", false)
+	label("O V E R F L O W", Vector3(0, 10.65, 9.12), 56, Color("f1e4c8"), 0.012)
 	anchor(Vector3(0, 9.44, 8), Vector3.DOWN)
 
 
@@ -111,10 +111,10 @@ func _islet(center: Vector3, size: Vector2, top: float) -> void:
 ## Two sentry towers on the banks. Their red strips face the basin, so the threat reads from the causeway.
 func _build_towers() -> void:
 	block(Vector3(-26, 0, -52), Vector3(4, 7.0, 4), "dark")
-	box(Vector3(-23.85, 5.2, -52), Vector3(0.1, 0.9, 3.0), "red", false)
+	box(Vector3(-23.95, 5.2, -52), Vector3(0.1, 0.9, 3.0), "red", false)
 	label("SENTRY  /  TOWER", Vector3(-26, 5.2, -49.9), 26, Color("ef654e"), 0.014)
 	block(Vector3(26, 0, -84), Vector3(4, 5.0, 4), "dark")
-	box(Vector3(23.85, 3.6, -84), Vector3(0.1, 0.9, 3.0), "red", false)
+	box(Vector3(23.95, 3.6, -84), Vector3(0.1, 0.9, 3.0), "red", false)
 
 
 ## Two anchor gantries cross the basin on pylons. The weights latch under the beams and swing across.
@@ -148,11 +148,11 @@ func _build_extraction() -> void:
 	extraction(Vector3(0, 0, -116))
 	for x: float in [-6.0, 6.0]:
 		box(Vector3(x, 3.0, -119), Vector3(0.6, 6.0, 0.6), "rust")
-	box(Vector3(0, 5.8, -119), Vector3(13, 0.65, 0.7), "dark")
+	box(Vector3(0, 6.04, -119), Vector3(13, 1.13, 0.7), "dark")
 	# One anchor under the beam centre covers everyone who holds the extraction.
 	anchor(Vector3(0, 5.415, -119), Vector3.DOWN)
-	label("E X T R A C T I O N", Vector3(0, 5.8, -118.6), 38, Color("5ad6c8"), 0.012)
-	label("BANK SALVAGE  /  HOLD POSITION", Vector3(0, 4.7, -118.6), 24, Color("d8dfca"), 0.011)
+	label("E X T R A C T I O N", Vector3(0, 6.22, -118.6), 38, Color("5ad6c8"), 0.012)
+	label("BANK SALVAGE  /  HOLD POSITION", Vector3(0, 5.72, -118.6), 24, Color("d8dfca"), 0.011)
 
 
 ## The east bank has a signal block, reached by a long, low ramp from the plaza. Its case is on top.
@@ -161,14 +161,14 @@ func _build_signal_block() -> void:
 	ramp(Vector3(26, 0, -24), Vector3(26, 4.5, -37), 5.0)
 
 
-## Porcelain teacups, a bathtub and two deadpan notices. Visual only: no collision, light or navigation.
+## Porcelain teacups, a bathtub and two deadpan notices. The cups and the tub are solid.
 func _build_dressing() -> void:
 	for spot: Vector3 in [Vector3(-9, 0, 4), Vector3(10, 0, -8), Vector3(-6, 0, -22)]:
-		cylinder(spot + Vector3.UP * 0.5, 0.8, 1.0, "light_concrete", false)
+		cylinder(spot + Vector3.UP * 0.5, 0.8, 1.0, "light_concrete")
 		cylinder(spot + Vector3.UP * 1.02, 0.85, 0.05, "yellow", false)
 	# A porcelain bathtub with a brass tap on the west bank.
-	box(Vector3(-26, 0.5, -76), Vector3(2.6, 1.0, 1.2), "light_concrete", false)
-	cylinder(Vector3(-27.4, 1.3, -76), 0.12, 0.5, "yellow", false)
+	box(Vector3(-26, 0.5, -76), Vector3(2.6, 1.0, 1.2), "light_concrete")
+	cylinder(Vector3(-27.4, 1.3, -76), 0.12, 0.5, "yellow")
 	signboard("03   OVERFLOW", Vector3(-8, 2.1, -4), "DEEP WATER HURTS   /   THE CAUSEWAY IS DRY", "cyan")
 	signboard("NO SWIMMING", Vector3(14, 2.1, -26.5), "", "red")
 

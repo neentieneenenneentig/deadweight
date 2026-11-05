@@ -78,9 +78,9 @@ func _build_entrance() -> void:
 		box(Vector3(side * 8.5, 5.5, 8), Vector3(1.5, 11, 2), "light_concrete")
 		box(Vector3(side * 8.5, 10.0, 8), Vector3(1.8, 0.3, 2.2), "yellow", false)
 	box(Vector3(0, 10.4, 8), Vector3(18.5, 1.8, 2), "dark")
-	box(Vector3(0, 10.3, 9.04), Vector3(15.2, 1.2, 0.1), "rust", false)
-	label("C R A N E   Y A R D", Vector3(0, 10.3, 9.12), 56, Color("f6e4c4"), 0.012)
-	label("FOUNDRY  /  DEPARTMENT OF UNFINISHED GRAVITY", Vector3(0, 8.7, 8.9), 26, Color("ffc46b"), 0.011)
+	box(Vector3(0, 10.65, 9.04), Vector3(15.2, 1.0, 0.1), "rust", false)
+	label("C R A N E   Y A R D", Vector3(0, 10.65, 9.12), 56, Color("f6e4c4"), 0.012)
+	label("FOUNDRY  /  DEPARTMENT OF UNFINISHED GRAVITY", Vector3(0, 9.82, 9.03), 26, Color("ffc46b"), 0.011)
 	signboard("05   CRANE YARD", Vector3(-16, 2.1, 6), "THE ARMS HOLD THE PLATES   /   THE BOXES HOLD NOTHING", "amber")
 
 
@@ -139,9 +139,9 @@ func _build_extraction() -> void:
 	extraction(EXTRACT)
 	for x: float in [-6.0, 6.0]:
 		box(Vector3(x, 3.0, -124), Vector3(0.6, 6.0, 0.6), "rust")
-	box(Vector3(0, 5.8, -124), Vector3(13, 0.65, 0.7), "dark")
-	label("E X T R A C T I O N", Vector3(0, 5.8, -123.6), 38, Color("5ad6c8"), 0.012)
-	label("BANK SALVAGE  /  HOLD POSITION", Vector3(0, 4.7, -123.6), 24, Color("f0e3c8"), 0.011)
+	box(Vector3(0, 6.04, -124), Vector3(13, 1.13, 0.7), "dark")
+	label("E X T R A C T I O N", Vector3(0, 6.22, -123.6), 38, Color("5ad6c8"), 0.012)
+	label("BANK SALVAGE  /  HOLD POSITION", Vector3(0, 5.72, -123.6), 24, Color("f0e3c8"), 0.011)
 	signboard("EXIT   >", Vector3(16, 2.1, -117), "LAST SIGNAL   /   THEN EXTRACT", "cyan")
 
 

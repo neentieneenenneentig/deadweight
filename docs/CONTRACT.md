@@ -337,6 +337,10 @@ platform(top_center: Vector3, size: Vector2, material := "dark", supports := tru
 pillar(base: Vector3, height: float, width := 0.9, material := "rust")
 signboard(title: String, position: Vector3, subtitle := "", accent := "amber", yaw := 0.0)   # not "sign": that is a GDScript built-in
 label(text: String, position: Vector3, font_size := 32, color := Color(...), pixel_size := 0.012, billboard := false, yaw := 0.0) -> Label3D
+                                                   # owner's rule: billboard stays false and a solid face sits within 0.3 m behind the text (levels_test)
+floor_text(text: String, point: Vector3, font_size := 40, color := Color(...), pixel_size := 0.016, yaw := 0.0) -> Label3D   # painted flat on a floor
+# Non-solid box/cylinder/pipe parts are dressing only: one 0.3 m thick or more must sit inside a solid,
+# a thinner one must touch a solid (levels_test). Anything that looks like an object is solid.
 anchor(position: Vector3, facing := Vector3.DOWN)  # magnetic plate, latches weights
 updraft(base: Vector3, size: Vector3, strength := 26.0)     # rising air column (acceleration m/s^2)
 hazard(center: Vector3, size: Vector3, kind := "electric", dps := 30.0)   # kinds electric | heat | water

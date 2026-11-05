@@ -177,6 +177,9 @@ var _environment: Environment
 var _sun: DirectionalLight3D
 var _fog_base: float = 0.0
 var _label_count: int = 0
+## Every non-solid box or cylinder with real volume: {transform, size}. The levels test checks that
+## each one is dressing on something solid, never a prop that looks solid but is not (owner's rule).
+var _ghost_parts: Array[Dictionary] = []
 var _pending_count: int = 0                          # statics before merging (for budgets/logs)
 var _merged_count: int = 0
 var _built: bool = false
@@ -277,6 +280,7 @@ func _reset_build_state() -> void:
 	_traps = null
 	_light_count = 0
 	_label_count = 0
+	_ghost_parts.clear()
 	_has_extraction = false
 	_in_water = false
 	if is_instance_valid(_stage):
@@ -436,6 +440,15 @@ func label(text: String, position: Vector3, font_size: int = 32, color: Color = 
 	node.visibility_range_end = 85.0
 	add_child(node)
 	_label_count += 1
+	return node
+
+
+## Text painted flat on a floor: point is on the surface, and the top of the text points along yaw
+## (0 = toward -z, away from a player walking in from +z). Paint never floats (owner's rule).
+func floor_text(text: String, point: Vector3, font_size: int = 40, color: Color = Color("e4ddbd"), pixel_size: float = 0.016, yaw: float = 0.0) -> Label3D:
+	var node: Label3D = label(text, point + Vector3.UP * 0.03, font_size, color, pixel_size)
+	node.rotation_order = EULER_ORDER_YXZ
+	node.rotation_degrees = Vector3(-90.0, yaw, 0.0)
 	return node
 
 
@@ -1330,6 +1343,8 @@ func _box_at(placement: Transform3D, size: Vector3, material: String, solid: boo
 		var block_view: MeshInstance3D = _stage_mesh(stone, placement, material)
 		if solid:
 			_add_collider(stone.create_convex_shape(true, false), placement)
+		else:
+			_note_ghost(placement, size)
 		return block_view
 	var mesh := BoxMesh.new()
 	mesh.size = size
@@ -1338,6 +1353,8 @@ func _box_at(placement: Transform3D, size: Vector3, material: String, solid: boo
 		var shape := BoxShape3D.new()
 		shape.size = size
 		_add_collider(shape, placement)
+	else:
+		_note_ghost(placement, size)
 	return instance
 
 
@@ -1353,7 +1370,14 @@ func _cylinder_at(placement: Transform3D, radius: float, height: float, material
 		shape.radius = radius
 		shape.height = height
 		_add_collider(shape, placement)
+	else:
+		_note_ghost(placement, Vector3(radius * 2.0, height, radius * 2.0))
 	return instance
+
+
+## Records a non-solid part for the levels test (see _ghost_parts).
+func _note_ghost(placement: Transform3D, size: Vector3) -> void:
+	_ghost_parts.append({"transform": placement, "size": size})
 
 
 func _stage_mesh(mesh: Mesh, placement: Transform3D, material: String) -> MeshInstance3D:

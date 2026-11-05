@@ -302,9 +302,8 @@ line, and tall drops must be lockable so they don't kill. Then redo:
 - `nav_cell_size` for large floors (the bake budget is 2 s);
 - the draw-call budget on phone (Q1);
 - the store screenshots (R6).
-The rescale must also follow the owner's rules from the range: no floating or billboard text
-(the tutorial and l01, l02 and l06 still have billboard labels), and no non-solid prop that looks
-solid (the per-level teacups, bathtub and kiln chimneys are still visual only).
+The rescale must also follow the owner's rules from the range: no floating or billboard text, and
+no non-solid prop that looks solid. Both are now enforced by levels_test for every level (R8 below).
 
 ### W — v2 direction: the open highlands (owner, 2026-11-04)
 **Why:** owner playtest: "the current world feels like alpha level", the ground is safe so running
@@ -383,6 +382,16 @@ golden yuzu on the hopper roof (bonus), and once she has all three the hopper ja
 and the bin's front wall sinks so the marbles roll into the valley. The run is planned from the
 terrain (no piece over 28 degrees, no crest a marble would jump). Pars 330/190 from the route.
 Needs owner tuning: run period, marble speed, mine rings.
+**R8 — Owner's rules sweep of the v1 levels (done, lead, 2026-11-05).** levels_test now fails any
+level with a billboard label, a label with no solid face within 0.3 m behind it, a non-solid part
+0.3 m thick or more whose centre is not inside a solid, or a thinner non-solid part that touches
+nothing solid (level_base records every non-solid box, cylinder and pipe in `_ghost_parts`). The
+sweep fixed 27 floating or billboard labels (tutorial station labels are now painted on the floor
+with the new `floor_text()`, gate subtitles sit on the lintel, extraction bars carry both lines,
+the rest moved onto the wall, beam or roof edge they named) and made the props solid: teacups
+(l02, l03, l04), the bathtub (l03), pump-house domes, kiln chimneys (l04, l06), the l01 skyline
+blocks, mast arms and lane pipes, the l06 teapot's lid, spout, handle and flue, and the l04 and l06
+rails. The l01 wall lamps and l03 tower strips moved flush onto their walls.
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
 department, and added three AI-generated textures. The store text, press kit, rating answers and

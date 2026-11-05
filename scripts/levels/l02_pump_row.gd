@@ -73,9 +73,9 @@ func _build_gate() -> void:
 		box(Vector3(side * 8.5, 5.5, 8), Vector3(1.5, 11, 2), "light_concrete")
 		box(Vector3(side * 8.5, 10.0, 8), Vector3(1.8, 0.3, 2.2), "yellow", false)
 	box(Vector3(0, 10.4, 8), Vector3(18.5, 1.8, 2), "dark")
-	box(Vector3(0, 10.3, 9.04), Vector3(15.2, 1.2, 0.1), "rust", false)
-	label("P U M P   R O W", Vector3(0, 10.3, 9.12), 56, Color("f1e4c8"), 0.012)
-	label("FLOODWORKS  /  DEPARTMENT OF UNFINISHED GRAVITY", Vector3(0, 8.7, 8.9), 26, Color("ffc46b"), 0.011)
+	box(Vector3(0, 10.65, 9.04), Vector3(15.2, 1.0, 0.1), "rust", false)
+	label("P U M P   R O W", Vector3(0, 10.65, 9.12), 56, Color("f1e4c8"), 0.012)
+	label("FLOODWORKS  /  DEPARTMENT OF UNFINISHED GRAVITY", Vector3(0, 9.82, 9.03), 26, Color("ffc46b"), 0.011)
 	signboard("02   PUMP ROW", Vector3(-16, 2.1, 6), "DEPARTMENTAL PUMPING IS SUSPENDED", "cyan")
 
 
@@ -91,8 +91,8 @@ func _pump_house(side: float, z: float, number: int, cache: bool) -> void:
 	box(Vector3(cx, 5.0, z), Vector3(9.6, 0.5, 9.0), "dark")
 	if not cache:
 		var dome_at: Vector3 = Vector3(cx + side * 2.2, ROOF_TOP + 0.8, z)
-		cylinder(dome_at, 1.7, 1.6, "light_concrete", false)
-		cylinder(dome_at + Vector3.UP * 0.9, 0.6, 0.25, "yellow", false)
+		cylinder(dome_at, 1.7, 1.6, "light_concrete")
+		cylinder(dome_at + Vector3.UP * 0.9, 0.6, 0.25, "yellow")
 	label("PUMP %02d  /  NOT PUMPING" % number, Vector3(cx, 2.2, z + 4.5), 30, Color("3b3146"), 0.014)
 
 
@@ -105,10 +105,10 @@ func _build_racks() -> void:
 		# Two magnetic plates per rack, hanging from the beam underside.
 		for x: float in [-5.0, 5.0]:
 			anchor(Vector3(x, ANCHOR_Y, z), Vector3.DOWN)
-		label("RIGGING  /  NOT FOR CLIMBING", Vector3(0, 10.2, z), 34, Color("e8d6a8"), 0.016)
-	# Celadon mains run the length of the lane edges. Decoration only.
+		label("RIGGING  /  NOT FOR CLIMBING", Vector3(0, RACK_Y, z + 0.62), 34, Color("e8d6a8"), 0.013)
+	# Celadon mains run the length of the lane edges.
 	for side: float in [-1.0, 1.0]:
-		pipe(Vector3(side * 21, 7.8, 0), Vector3(side * 21, 7.8, -112), 0.35, "metal", false)
+		pipe(Vector3(side * 21, 7.8, 0), Vector3(side * 21, 7.8, -112), 0.35, "metal")
 
 
 ## Plinth in the centre lane: the middle case sits on it, reached by one long, low ramp.
@@ -116,27 +116,29 @@ func _build_plinth() -> void:
 	platform(Vector3(0, PLINTH_TOP, -68), Vector2(6, 6), "light_concrete", true)
 	# The ramp finishes on the plinth's north edge (z = -65), so its top meets the plinth top flush.
 	ramp(Vector3(0, 0, -57), Vector3(0, PLINTH_TOP, -65), 4.0)
-	label("THE PLINTH IS FOR CASES", Vector3(0, 4.4, -64.6), 30, Color("f1e4c8"), 0.014)
+	# A low porcelain parapet on the plinth's far edge carries its notice.
+	box(Vector3(0, PLINTH_TOP + 0.5, -70.75), Vector3(5.0, 1.0, 0.5), "light_concrete")
+	label("THE PLINTH IS FOR CASES", Vector3(0, PLINTH_TOP + 0.5, -70.48), 30, Color("3b3146"), 0.012)
 
 
 func _build_extraction() -> void:
 	extraction(Vector3(0, 0, -112))
 	for x: float in [-6.0, 6.0]:
 		box(Vector3(x, 3.0, -119), Vector3(0.6, 6.0, 0.6), "rust")
-	box(Vector3(0, 5.8, -119), Vector3(13, 0.65, 0.7), "dark")
-	label("E X T R A C T I O N", Vector3(0, 5.8, -118.6), 38, Color("5ad6c8"), 0.012)
-	label("BANK SALVAGE  /  HOLD POSITION", Vector3(0, 4.7, -118.6), 24, Color("d8dfca"), 0.011)
+	box(Vector3(0, 6.04, -119), Vector3(13, 1.13, 0.7), "dark")
+	label("E X T R A C T I O N", Vector3(0, 6.22, -118.6), 38, Color("5ad6c8"), 0.012)
+	label("BANK SALVAGE  /  HOLD POSITION", Vector3(0, 5.72, -118.6), 24, Color("d8dfca"), 0.011)
 	signboard("03   RIGGING", Vector3(-7, 2.1, -104), "LAST SIGNAL   /   THEN EXTRACT", "cyan")
 
 
 ## Absurd domestic dressing: porcelain teacups on saucers, a red sentry marker and a deadpan notice.
-## Everything here is visual only and adds no collision, light or navigation.
+## The cups are solid; the notice is on the roof edge under the sentry.
 func _build_dressing() -> void:
 	for spot: Vector3 in [Vector3(-7.5, 0, 4), Vector3(7.5, 0, -2), Vector3(8.0, 0, -40)]:
-		cylinder(spot + Vector3.UP * 0.5, 0.8, 1.0, "light_concrete", false)
+		cylinder(spot + Vector3.UP * 0.5, 0.8, 1.0, "light_concrete")
 		cylinder(spot + Vector3.UP * 1.02, 0.85, 0.05, "yellow", false)
 	box(Vector3(10.8, ROOF_TOP + 0.05, -52), Vector3(0.1, 0.1, 8.0), "red", false)
-	label("SENTRY  /  ROOF", Vector3(12.5, 6.8, -49), 26, Color("ef654e"), 0.016, true)
+	label("SENTRY  /  ROOF", Vector3(HOUSE_X - 4.82, 5.0, -52), 26, Color("ef654e"), 0.012, false, -90.0)
 
 
 func _place_objectives() -> void:

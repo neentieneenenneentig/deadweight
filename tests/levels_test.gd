@@ -24,6 +24,10 @@ const PAR_GOLD_FACTOR := 0.9
 const EXTRACTION_HOLD := 6.0         # s; main.gd EXTRACTION_SECONDS
 const SPAWN_CLEARANCE := 0.4         # sphere radius for "not inside a solid" at the spawn
 const CASE_CLEARANCE := 0.3          # sphere radius for "not inside a solid" at a case
+## Owner's rules (2026-11-04): no floating or billboard text, and anything that looks solid is solid.
+const TEXT_BACKING := 0.3            # m: every Label3D has a solid surface this close behind its face
+const GHOST_VOLUME := 0.3            # m: a non-solid part this thick in every direction must be sunk into a solid
+const GHOST_TOUCH := 0.1             # m: a thinner non-solid part (trim, paint) must touch a solid within this
 ## Required INFO keys (CONTRACT 5.6) and their types. "repeatable" is optional and checked if present.
 const INFO_TYPES := {
 	"title": TYPE_STRING, "zone": TYPE_STRING, "number": TYPE_INT, "blurb": TYPE_STRING,
@@ -127,6 +131,7 @@ func _build_and_check(id: String, level: Node3D, dummy: Node3D, info: Dictionary
 	var extraction: Vector3 = level.get("extraction_position")
 	_check_counts(id, level, info, cases)
 	_check_budgets(id, level)
+	_check_owner_rules(id, level)
 	_check_placement(id, level, spawn, cases, extraction)
 	var triangles: int = _count_triangles(level)
 
@@ -154,6 +159,43 @@ func _check_counts(id: String, level: Node3D, info: Dictionary, cases: Array[Vec
 	var enemies: Array[Node] = _enemies_in(level)
 	_check((enemies.size() > 0) == bool(info.get("enemies", false)), "%s: %d enemies agree with INFO.enemies" % [id, enemies.size()])
 	print("  enemies by kind: %s" % _kind_summary(enemies))
+
+
+## The owner's rules from the range: text is never billboarded and never floats (a solid surface sits
+## right behind every label), and a non-solid part is only dressing on something solid: one with real
+## volume has its centre inside a solid, a thin one (trim, paint) touches one.
+func _check_owner_rules(id: String, level: Node3D) -> void:
+	var space: PhysicsDirectSpaceState3D = level.get_world_3d().direct_space_state
+	var floating: Array[String] = []
+	for node: Node in level.find_children("*", "Label3D", true, false):
+		var text: Label3D = node
+		var face: Vector3 = text.global_transform.basis.z.normalized()
+		var at: Vector3 = text.global_position
+		var hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(at + face * 0.05, at - face * TEXT_BACKING, LevelBase.LAYER_WORLD))
+		if text.billboard != BaseMaterial3D.BILLBOARD_DISABLED or hit.is_empty():
+			floating.append("'%s' at %s" % [text.text.replace("
+", " / "), at.snapped(Vector3.ONE * 0.1)])
+	_check(floating.is_empty(), "%s: every label is fixed to a solid surface, none billboarded %s" % [id, floating])
+	var ghosts: Array[String] = []
+	for record: Dictionary in level.get("_ghost_parts"):
+		var size: Vector3 = record["size"]
+		var placement: Transform3D = level.global_transform * (record["transform"] as Transform3D)
+		if minf(size.x, minf(size.y, size.z)) >= GHOST_VOLUME:
+			var point := PhysicsPointQueryParameters3D.new()
+			point.position = placement.origin
+			point.collision_mask = LevelBase.LAYER_WORLD
+			if space.intersect_point(point, 1).is_empty():
+				ghosts.append("%s at %s" % [size.snapped(Vector3.ONE * 0.01), placement.origin.snapped(Vector3.ONE * 0.1)])
+		else:
+			var box := BoxShape3D.new()
+			box.size = size + Vector3.ONE * GHOST_TOUCH * 2.0
+			var query := PhysicsShapeQueryParameters3D.new()
+			query.shape = box
+			query.transform = placement
+			query.collision_mask = LevelBase.LAYER_WORLD
+			if space.intersect_shape(query, 1).is_empty():
+				ghosts.append("thin %s at %s" % [size.snapped(Vector3.ONE * 0.01), placement.origin.snapped(Vector3.ONE * 0.1)])
+	_check(ghosts.is_empty(), "%s: no non-solid part stands alone (%d parts) %s" % [id, (level.get("_ghost_parts") as Array).size(), ghosts])
 
 
 ## Label3D and light counts stay inside the budget. Lights include the sun, which is a light node.

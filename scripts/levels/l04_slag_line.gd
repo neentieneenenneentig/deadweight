@@ -71,9 +71,9 @@ func _build_entrance() -> void:
 		box(Vector3(side * 8.5, 10.0, 8), Vector3(1.8, 0.3, 2.2), "yellow", false)
 		box(Vector3(side * 8.5, 2.5, 9.05), Vector3(0.9, 1.6, 0.06), "amber", false)
 	box(Vector3(0, 10.4, 8), Vector3(18.5, 1.8, 2), "dark")
-	box(Vector3(0, 10.3, 9.04), Vector3(15.2, 1.2, 0.1), "rust", false)
-	label("S L A G   L I N E", Vector3(0, 10.3, 9.12), 56, Color("f6e4c4"), 0.012)
-	label("FOUNDRY  /  DEPARTMENT OF UNFINISHED GRAVITY", Vector3(0, 8.7, 8.9), 26, Color("ffc46b"), 0.011)
+	box(Vector3(0, 10.65, 9.04), Vector3(15.2, 1.0, 0.1), "rust", false)
+	label("S L A G   L I N E", Vector3(0, 10.65, 9.12), 56, Color("f6e4c4"), 0.012)
+	label("FOUNDRY  /  DEPARTMENT OF UNFINISHED GRAVITY", Vector3(0, 9.82, 9.03), 26, Color("ffc46b"), 0.011)
 	signboard("04   SLAG LINE", Vector3(-16, 2.1, 6), "THE CUPS ARE NOT READY, BUT THEY ARE HOT", "orange")
 	# Two anchors under the lintel give the start a swing to learn on.
 	for x: float in [-4.0, 4.0]:
@@ -94,12 +94,12 @@ func _build_conveyors() -> void:
 			_teacups_along(cx, near - 2.0, far + 2.0)
 
 
-## Teacups and saucers at fixed intervals on a conveyor top. Visual only (non-solid).
+## Teacups and saucers at fixed intervals on a conveyor top. The cups are solid.
 func _teacups_along(cx: float, from_z: float, to_z: float) -> void:
 	var z: float = from_z
 	while z >= to_z:
 		cylinder(Vector3(cx, 1.235, z), 0.36, 0.03, "yellow", false)
-		cylinder(Vector3(cx, 1.40, z), 0.22, 0.30, "light_concrete", false)
+		cylinder(Vector3(cx, 1.40, z), 0.22, 0.30, "light_concrete")
 		z -= 6.0
 
 
@@ -112,14 +112,14 @@ func _build_heat() -> void:
 			box(Vector3(0, 0.06, z + edge * 1.25), Vector3(12.0, 0.02, 0.1), "amber", false)
 		# Heat lamp posts at both ends of the strip make it readable from across the hall.
 		for side: float in [-1.0, 1.0]:
-			box(Vector3(side * 6.0, 0.7, z), Vector3(0.25, 1.4, 2.6), "red", false)
+			box(Vector3(side * 6.0, 0.7, z), Vector3(0.25, 1.4, 2.6), "red")
 
 
 ## Catwalk deck over the hall, reached by two ramps in the side aisles. Pillars stand in the aisles
-## and inside the conveyors. Rails run along the far edge. The deck is solid; the rails are not.
+## and inside the conveyors. A solid rail runs along the far edge.
 func _build_catwalk() -> void:
 	box(Vector3(0, DECK_TOP - 0.15, DECK_Z), Vector3(42, 0.3, 6), "light_concrete")
-	box(Vector3(0, DECK_TOP + 0.5, DECK_Z - 3.0), Vector3(42, 1.0, 0.12), "yellow", false)
+	box(Vector3(0, DECK_TOP + 0.5, DECK_Z - 3.0), Vector3(42, 1.0, 0.12), "yellow")
 	ramp(Vector3(14, 0, -47), Vector3(14, DECK_TOP, -57), 4.5)
 	ramp(Vector3(-14, 0, -47), Vector3(-14, DECK_TOP, -57), 4.5)
 	for x: float in [-18.5, 18.5]:
@@ -149,23 +149,23 @@ func _build_extraction() -> void:
 	extraction(EXTRACT)
 	for x: float in [-6.0, 6.0]:
 		box(Vector3(x, 3.0, -127), Vector3(0.6, 6.0, 0.6), "rust")
-	box(Vector3(0, 5.8, -127), Vector3(13, 0.65, 0.7), "dark")
-	label("E X T R A C T I O N", Vector3(0, 5.8, -126.6), 38, Color("5ad6c8"), 0.012)
-	label("BANK SALVAGE  /  HOLD POSITION", Vector3(0, 4.7, -126.6), 24, Color("f0e3c8"), 0.011)
+	box(Vector3(0, 6.04, -127), Vector3(13, 1.13, 0.7), "dark")
+	label("E X T R A C T I O N", Vector3(0, 6.22, -126.6), 38, Color("5ad6c8"), 0.012)
+	label("BANK SALVAGE  /  HOLD POSITION", Vector3(0, 5.72, -126.6), 24, Color("f0e3c8"), 0.011)
 	signboard("03   COOLING ROOM", Vector3(16, 2.1, -104), "LAST SIGNAL   /   THEN EXTRACT", "cyan")
 
 
-## Foundry dressing: kiln chimneys beyond the walls, a deadpan notice on the first conveyor, and a
-## cooling-rack notice above the first heat strip. Everything is visual only.
+## Foundry dressing: solid kiln chimneys beyond the walls, a deadpan notice on the end of the first
+## conveyor, and a notice painted on the floor before the first heat strip.
 func _build_dressing() -> void:
 	for z: float in [-18.0, -74.0, -118.0]:
 		for side: float in [-1.0, 1.0]:
 			var cx: float = side * 26.0
-			cylinder(Vector3(cx, 13.0, z), 2.2, 26.0, "light_concrete", false)
+			cylinder(Vector3(cx, 13.0, z), 2.2, 26.0, "light_concrete")
 			cylinder(Vector3(cx, 19.5, z), 2.3, 0.8, "yellow", false)
-			cylinder(Vector3(cx, 26.2, z), 2.4, 0.4, "amber", false)
-	label("NO ONE ORDERED\nTHESE CUPS", Vector3(-CONVEYOR_X, 2.2, -29.4), 24, Color("f4e6c8"), 0.014)
-	label("PLEASE MIND THE HEAT\n(IT IS FOR THE CUPS)", Vector3(0, 3.6, -20.5), 26, Color("f4e6c8"), 0.014)
+			cylinder(Vector3(cx, 26.2, z), 2.4, 0.4, "amber")
+	label("NO ONE ORDERED\nTHESE CUPS", Vector3(-CONVEYOR_X, 0.6, -29.97), 24, Color("f4e6c8"), 0.011)
+	floor_text("PLEASE MIND THE HEAT\n(IT IS FOR THE CUPS)", Vector3(0, 0, -19.5), 40, Color("f4e6c8"), 0.02)
 
 
 func _place_objectives() -> void:

@@ -698,3 +698,23 @@ Template:
   its period, marbles roll and go home, tempo. world_test: grade, crests, clearance, lintel, six
   marbles, and the jammed hopper drops the bin wall. Gate PASSED, 12 suites.
 - Needs owner tuning: run period, marble size and speed, mine rings, the hill's walk.
+
+## 2026-11-05: R8 Owner's rules sweep of the v1 levels
+- Model: Claude Opus 5.5 (lead), owner away ("continue").
+- levels_test enforces the owner's rules for every level: no billboard label, a solid face within
+  0.3 m behind every label, and no non-solid part standing alone (one 0.3 m thick or more must have
+  its centre inside a solid; a thinner trim or paint must touch a solid). level_base records each
+  non-solid box, cylinder and pipe in `_ghost_parts` for this.
+- Labels: 27 fixed. Tutorial station labels are painted on the floor in front of each station
+  (new `floor_text()`), the anchor notice is a board standing on the gantry beam, and EXTRACTION is
+  on the end wall. Gate subtitles (l01, l02, l04, l05) sit on the lintel under a shorter title
+  board. Extraction bars grow upward so both lines sit on them (the l03 anchor underneath stays
+  put). l01: PUMP 01 on the back wall, GANTRY 02 on the beam, "CAST ABOVE THE GATE" removed. l02:
+  rigging notices on the rack beams, the plinth notice on a new parapet, SENTRY / ROOF on the roof
+  edge. l04: the cups notice on the conveyor's end, the heat notice painted on the floor. l06: the
+  crucible notice on the teapot's belly.
+- Solid now: teacups (l02, l03, l04 conveyors), the l03 bathtub and tap, l02 pump-house domes and
+  lane pipes, kiln chimneys (l04, l06), the l01 skyline blocks, chimneys, lamp arms and lane pipes,
+  the l06 teapot's lid, spout, handle and flue, the l04 heat-lamp posts and catwalk rail, the l06
+  ring rails. The l01 wall lamps and l03 tower strips moved flush onto their walls.
+- All routes, pars and bonus checks unchanged. Captures in `.tools/captures/RULES/`.
