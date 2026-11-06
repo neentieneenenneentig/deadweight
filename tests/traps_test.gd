@@ -30,6 +30,8 @@ func _run() -> void:
 	_floor(Vector3(0.0, -0.5, 0.0), Vector3(40.0, 1.0, 40.0))
 	_traps = _level.call("traps")
 	await _test_plates()
+	await _test_turned_plates()
+	await _test_wave()
 	await _test_mine()
 	await _test_boulder()
 	await _test_marble_run()
@@ -56,6 +58,36 @@ func _test_plates() -> void:
 		if int(cell["state"]) == 2:
 			broken += 1
 	_check(broken == 1, "only the plate stood on breaks (%d broken)" % broken)
+
+
+func _test_turned_plates() -> void:
+	# A strip of 3 m slabs turned 45 degrees. 4.5 m along its turned axis lies outside the same
+	# strip unturned (1.5 m half-width), so standing there proves the turn.
+	_traps.call("crack_field", Vector3(60.0, 0.0, 40.0), Vector2(3.0, 12.0), 3.0, "paving", Callable(), 45.0)
+	var along: Vector3 = Basis(Vector3.UP, deg_to_rad(45.0)) * Vector3(0.0, 0.0, 4.5)
+	await _place(Vector3(60.0, 1.2, 40.0) + along)
+	await _seconds(0.4)
+	_check(bool(_player.get("grounded")) and _player.global_position.y > 0.3, "a turned field holds the player on its turned slab")
+	await _seconds(2.2)
+	_check(_player.global_position.y < -1.0, "and that slab cracks and gives way like any other")
+
+
+func _test_wave() -> void:
+	await _place(Vector3(0.0, 1.2, 0.0))
+	var index: int = _traps.call("crack_field", Vector3(-60.0, 0.0, 40.0), Vector2(3.0, 15.0), 3.0, "paving")
+	var cells: Array = ((_traps.get("_fields") as Array)[index]["cells"] as Dictionary).values()
+	# Slab centres sit 1.5, 4.5, ... 13.5 m from the origin: due at 0.25 s to 2.25 s at 6 m/s.
+	_traps.call("crack_wave", [index], Vector3(-60.0, 0.0, 32.5), 6.0, 0.0)
+	await _seconds(1.9)
+	var first: Dictionary = cells[0]
+	var last: Dictionary = cells[cells.size() - 1]
+	_check(int(first["state"]) == 2 and int(last["state"]) == 0, "a collapse wave breaks the near slab first and has not reached the far one yet")
+	await _seconds(2.6)
+	var broken: int = 0
+	for cell: Dictionary in cells:
+		if int(cell["state"]) == 2:
+			broken += 1
+	_check(broken == cells.size(), "then it runs on until every slab in the field is down (%d of %d)" % [broken, cells.size()])
 
 
 func _test_mine() -> void:

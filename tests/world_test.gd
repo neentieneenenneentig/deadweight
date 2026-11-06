@@ -72,6 +72,8 @@ func _run() -> void:
 	_test_thaw()
 	_test_nature_lod()
 	await _test_yuzu_run()
+	await _test_ducklings()
+	_test_merge_mix()
 	_scene.queue_free()
 	await _frames(3)
 	print("WORLD TEST: %d checks, %d failures" % [_checks, _failures])
@@ -83,7 +85,7 @@ func _test_framework() -> void:
 	var campaign: Array[String] = Catalog.campaign_ids()
 	_check(campaign.has("l01") and not campaign.has("l09") and not campaign.has("range"), "catalog lists only the campaign levels that exist")
 	var ids: Array[String] = Catalog.all_ids()
-	_check(ids.size() == 15 and ids[7] == "h01" and ids[8] == "h02" and ids[9] == "h03" and ids[13] == "range" and ids[14] == "valley", "catalog lists all fifteen levels: h01 to h03 after l06, then the range and the highlands preview last")
+	_check(ids.size() == 16 and ids[7] == "h01" and ids[8] == "h02" and ids[9] == "h03" and ids[10] == "h04" and ids[14] == "range" and ids[15] == "valley", "catalog lists all sixteen levels: h01 to h04 after l06, then the range and the highlands preview last")
 	var details: Dictionary = Catalog.info("l01")
 	_check(details["available"] and details["title"] == "SLUICE GATE" and details["zone"] == "floodworks", "catalog merges the level INFO")
 	_check(not Catalog.info("l09")["available"], "levels without a script are unavailable")
@@ -917,6 +919,66 @@ func _test_nature_lod() -> void:
 
 ## H03: the marble run follows the hill without a crest a marble would jump, stays walkable, and the
 ## jammed hopper drops the bin's front wall.
+## H04: the aqueduct's paving has open air under it, a fall from the deck hurts without killing, the
+## ends meet the ground, and the last duckling sends a collapse along the whole deck.
+func _test_ducklings() -> void:
+	var holder := Node3D.new()
+	_scene.add_child(holder)
+	var dummy := Node3D.new()
+	holder.add_child(dummy)
+	var level: Node3D = Catalog.create("h04")
+	holder.add_child(level)
+	level.call("build", dummy, false)
+	var constants: Dictionary = (level.get_script() as GDScript).get_script_constant_map()
+	var land: RefCounted = level.get("land")
+	var deck_y: float = level.get("deck_y")
+	var traps: Node3D = level.call("traps")
+	var fields: Array = traps.get("_fields")
+	var deck: Array = level.get("deck_fields")
+	_check((level.get("towers") as Array).size() == int(constants["SPANS"]) - 1 and deck.size() == int(constants["SPANS"]) * int(constants["BAYS"]), "the aqueduct has %d towers and %d bays of paving" % [int(constants["SPANS"]) - 1, deck.size()])
+	await _frames(2)
+	var space: PhysicsDirectSpaceState3D = level.get_world_3d().direct_space_state
+	var open: bool = true
+	var deepest: float = 0.0
+	for index: int in deck:
+		for cell: Dictionary in (fields[index]["cells"] as Dictionary).values():
+			var at: Vector3 = cell["at"]
+			var ground: float = float(land.call("height_at", at.x, at.z))
+			deepest = maxf(deepest, deck_y - ground)
+			var query := PhysicsRayQueryParameters3D.create(at + Vector3.DOWN * 0.4, Vector3(at.x, ground + 0.3, at.z), LevelBase.LAYER_WORLD)
+			if not space.intersect_ray(query).is_empty() and deck_y - ground > 1.0:
+				open = false
+	_check(open, "nothing solid lies under the paving: a broken slab drops the player to the ground")
+	var worst: float = PlayerScript.landing_damage(sqrt(2.0 * 12.0 * deepest))
+	_check(deepest > 10.0 and worst < 100.0, "the deepest fall from the deck (%.1f m) hurts (%.0f) without killing" % [deepest, worst])
+	var head: Vector3 = level.call("on_line", 0.0)
+	var tail: Vector3 = level.call("on_line", float(level.get("causeway_end")) + 2.0)
+	_check(absf(deck_y - float(land.call("height_at", head.x, head.z))) < 1.2 and float(land.call("height_at", tail.x, tail.z)) >= deck_y - 0.35, "the deck meets the ground at the spring and where the causeway runs into the hill")
+	level.set("collected_loot", int(level.get("total_loot")))
+	level.call("_on_duckling_taken", "case", 1)
+	var scheduled: bool = true
+	for index: int in deck:
+		for cell: Dictionary in (fields[index]["cells"] as Dictionary).values():
+			scheduled = scheduled and float(cell["due"]) >= 0.0
+	_check(scheduled, "once she has all three ducklings every slab on the deck is due to collapse")
+	holder.queue_free()
+	await _frames(2)
+
+
+## level_base merges each material into one mesh: the chamfered blocks (plain arrays) and the
+## primitive boxes (indexed) must both survive the merge.
+func _test_merge_mix() -> void:
+	var box := BoxMesh.new()
+	var block: Mesh = LevelBase.Alpine.block_mesh(Vector3(2.0, 1.0, 1.5))
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	tool.append_from(LevelBase._indexed(block), 0, Transform3D.IDENTITY)
+	tool.append_from(LevelBase._indexed(box), 0, Transform3D(Basis.IDENTITY, Vector3(5.0, 0.0, 0.0)))
+	var merged: int = tool.commit().get_faces().size() / 3
+	var expected: int = block.get_faces().size() / 3 + box.get_faces().size() / 3
+	_check(merged == expected, "a merged batch keeps every triangle of mixed block and box meshes (%d of %d)" % [merged, expected])
+
+
 func _test_yuzu_run() -> void:
 	var holder := Node3D.new()
 	_scene.add_child(holder)

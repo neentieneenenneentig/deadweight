@@ -34,6 +34,9 @@ var extra_mounds: Array[Vector4] = []
 ## Spots (x, z, radius) kept free of trees and rocks without flattening them (a structure's
 ## footprint on a slope), set before super._design().
 var clear_spots: Array[Vector3] = []
+## The navmesh's bake volume. A subclass whose errand reaches past it (into the northern foothills,
+## say) widens it before super._design(); a bigger volume bakes slower.
+var nav_area := AABB(Vector3(-420.0, -20.0, -420.0), Vector3(840.0, 160.0, 840.0))
 ## Which way the player faces at the spawn (degrees; 0 looks north, toward -z).
 var spawn_facing: float = 0.0
 ## What the spawn hint and the sign by the tub say; a subclass with another errand changes them.
@@ -46,7 +49,7 @@ func _design() -> void:
 	dreamscape = false
 	nav_cell_size = 1.0
 	nav_max_climb = 0.8
-	nav_bounds = AABB(Vector3(-420.0, -20.0, -420.0), Vector3(840.0, 160.0, 840.0))
+	nav_bounds = nav_area
 	set_kill_y(-30.0)
 	land = Terrain.new(SEED, SIZE)
 	land.mound(TUB_XZ, TUB_HILL.x, TUB_HILL.y)

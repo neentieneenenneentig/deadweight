@@ -50,7 +50,8 @@ static func _box(surface: SurfaceTool, at: Vector3, size: Vector3) -> void:
 ## Pickup models for absurd objectives (W4), vertex coloured, centred on the floor point's axis:
 ## "duck" (a rubber duck), "towel" (a folded striped towel), "firewood" (a bundle of logs),
 ## "salts" (a jar of pink bath salts), "sponge" (a sea sponge, holes and all), "yuzu" (a knobbly
-## citrus with a leaf), "yuzu_gold" (the same, gilded).
+## citrus with a leaf), "yuzu_gold" (the same, gilded), "duckling" (a small rubber duck with a tuft),
+## "duckling_gold" (the same, gilded).
 static var _looks: Dictionary = {}
 
 static func pickup_mesh(look: String) -> ArrayMesh:
@@ -65,6 +66,15 @@ static func pickup_mesh(look: String) -> ArrayMesh:
 			_painted(tool, _block(Vector3(0.16, 0.06, 0.16)), Transform3D(Basis.IDENTITY, Vector3(0, 0.31, 0.44)), Color("ed9647"))
 			for side: float in [-1.0, 1.0]:
 				_painted(tool, _ball(0.035), Transform3D(Basis.IDENTITY, Vector3(side * 0.1, 0.42, 0.38)), Color("1d1d22"))
+		"duckling", "duckling_gold":
+			var body: Color = Color("f6dc6a") if look == "duckling" else Color("ffc928")
+			var beak: Color = Color("ed9647") if look == "duckling" else Color("f08a1c")
+			_painted(tool, _ball(0.22), Transform3D(Basis.from_scale(Vector3(1.0, 0.8, 1.25)), Vector3(0, -0.06, 0)), body)
+			_painted(tool, _ball(0.15), Transform3D(Basis.IDENTITY, Vector3(0, 0.17, 0.12)), body)
+			_painted(tool, _block(Vector3(0.11, 0.04, 0.11)), Transform3D(Basis.IDENTITY, Vector3(0, 0.15, 0.29)), beak)
+			_painted(tool, _block(Vector3(0.03, 0.09, 0.03)), Transform3D(Basis(Vector3.RIGHT, -0.4), Vector3(0, 0.33, 0.1)), body)
+			for side: float in [-1.0, 1.0]:
+				_painted(tool, _ball(0.025), Transform3D(Basis.IDENTITY, Vector3(side * 0.07, 0.22, 0.24)), Color("1d1d22"))
 		"towel":
 			for k in range(4):
 				var stripe: Color = Color("e3e8e5") if k % 2 == 0 else Color("779ea9")

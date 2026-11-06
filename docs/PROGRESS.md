@@ -718,3 +718,28 @@ Template:
   the l06 teapot's lid, spout, handle and flue, the l04 heat-lamp posts and catwalk rail, the l06
   ring rails. The l01 wall lamps and l03 tower strips moved flush onto their walls.
 - All routes, pars and bonus checks unchanged. Captures in `.tools/captures/RULES/`.
+
+## 2026-11-06: H04 The Ducklings, and the missing-block merge fix
+- Model: Claude Opus 5.5 (lead), owner away ("continue").
+- New raid **h04 "The Ducklings"** (`scripts/levels/h04_the_ducklings.gd`, after h03,
+  `tools/run.ps1 -Level h04`): the princess's rubber duck has had ducklings and they have wandered up
+  the old aqueduct, which runs 230 m from the Soap Spring in the northern foothills (a pump bottle
+  of bath soap the size of a house) down to her hill. The deck is cracking paving (3 m slabs, 2
+  across) on twin-column piers and round arches, 21 m above the ground at its highest (a fall does
+  53 damage, not lethal); the piers' ribs and three towers are solid stone to rest on, and a solid
+  causeway runs the tail into the hill. Ducklings at the spring and on the middle and last towers,
+  the golden duckling on the soap pump (bonus, rod only). Once she has all three a collapse wave
+  runs out along the deck from wherever the player stands (5.5 m/s, a little under a run). 36 mines,
+  7 hounds, the tub-hill marble. Route 893 m, pars 250/145. The navmesh volume reaches z -500 for
+  the spring (`nav_area` in highlands_base); bake 0.5 s.
+- traps: `crack_field()` takes a yaw (a diagonal deck) and returns its index; new
+  `crack_wave(fields, origin, speed, delay)`. dream_props: duckling and golden duckling pickups.
+- **Fix, all levels:** `_merge_statics` dropped geometry when a material mixed chamfered Alpine
+  blocks (plain arrays) with primitive boxes (indexed): `SurfaceTool.append_from` then keeps only the
+  indexed triangles. Since the V2 pass some blocks in the Floodworks levels and the tutorial were
+  drawn nowhere but stayed solid (l01: 1680 -> 3000 dark and 336 -> 2008 light-concrete triangles;
+  the skyline blocks R8 made solid were among them). Plain meshes are now indexed before the merge
+  (`_indexed()`), and world_test checks a mixed merge keeps every triangle.
+- Tests: traps (turned field, collapse wave), world (catalog of 16, aqueduct: open air under the
+  paving, survivable fall, ends meet the ground, the finale schedules every slab; the merge).
+  Captures in `.tools/captures/H04/` and `.tools/captures/MERGE/`.

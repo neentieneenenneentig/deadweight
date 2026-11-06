@@ -456,7 +456,7 @@ func floor_text(text: String, point: Vector3, font_size: int = 40, color: Color 
 
 ## A required case: all of them must be collected before extraction unlocks.
 ## look picks the model (W4): "case" (the salvage case), "duck", "towel", "firewood", "salts", "sponge",
-## "yuzu" or "yuzu_gold".
+## "yuzu", "yuzu_gold", "duckling" or "duckling_gold".
 func case_at(floor_point: Vector3, title: String, look: String = "case") -> void:
 	total_loot += 1
 	_case_spots.append({"floor_point": floor_point, "title": title, "look": look})
@@ -1411,7 +1411,7 @@ func _merge_statics() -> void:
 			var fresh := SurfaceTool.new()
 			fresh.begin(Mesh.PRIMITIVE_TRIANGLES)
 			tools[key] = fresh
-		(tools[key] as SurfaceTool).append_from(instance.mesh, 0, instance.transform)
+		(tools[key] as SurfaceTool).append_from(_indexed(instance.mesh), 0, instance.transform)
 	_merged_count = tools.size()
 	_pending.clear()
 	remove_child(_stage)
@@ -1426,6 +1426,19 @@ func _merge_statics() -> void:
 		if NO_SHADOW_KEYS.has(key):
 			merged.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(merged)
+
+
+## SurfaceTool.append_from keeps only the indexed triangles once indexed and plain meshes are mixed
+## in one tool, so a plain ArrayMesh (the chamfered Alpine blocks) is indexed before it is merged.
+## Without this, a material's batch silently lost every block of the other kind: drawn nowhere,
+## but still solid.
+static func _indexed(mesh: Mesh) -> Mesh:
+	if not (mesh is ArrayMesh) or ((mesh as ArrayMesh).surface_get_format(0) & Mesh.ARRAY_FORMAT_INDEX) != 0:
+		return mesh
+	var tool := SurfaceTool.new()
+	tool.create_from(mesh, 0)
+	tool.index()
+	return tool.commit()
 
 
 # A level-local clock makes the sky pause with gameplay and resets it on restart.

@@ -3,7 +3,8 @@ extends Node3D
 ## level.traps(), and run here each physics step while the level is active:
 ##   crack_field  plates (thin ice, old paving) that crack under the player and break after
 ##                CRACK_TIME, dropping them into whatever is below; a hard landing breaks one at
-##                once. Broken plates grow back after REGROW_TIME.
+##                once. Broken plates grow back after REGROW_TIME. A field may be turned (yaw) to
+##                pave a diagonal deck, and crack_wave() brings whole fields down in a running wave.
 ##   mine         a teacup landmine. The player, a hound or the rod's weight within MINE_TRIGGER
 ##                arms it: it beeps and blinks for MINE_FUSE, then blows. The blast hurts and
 ##                throws, and it kills hounds, so luring them over a mine works.
@@ -78,35 +79,37 @@ func setup(owner_level: Node3D) -> void:
 
 # --- Builders ------------------------------------------------------------------------------------
 
-## A grid of breakable plates with their tops at center.y. keep(x, z) -> bool may leave tiles out
-## (a round lake, say). kind is "ice" or "paving".
-func crack_field(center: Vector3, size: Vector2, tile: float, kind: String, keep: Callable = Callable()) -> void:
+## A grid of breakable plates with their tops at center.y. keep(x, z) -> bool (world x, z) may leave
+## tiles out (a round lake, say). kind is "ice" or "paving". yaw (degrees) turns the grid about
+## center: size.x runs across the turned x axis and size.y along its z axis. Returns the field's
+## index, for crack_wave().
+func crack_field(center: Vector3, size: Vector2, tile: float, kind: String, keep: Callable = Callable(), yaw: float = 0.0) -> int:
 	var columns: int = maxi(1, int(round(size.x / tile)))
 	var rows: int = maxi(1, int(round(size.y / tile)))
 	var thickness: float = 0.3 if kind == "ice" else 0.5
-	var field := {"center": center, "tile": tile, "columns": columns, "rows": rows, "kind": kind, "cells": {}, "thickness": thickness}
+	var turn := Basis(Vector3.UP, deg_to_rad(yaw))
+	var field := {"center": center, "tile": tile, "columns": columns, "rows": rows, "kind": kind, "cells": {}, "thickness": thickness, "turn": turn}
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(tile - 0.04, thickness, tile - 0.04)
-	var origin: Vector2 = Vector2(center.x, center.z) - Vector2(columns, rows) * tile * 0.5
+	var origin: Vector2 = -Vector2(columns, rows) * tile * 0.5
 	var placements: Array[Transform3D] = []
 	for row in range(rows):
 		for column in range(columns):
-			var x: float = origin.x + (float(column) + 0.5) * tile
-			var z: float = origin.y + (float(row) + 0.5) * tile
-			if keep.is_valid() and not bool(keep.call(x, z)):
+			var local := Vector3(origin.x + (float(column) + 0.5) * tile, -thickness * 0.5, origin.y + (float(row) + 0.5) * tile)
+			var at: Vector3 = center + turn * local
+			if keep.is_valid() and not bool(keep.call(at.x, at.z)):
 				continue
-			var at := Vector3(x, center.y - thickness * 0.5, z)
 			var body := StaticBody3D.new()
-			body.position = at
+			body.transform = Transform3D(turn, at)
 			body.collision_layer = 1
 			body.collision_mask = 0
 			var collision := CollisionShape3D.new()
 			collision.shape = shape
 			body.add_child(collision)
 			add_child(body)
-			var cell := {"body": body, "index": placements.size(), "at": at, "state": 0, "timer": 0.0}
+			var cell := {"body": body, "index": placements.size(), "at": at, "state": 0, "timer": 0.0, "due": -1.0}
 			(field["cells"] as Dictionary)[Vector2i(column, row)] = cell
-			placements.append(Transform3D(Basis.from_scale(Vector3(tile - 0.08, thickness, tile - 0.08)), at))
+			placements.append(Transform3D(turn * Basis.from_scale(Vector3(tile - 0.08, thickness, tile - 0.08)), at))
 	var multi := MultiMesh.new()
 	multi.transform_format = MultiMesh.TRANSFORM_3D
 	multi.use_colors = true
@@ -124,6 +127,19 @@ func crack_field(center: Vector3, size: Vector2, tile: float, kind: String, keep
 	field["multimesh"] = multi
 	field["placements"] = placements
 	_fields.append(field)
+	return _fields.size() - 1
+
+
+## Brings the given fields down in a wave that runs out from origin at speed m/s, starting after
+## delay seconds: each intact plate starts cracking when the wave reaches it (its horizontal
+## distance from origin over speed), as if the player had stepped on it. Plates still grow back.
+func crack_wave(field_indices: Array, origin: Vector3, speed: float, delay: float = 0.0) -> void:
+	for index: int in field_indices:
+		if index < 0 or index >= _fields.size():
+			continue
+		for cell: Dictionary in (_fields[index]["cells"] as Dictionary).values():
+			var at: Vector3 = cell["at"]
+			cell["due"] = delay + Vector2(at.x - origin.x, at.z - origin.z).length() / maxf(speed, 0.01)
 
 
 func mine(floor_point: Vector3) -> void:
@@ -350,8 +366,9 @@ func _physics_process(delta: float) -> void:
 func _cell_under(field: Dictionary, point: Vector3) -> Dictionary:
 	var center: Vector3 = field["center"]
 	var tile: float = field["tile"]
-	var origin: Vector2 = Vector2(center.x, center.z) - Vector2(int(field["columns"]), int(field["rows"])) * tile * 0.5
-	var key := Vector2i(int(floor((point.x - origin.x) / tile)), int(floor((point.z - origin.y) / tile)))
+	var local: Vector3 = (field["turn"] as Basis).inverse() * (point - center)
+	var origin: Vector2 = -Vector2(int(field["columns"]), int(field["rows"])) * tile * 0.5
+	var key := Vector2i(int(floor((local.x - origin.x) / tile)), int(floor((local.z - origin.y) / tile)))
 	var cells: Dictionary = field["cells"]
 	if not cells.has(key):
 		return {}
@@ -369,6 +386,10 @@ func _update_fields(player: Node3D, delta: float) -> void:
 			if not under.is_empty() and int(under["state"]) == 0:
 				_start_crack(field, under)
 		for cell: Dictionary in (field["cells"] as Dictionary).values():
+			if float(cell["due"]) >= 0.0:
+				cell["due"] = float(cell["due"]) - delta
+				if float(cell["due"]) < 0.0 and int(cell["state"]) == 0:
+					_start_crack(field, cell)
 			match int(cell["state"]):
 				1:
 					cell["timer"] = float(cell["timer"]) - delta
@@ -379,7 +400,7 @@ func _update_fields(player: Node3D, delta: float) -> void:
 						_break(field, cell)
 				2:
 					cell["timer"] = float(cell["timer"]) - delta
-					if float(cell["timer"]) <= 0.0 and not _player_over(player, cell, float(field["tile"])):
+					if float(cell["timer"]) <= 0.0 and not _player_over(player, field, cell):
 						_restore(field, cell)
 
 
@@ -408,9 +429,10 @@ func _restore(field: Dictionary, cell: Dictionary) -> void:
 	multi.set_instance_color(int(cell["index"]), _plate_color(str(field["kind"]), 0.0))
 
 
-func _player_over(player: Node3D, cell: Dictionary, tile: float) -> bool:
-	var at: Vector3 = cell["at"]
-	return absf(player.global_position.x - at.x) < tile * 0.7 and absf(player.global_position.z - at.z) < tile * 0.7
+func _player_over(player: Node3D, field: Dictionary, cell: Dictionary) -> bool:
+	var tile: float = field["tile"]
+	var local: Vector3 = (field["turn"] as Basis).inverse() * (player.global_position - (cell["at"] as Vector3))
+	return absf(local.x) < tile * 0.7 and absf(local.z) < tile * 0.7
 
 
 ## A hard landing on a plate breaks it on the spot and sets the ones around it cracking.

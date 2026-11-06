@@ -392,6 +392,17 @@ the rest moved onto the wall, beam or roof edge they named) and made the props s
 (l02, l03, l04), the bathtub (l03), pump-house domes, kiln chimneys (l04, l06), the l01 skyline
 blocks, mast arms and lane pipes, the l06 teapot's lid, spout, handle and flue, and the l04 and l06
 rails. The l01 wall lamps and l03 tower strips moved flush onto their walls.
+**H04 — The Ducklings (done, lead, 2026-11-06).** Fourth highland errand
+(`scripts/levels/h04_the_ducklings.gd`, after h03, `tools/run.ps1 -Level h04`): three rubber
+ducklings along the old aqueduct from the Soap Spring (a house-sized soap pump bottle) to the tub
+hill. The deck is cracking paving on arches up to 21 m above the ground; ribs, towers and the tail
+causeway are solid stone. Golden duckling on the soap pump (bonus, rod only). With all three, a
+collapse wave runs out along the deck from the player (traps `crack_wave()`; `crack_field()` now
+takes a yaw). Pars 250/145 from the route. Needs owner tuning: wave speed, deck height, slab size.
+**Merge fix (lead, 2026-11-06).** `_merge_statics` lost every chamfered Alpine block that shared a
+material with a primitive box (SurfaceTool keeps only indexed triangles when the two mix): drawn
+nowhere, still solid, in the Floodworks levels and the tutorial since V2. Fixed with `_indexed()`;
+world_test guards it.
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
 department, and added three AI-generated textures. The store text, press kit, rating answers and
