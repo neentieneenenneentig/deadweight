@@ -12,6 +12,7 @@ extends SceneTree
 ## tools/capture-store-art.ps1 runs one process per shot, at the shot's size and renderer:
 ##   <godot> --path . --position 20000,20000 --resolution 1920x1080 --fixed-fps 60 --script res://tools/store_art.gd -- --shot=hud_03_pump_row_swing --profile=user://test_store_art.cfg --unlock-all
 ## Use --probe=1 in place of --shot=<name> with --level=<id> to list the anchors and enemies of a level.
+## While retuning a shot: --power= and --lift= override its cast, --trace prints the weight every 6 frames.
 ##
 ## Nothing touches the player's save. Writes only under store/art/screenshots/ (live) or the JOBS files
 ## under store/art/steam/ and store/art/google-play/ (key art).
@@ -39,25 +40,28 @@ const LIVE_FPS: float = 60.0
 ##   mode: "still" (frozen player, camera only) or "cast" (rod fired from "from" at "aim")
 ##   practice: true removes enemies (clean scenery); cam/look/fov: camera; hold: seconds after latch
 ##   layout: overlay style, "none" for text-free art; transparent: alpha background (logo only)
+## Re-shot on 2026-11-06 in the alpine highlands (the v2 look): the h04 aqueduct and soap spring, the
+## h01 giant duck on the frozen lake, the h02 basalt stack, and the valley from above. Where the
+## lockup sits on the left, the subject sits right of it (the duck) or below it (the soap bottle).
 const JOBS: Array[Dictionary] = [
-	{"file": "steam/steam_header_920x430.png", "size": Vector2i(920, 430), "level": "l03", "mode": "still",
-		"practice": false, "cam": Vector3(0.0, 4.0, 12.0), "look": Vector3(-1.0, 4.0, -40.0), "fov": 60.0, "layout": "header"},
-	{"file": "steam/steam_capsule_small_462x174.png", "size": Vector2i(462, 174), "level": "l05", "mode": "still",
-		"practice": false, "cam": Vector3(6.0, 14.0, 18.0), "look": Vector3(0.0, 9.0, -30.0), "fov": 60.0, "layout": "small"},
-	{"file": "steam/steam_capsule_main_1232x706.png", "size": Vector2i(1232, 706), "level": "l01", "mode": "still",
-		"practice": false, "cam": Vector3(15.0, 15.0, 34.0), "look": Vector3(-4.0, 9.0, -40.0), "fov": 60.0, "layout": "main"},
-	{"file": "steam/steam_capsule_vertical_748x896.png", "size": Vector2i(748, 896), "level": "l04", "mode": "still",
-		"practice": false, "cam": Vector3(0.0, 6.0, 12.0), "look": Vector3(0.0, 4.0, -40.0), "fov": 60.0, "layout": "vertical"},
-	{"file": "steam/steam_library_capsule_600x900.png", "size": Vector2i(600, 900), "level": "l02", "mode": "still",
-		"practice": false, "cam": Vector3(0.0, 4.0, 10.0), "look": Vector3(0.0, 5.0, -30.0), "fov": 60.0, "layout": "capsule"},
-	{"file": "steam/steam_library_hero_3840x1240.png", "size": Vector2i(3840, 1240), "level": "l03", "mode": "still",
-		"practice": false, "cam": Vector3(0.0, 12.0, 20.0), "look": Vector3(0.0, 4.0, -40.0), "fov": 70.0, "layout": "none"},
+	{"file": "steam/steam_header_920x430.png", "size": Vector2i(920, 430), "level": "h01", "mode": "still",
+		"practice": true, "cam": Vector3(-166.0, 5.0, -50.0), "look": Vector3(-224.0, 8.0, -72.0), "fov": 60.0, "layout": "header"},
+	{"file": "steam/steam_capsule_small_462x174.png", "size": Vector2i(462, 174), "level": "h04", "mode": "still",
+		"practice": true, "cam": Vector3(161.9, 30.0, -336.5), "look": Vector3(195.0, 18.0, -410.0), "fov": 60.0, "layout": "small"},
+	{"file": "steam/steam_capsule_main_1232x706.png", "size": Vector2i(1232, 706), "level": "h04", "mode": "still",
+		"practice": true, "cam": Vector3(161.9, 30.0, -336.5), "look": Vector3(195.0, 32.0, -410.0), "fov": 60.0, "layout": "main"},
+	{"file": "steam/steam_capsule_vertical_748x896.png", "size": Vector2i(748, 896), "level": "h02", "mode": "still",
+		"practice": true, "cam": Vector3(-168.0, 8.0, 222.0), "look": Vector3(-198.0, 17.0, 256.0), "fov": 62.0, "layout": "vertical"},
+	{"file": "steam/steam_library_capsule_600x900.png", "size": Vector2i(600, 900), "level": "h02", "mode": "still",
+		"practice": true, "cam": Vector3(-168.0, 8.0, 222.0), "look": Vector3(-198.0, 17.0, 256.0), "fov": 62.0, "layout": "capsule"},
+	{"file": "steam/steam_library_hero_3840x1240.png", "size": Vector2i(3840, 1240), "level": "h04", "mode": "still",
+		"practice": true, "cam": Vector3(150.0, 30.0, -330.0), "look": Vector3(205.0, 17.0, -415.0), "fov": 70.0, "layout": "none"},
 	{"file": "steam/steam_library_logo_1280x720.png", "size": Vector2i(1280, 720), "level": "", "mode": "still",
 		"practice": false, "cam": Vector3.ZERO, "look": Vector3.FORWARD, "fov": 60.0, "layout": "logo", "transparent": true},
-	{"file": "steam/steam_page_background_1438x810.png", "size": Vector2i(1438, 810), "level": "l05", "mode": "still",
-		"practice": false, "cam": Vector3(-12.0, 8.0, 14.0), "look": Vector3(4.0, 8.0, -60.0), "fov": 60.0, "layout": "none"},
-	{"file": "google-play/play_feature_graphic_1024x500.png", "size": Vector2i(1024, 500), "level": "l03", "mode": "still",
-		"practice": false, "cam": Vector3(0.0, 6.0, 16.0), "look": Vector3(0.0, 5.0, -40.0), "fov": 60.0, "layout": "feature"},
+	{"file": "steam/steam_page_background_1438x810.png", "size": Vector2i(1438, 810), "level": "h01", "mode": "still",
+		"practice": true, "cam": Vector3(0.0, 120.0, 220.0), "look": Vector3(40.0, 20.0, -200.0), "fov": 60.0, "layout": "none"},
+	{"file": "google-play/play_feature_graphic_1024x500.png", "size": Vector2i(1024, 500), "level": "h01", "mode": "still",
+		"practice": true, "cam": Vector3(-166.0, 5.0, -50.0), "look": Vector3(-224.0, 8.0, -72.0), "fov": 60.0, "layout": "feature"},
 ]
 
 ## Live gameplay shots (R6b). Fields:
@@ -72,22 +76,31 @@ const JOBS: Array[Dictionary] = [
 ##   line runs from the rod up through the frame and the level shows below; "hound" follows the nearest
 ##   hound; anything else follows aim. track applies the look once latched, or from the cast for latch false.
 ##   near: capture once the nearest hound is this close (m), for a chase; 0 for none.
+##   cast: false stands at from, looks at aim and never casts (a quiet portrait of an objective).
 ##   practice: true starts the level with --practice (no enemies), so a bite cannot knock the swing off course.
 ## Casts start 15 to 25 m from their plate, so the line is long in frame. Plates are listed by --probe.
+## Retuned on 2026-11-06 for the 0.6x rod of S1: a cast now flies flatter, so lift is 3 to 5 m (9.5 m for
+## the range's 29 m gantry), found by sweeping --lift= (and --power=) until the cast latches.
 const LIVE_SHOTS: Dictionary = {
 	"hud_01_pump_row_hound_chase": {"level": "l02", "from": Vector3(-4, 1, -6), "aim": Vector3(-10, 5, -30), "latch": false, "power": 0.3, "track": true, "look": "hound", "near": 7.0, "frames": 300},
 	"hud_02_sluice_gate_sentry_beam": {"level": "l01", "from": Vector3(-8, 1, -30), "aim": Vector3(-22, 3.6, -46), "latch": false, "power": 0.3, "frames": 40},
-	"hud_03_pump_row_swing": {"level": "l02", "from": Vector3(0, 1, -16), "aim": Vector3(-5, 8.64, -37), "power": 0.4, "lift": 2.2, "reel_frames": 120, "swing": Vector3(910.0, 250.0, -410.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
-	"hud_04_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(12, 8.54, -38), "power": 0.2, "lift": 2.2, "reel_frames": 60, "swing": Vector3(800.0, 250.0, 480.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
-	"hud_05_slag_line_lintel_swing": {"level": "l04", "from": Vector3(-2, 1, -66), "aim": Vector3(-6, 9.54, -88), "power": 0.6, "lift": 2.2, "reel_frames": 110, "swing": Vector3(1000.0, 200.0, -180.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
-	"hud_06_crane_yard_arm_reel": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(-5, 14.99, -22), "power": 0.2, "lift": 1.5, "reel": true, "practice": true, "track": true, "look": "velocity", "frames": 90},
-	"hud_07_crucible_kiln_swing": {"level": "l06", "from": Vector3(0, 10, -54), "aim": Vector3(-11, 16.34, -65.05), "power": 0.2, "lift": 1.5, "reel_frames": 60, "swing": Vector3(-600.0, 150.0, 600.0), "practice": true, "track": true, "look": "aim", "view": Vector3(0, 0.5, -46), "min_speed": 12.0, "frames": 150},
-	"hud_08_induction_ledge_swing": {"level": "tutorial", "from": Vector3(0, 1, -48), "aim": Vector3(3.5, 7.74, -66), "power": 0.4, "lift": 2.2, "reel_frames": 80, "swing": Vector3(900.0, 200.0, 180.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
-	"hud_09_practice_range_gantry": {"level": "range", "from": Vector3(0, 1, -50), "aim": Vector3(4, 8.64, -70), "power": 0.4, "lift": 2.2, "reel_frames": 110, "swing": Vector3(900.0, 250.0, 180.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"hud_03_pump_row_swing": {"level": "l02", "from": Vector3(0, 1, -16), "aim": Vector3(-5, 8.64, -37), "power": 0.8, "lift": 5.0, "reel_frames": 120, "swing": Vector3(910.0, 250.0, -410.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"hud_04_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(12, 8.54, -38), "power": 0.8, "lift": 3.0, "reel_frames": 60, "swing": Vector3(800.0, 250.0, 480.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"hud_05_slag_line_lintel_swing": {"level": "l04", "from": Vector3(-2, 1, -66), "aim": Vector3(-6, 9.54, -88), "power": 0.8, "lift": 4.5, "reel_frames": 110, "swing": Vector3(1000.0, 200.0, -180.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"hud_06_crane_yard_arm_reel": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(-5, 14.99, -22), "power": 0.8, "lift": 4.0, "reel": true, "practice": true, "track": true, "look": "velocity", "frames": 90},
+	"hud_07_crucible_kiln_swing": {"level": "l06", "from": Vector3(0, 10, -54), "aim": Vector3(-11, 16.34, -65.05), "power": 0.8, "lift": 3.0, "reel_frames": 60, "swing": Vector3(-600.0, 150.0, 600.0), "practice": true, "track": true, "look": "aim", "view": Vector3(0, 0.5, -46), "min_speed": 12.0, "frames": 150},
+	"hud_08_induction_ledge_swing": {"level": "tutorial", "from": Vector3(0, 1, -48), "aim": Vector3(3.5, 7.74, -66), "power": 0.8, "lift": 3.9, "reel_frames": 80, "swing": Vector3(900.0, 200.0, 180.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"hud_09_practice_range_gantry": {"level": "range", "from": Vector3(2, 1, -284), "aim": Vector3(15, 29.34, -300), "power": 1.0, "lift": 9.5, "reel_frames": 110, "swing": Vector3(900.0, 250.0, 180.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	# The highlands have no anchor plates: these cast a free weight and capture the line in flight.
+	"hud_10_highlands_giant_duck": {"level": "h01", "from": Vector3(-172, -0.4, -52), "aim": Vector3(-200, 9, -86), "latch": false, "power": 0.5, "practice": true, "track": true, "frames": 35},
+	"hud_11_ducklings_aqueduct": {"level": "h04", "from": Vector3(160.1, 25.8, -442.8), "aim": Vector3(209.5, 31, -388.2), "latch": false, "power": 1.0, "track": true, "frames": 45},
+	"hud_12_bath_salts_kettle": {"level": "h02", "from": Vector3(-180, 7.5, 232), "aim": Vector3(-198, 22, 256), "latch": false, "power": 0.5, "practice": true, "track": true, "frames": 35},
+	"hud_13_princess_hot_tub": {"level": "h01", "from": Vector3(301.0, 47.7, -253.0), "aim": Vector3(300, 48.4, -260), "latch": false, "cast": false, "practice": true, "frames": 10},
 	"touch_01_sluice_gate_sentry_beam": {"level": "l01", "from": Vector3(-8, 1, -30), "aim": Vector3(-22, 3.6, -46), "latch": false, "power": 0.3, "frames": 40},
-	"touch_02_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(-12, 8.54, -38), "power": 0.2, "lift": 2.2, "reel_frames": 60, "swing": Vector3(-800.0, 250.0, 480.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
-	"touch_03_crane_yard_arm": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(5, 14.99, -22), "power": 0.2, "lift": 1.5, "reel": true, "practice": true, "track": true, "look": "velocity", "frames": 90},
-	"touch_04_crucible_kiln_reel": {"level": "l06", "from": Vector3(0, 1, -14), "aim": Vector3(4, 9.44, 1.5), "power": 0.2, "lift": 2.2, "reel_frames": 60, "swing": Vector3(700.0, 150.0, 220.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"touch_02_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(-12, 8.54, -38), "power": 0.8, "lift": 3.0, "reel_frames": 60, "swing": Vector3(-800.0, 250.0, 480.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"touch_03_crane_yard_arm": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(5, 14.99, -22), "power": 0.8, "lift": 4.0, "reel": true, "practice": true, "track": true, "look": "velocity", "frames": 90},
+	"touch_04_crucible_kiln_reel": {"level": "l06", "from": Vector3(0, 1, -14), "aim": Vector3(4, 9.44, 1.5), "power": 0.8, "lift": 3.5, "reel_frames": 60, "swing": Vector3(700.0, 150.0, 220.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
+	"touch_05_ducklings_aqueduct": {"level": "h04", "from": Vector3(160.1, 25.8, -442.8), "aim": Vector3(209.5, 31, -388.2), "latch": false, "power": 1.0, "track": true, "frames": 45},
 }
 
 
@@ -194,7 +207,13 @@ func _run(only: String) -> void:
 ## Runs one live shot through the real game (main.tscn) and saves the root viewport as
 ## store/art/screenshots/<name>_<width>x<height>.png. With probe the level is only listed.
 func _run_live(name: String, probe: bool) -> void:
-	var shot: Dictionary = LIVE_SHOTS.get(name, {})
+	var shot: Dictionary = (LIVE_SHOTS.get(name, {}) as Dictionary).duplicate()
+	# --power= and --lift= override a shot's cast while tuning it, so a retune needs no edit per try.
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--power="):
+			shot["power"] = float(argument.substr(8))
+		elif argument.begins_with("--lift="):
+			shot["lift"] = float(argument.substr(7))
 	if shot.is_empty() and not probe:
 		push_error("STORE_ART no live shot named %s" % name)
 		quit(1)
@@ -245,7 +264,15 @@ func _run_live(name: String, probe: bool) -> void:
 	var aim: Vector3 = shot["aim"]
 	if wait_latch:
 		aim = _nearest_anchor(aim) + Vector3(0.0, float(shot.get("lift", 0.0)), 0.0)
-	var latched: bool = await _cast_at(player, tether, from, aim, float(shot.get("power", 1.0)), wait_latch)
+	var latched: bool = false
+	if bool(shot.get("cast", true)):
+		latched = await _cast_at(player, tether, from, aim, float(shot.get("power", 1.0)), wait_latch)
+	else:
+		# "cast": false is a quiet shot: the player stands at from and looks at aim, rod at rest.
+		player.reset_at(from)
+		await _frames(SETTLE_FRAMES)
+		_look_at(player, aim)
+		await _frames(6)
 	print("STORE_ART %s latched=%s anchor=%s" % [name, str(latched), str(aim)])
 	if wait_latch and not latched:
 		push_error("STORE_ART %s did not latch; adjust its aim, power or lift" % name)
@@ -423,7 +450,8 @@ func _render(job: Dictionary) -> void:
 
 func _add_camera(stage: Node3D, job: Dictionary) -> void:
 	var cam := Camera3D.new()
-	cam.far = 1000.0
+	# The highlands' mountain ring is up to 1 km from the camera; 2.5 km keeps it and the snow plane.
+	cam.far = 2500.0
 	cam.fov = float(job["fov"])
 	stage.add_child(cam)
 	cam.global_position = job["cam"]
@@ -464,6 +492,8 @@ func _cast_at(player: RigidBody3D, tether: Node3D, from: Vector3, aim: Vector3, 
 	while not tether.anchored and waited < CAST_TIMEOUT_FRAMES:
 		await process_frame
 		waited += 1
+		if waited % 6 == 0 and OS.get_cmdline_user_args().has("--trace") and is_instance_valid(tether.get("weight")):
+			print("TRACE %d weight %s player %s" % [waited, str((tether.get("weight") as Node3D).global_position), str(player.global_position)])
 	print("STORE_ART cast latched=%s after %d frames" % [str(tether.anchored), waited])
 	return bool(tether.anchored)
 

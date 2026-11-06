@@ -29,10 +29,15 @@ $shots = @(
 	@{ id = "hud_07"; name = "hud_07_crucible_kiln_swing"; size = "1920x1080"; renderer = "forward_plus"; touch = $false },
 	@{ id = "hud_08"; name = "hud_08_induction_ledge_swing"; size = "1920x1080"; renderer = "forward_plus"; touch = $false },
 	@{ id = "hud_09"; name = "hud_09_practice_range_gantry"; size = "1920x1080"; renderer = "forward_plus"; touch = $false },
+	@{ id = "hud_10"; name = "hud_10_highlands_giant_duck"; size = "1920x1080"; renderer = "forward_plus"; touch = $false },
+	@{ id = "hud_11"; name = "hud_11_ducklings_aqueduct"; size = "1920x1080"; renderer = "forward_plus"; touch = $false },
+	@{ id = "hud_12"; name = "hud_12_bath_salts_kettle"; size = "1920x1080"; renderer = "forward_plus"; touch = $false },
+	@{ id = "hud_13"; name = "hud_13_princess_hot_tub"; size = "1920x1080"; renderer = "forward_plus"; touch = $false },
 	@{ id = "touch_01"; name = "touch_01_sluice_gate_sentry_beam"; size = "2400x1080"; renderer = "gl_compatibility"; touch = $true },
 	@{ id = "touch_02"; name = "touch_02_overflow_causeway_gantry"; size = "2400x1080"; renderer = "gl_compatibility"; touch = $true },
 	@{ id = "touch_03"; name = "touch_03_crane_yard_arm"; size = "2400x1080"; renderer = "gl_compatibility"; touch = $true },
-	@{ id = "touch_04"; name = "touch_04_crucible_kiln_reel"; size = "2400x1080"; renderer = "gl_compatibility"; touch = $true }
+	@{ id = "touch_04"; name = "touch_04_crucible_kiln_reel"; size = "2400x1080"; renderer = "gl_compatibility"; touch = $true },
+	@{ id = "touch_05"; name = "touch_05_ducklings_aqueduct"; size = "2400x1080"; renderer = "gl_compatibility"; touch = $true }
 )
 
 foreach ($shot in $shots) {

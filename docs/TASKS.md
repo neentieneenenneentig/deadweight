@@ -26,6 +26,7 @@ owner = needs the human (devices, accounts).
 | R6b | Live action screenshots | R6 | S | B | shell, vision | MUST | done 2026-11-03 |
 | R6c | Screenshot framing pass | R6b | S | B | shell, vision | SHOULD | done 2026-11-03 (touch_04 slow, sentry shots are casts) |
 | R7 | Store copy, notices + AI disclosure for the dreamscape | V1 | S | C | — | MUST | done 2026-11-03 |
+| R9 | Store copy, art, notices + AI disclosure for v2 (highlands, six textures) | V2, H04 | S | B | shell, vision | MUST | done 2026-11-06 |
 | V1 | Art direction: The Department of Unfinished Gravity (owner, via Codex) | — | L | — | shell, vision | MUST | done (2026-11-03) |
 | P1 | Android full-game unlock (Play Billing); only if the owner picks model A | F5, F10, O3b | M | A | shell, owner | MUST if A | todo |
 | F1 | Data layer: profile/upgrades/achievements/settings + tests | — | M | B | shell | MUST | done |
@@ -403,6 +404,23 @@ takes a yaw). Pars 250/145 from the route. Needs owner tuning: wave speed, deck 
 material with a primitive box (SurfaceTool keeps only indexed triangles when the two mix): drawn
 nowhere, still solid, in the Floodworks levels and the tutorial since V2. Fixed with `_indexed()`;
 world_test guards it.
+### R9 — Store pages, art and AI disclosure catch up with v2 (done, lead, 2026-11-06)
+**Why:** the store copy, key art and screenshots still showed the v1 game (afternoon sky,
+checkerboard department, "short raids of one to four minutes"), and the AI disclosure, notices and
+press kit named three AI textures when the build ships six (the alpine sky, slate and nightmare sky
+came with V2). A wrong disclosure is a Steam compliance problem.
+**Done:** Steam, Play, press kit, content rating and README describe the build: floor is lava, the
+four highland errands for Princess Capybara, the department's six raids, runs of one to six
+minutes, the style multiplier. Notices header, Steam AI disclosure draft, PLAN O11, DESIGN and
+README name all six textures. Key art re-rendered in the highlands (h04 aqueduct, h02 stack, h01
+giant duck, the valley). Live screenshots: every swing shot was failing to latch since S1's 0.6x
+rod (they had kept the v1 files); retuned (`--power=`/`--lift=` overrides for sweeping), the range
+shot moved to the new 29 m gantry, and five highland shots added (hud_10 to hud_13, touch_05;
+`"cast": false` makes a quiet portrait shot). The screenshots showed the HUD's objectives panel
+running off the right edge with h04's long mission: the mission line now wraps inside the panel,
+and hud_test lays out the longest catalog mission at every size.
+**Owner:** check the copy against the release candidate (Q2) and pick the screenshots to upload.
+
 ### R7 — Store copy, notices + AI disclosure for the dreamscape
 **Why:** V1 changed the look and fiction from "industrial robots" to an absurdist porcelain
 department, and added three AI-generated textures. The store text, press kit, rating answers and

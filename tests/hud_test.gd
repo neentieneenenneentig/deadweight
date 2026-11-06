@@ -5,6 +5,8 @@ extends SceneTree
 ## options (scale, opacity, mirror) and, when run as `-- --shots` with a windowed renderer, the
 ## G7 captures in .tools/captures/G7.
 
+const Catalog = preload("res://scripts/level_catalog.gd")
+
 const LAYOUT_SIZES := [
 	Vector2i(1280, 720),
 	Vector2i(1280, 800),
@@ -441,6 +443,14 @@ func _test_layouts() -> void:
 
 
 func _run_layouts(tag: String) -> void:
+	# The longest objective wording any catalog level uses, so a long mission is laid out too.
+	var longest: Dictionary = {"loot_label": "", "mission": "", "deliver": ""}
+	for id: String in Catalog.all_ids():
+		var info: Dictionary = Catalog.info(id)
+		for key: String in longest:
+			if str(info.get(key, "")).length() > str(longest[key]).length():
+				longest[key] = str(info.get(key, ""))
+	_hud.set_objective_text(longest["loot_label"], longest["mission"], longest["deliver"])
 	for dimensions: Vector2i in LAYOUT_SIZES:
 		root.size = dimensions
 		await _frames(SETTLE_FRAMES)
@@ -465,6 +475,7 @@ func _run_layouts(tag: String) -> void:
 			var rect: Rect2 = _hud._touch_pads[action].get_rect()
 			_expect(rect.position.x >= 0 and rect.position.y >= 0 and rect.end.x <= logical_size.x and rect.end.y <= logical_size.y, action + " touch control stays visible at " + size_text)
 		print("HUD layout: physical ", dimensions, " / canvas ", logical_size, tag)
+	_hud.set_objective_text("", "", "")
 
 
 ## Every HUD panel the overlap check compares. The touch pads are included on touch screens.

@@ -743,3 +743,29 @@ Template:
 - Tests: traps (turned field, collapse wave), world (catalog of 16, aqueduct: open air under the
   paving, survivable fall, ends meet the ground, the finale schedules every slab; the merge).
   Captures in `.tools/captures/H04/` and `.tools/captures/MERGE/`.
+
+## 2026-11-06: R9 store pages, art and AI disclosure catch up with v2
+- Model: Claude Opus 5.5 (lead), owner away ("continue").
+- **AI disclosure fixed:** the build ships six AI-generated textures (alpine sky, afternoon sky,
+  nightmare sky, slate, porcelain, mural), but the Steam Content Survey draft, notices header, press
+  kit, PLAN O11, DESIGN and README still named three. All now list six; THIRD_PARTY_NOTICES.txt
+  regenerated with tools/notices.gd.
+- **Store copy:** Steam (short description 265/300), Play (1,772 / 1,717 characters with closings
+  A / B), press kit, README and the content-rating notes describe the current build: the floor is
+  lava, Princess Capybara's four highland errands, the department's six raids, runs of one to six
+  minutes, the style multiplier. The content notes add mines, geysers and mud (no injury shown) and
+  the Foundry's ominous sky (no horror creatures or jump scares).
+- **Key art** (tools/store_art.gd JOBS) re-rendered in the highlands: the h04 aqueduct and soap
+  spring (header, main and small capsules, library hero), the h02 basalt stack (vertical and
+  library capsules), the valley from above (page background), the h01 giant duck on the frozen lake
+  (Play feature graphic). Camera far plane 2.5 km for the mountain ring.
+- **Live screenshots:** all 13 old shots were v1 (afternoon look), and every swing shot had been
+  failing to latch since S1 cut the rod to 0.6x. Retuned by sweeping the new `--power=` and
+  `--lift=` overrides (lift 3-5 m, 9.5 m for the range's new 29 m gantry); all ten swing shots latch
+  again at 15-23 m/s. Five highland shots added: hud_10 giant duck, hud_11 aqueduct deck, hud_12
+  Kettle and basalt stack, hud_13 Princess Capybara (`"cast": false`, a quiet portrait), touch_05
+  aqueduct on the mobile renderer.
+- **HUD fix:** h04's mission ("BRING BACK HER RUBBER DUCK'S THREE DUCKLINGS") pushed the
+  objectives panel off the right edge of the screen. The mission line now wraps inside the panel
+  (`OBJECTIVE_WIDTH`), and hud_test lays out the longest catalog objective wording at all six sizes
+  (12 failures without the fix).

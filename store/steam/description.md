@@ -7,10 +7,10 @@ every line against the release candidate (task Q2) before you submit the page fo
 
 DEADWEIGHT
 
-## Short description (Steam limit 300 characters; this one is 256)
+## Short description (Steam limit 300 characters; this one is 265)
 
 ```
-Your legs are slow and the ground is hostile. Your one real tool is a fishing rod that casts impossibly heavy weights. Lock the line, get dragged into the sky, outfly porcelain tea hounds and clockwork sentries, and extract beneath a painted afternoon sky.
+Your legs are slow and the floor is lava. Your one real tool is a fishing rod that casts impossibly heavy weights. Lock the line, get dragged into the sky, outfly porcelain tea hounds, and run errands across the snowy highlands for a capybara princess in a hot tub.
 ```
 
 ## About This Game
@@ -19,22 +19,25 @@ Your legs are slow and the ground is hostile. Your one real tool is a fishing ro
 [h2]Cast. Lock. Fly.[/h2]
 DEADWEIGHT is a first-person movement game about a fishing rod that throws weights far too heavy to exist. Cast one, lock the spool, and the weight drags you off your feet and into the sky. Reel in to climb, cut loose to keep your momentum, recast in mid-air before you hit the ground.
 
-The line is physical and honest: it only pulls when it is taut, you keep every bit of speed you earn, and a cast kicks you back. Learn how the weight swings and you will cross whole sectors without touching the floor.
+The line is physical and honest: it only pulls when it is taut, you keep every bit of speed you earn, and a cast kicks you back. Learn how the weight swings and you will cross whole valleys without touching the floor.
+
+[h2]The floor is lava[/h2]
+The ground is where things go wrong. Ice and old paving crack under your boots and give way. Teacup mines beep once before they go off. Giant marbles come rolling down the hill, geysers throw you into the sky, and the meltwater rises. Porcelain tea hounds outrun you on foot, so stay in the air: hit something fast enough and it shatters, and the longer you fly, the higher your style multiplier climbs.
+
+[h2]Errands for a princess[/h2]
+Princess Capybara is soaking in her hot tub on a hill in the snowy highlands, and she keeps losing things. Her rubber duck. Her firewood. Three jars of bath salts from a boiling geyser basin. Three yuzu from the top of a giant toy marble run. Her rubber duck's three ducklings, who wandered up a crumbling aqueduct. Bring them all back.
 
 [h2]The Department of Unfinished Gravity[/h2]
-An official public works department keeps building under a painted afternoon sky, long after anyone remembers what the works were for. Giant empty chairs stand where offices used to be. Doors open onto nothing. The notices on the walls are deadpan and very polite. The department still keeps its staff: porcelain tea hounds, alarm-clock sentries and ceramic drones, all on duty, all faintly absurd.
-
-[h2]Raid, then get out[/h2]
-The department's halls are full of salvage cases, and its staff will defend every one. Hounds own the ground, sentries own the sightlines, drones own the air between. Grab every case, reach the extraction pad and hold it while the clock runs down. Die, and the run's salvage is gone.
+Below the snowline an official public works department keeps building long after anyone remembers what the works were for: sluice gates and pump rows in the frozen Floodworks, and kilns and cranes in the Foundry under a violet nightmare sky. Doors open onto nothing and the notices are deadpan and very polite. Porcelain tea hounds, alarm-clock sentries and ceramic drones guard every salvage case. Grab them all, reach the extraction pad and hold it while the clock runs down.
 
 [h2]Features[/h2]
 [list]
 [*] Rope physics you can master: tension-only line, inherited momentum, casting recoil, free spool, lock, reel and cut.
-[*] Short, replayable raids of one to four minutes, with bronze, silver and gold medal times on every level.
-[*] A campaign of hand-built levels across the department's zones, plus a tutorial and a practice range.
-[*] Swing a weight into a sentry, hound or drone fast enough and it shatters. A sidearm covers the rest.
+[*] A campaign of hand-built levels: four open highland errands, six department raids, a tutorial and a practice range.
+[*] Replayable runs of one to six minutes, with bronze, silver and gold medal times on every level.
+[*] Cracking ice, teacup mines, rolling marbles, geysers and rising floods, and a style multiplier for staying airborne.
+[*] Swing a weight into a hound, sentry or drone fast enough and it shatters. A sidearm covers the rest.
 [*] Spend salvage in the workshop on six upgrade tracks: spool length, reel motor, sinker mass, plating, quickdraw and sidearm.
-[*] A painted sky, porcelain architecture and a quiet, solemn tone with a faintly comic edge.
 [*] Mouse and keyboard or full gamepad support, built to play well on Steam Deck.
 [*] Fully offline. No accounts, ads, microtransactions or data collection.
 [/list]
@@ -79,7 +82,10 @@ price; accept them unless you have a reason not to.
 
 No mature content: no blood, gore, sexual content, strong language or gambling. Violence is
 limited to fantasy violence against non-human porcelain and clockwork automatons (tea hounds,
-sentries and drones). They shatter. There is no blood, and no humans or animals are harmed.
+sentries and drones). They shatter. There is no blood, and no humans or animals are harmed. The
+player can be hurt by falls, bites, teacup mines (a small cartoon blast), geysers and boiling mud,
+with no injury shown. The Foundry has an ominous animated violet sky, but no horror creatures,
+gore or jump scares. Princess Capybara and the rubber ducks are never in danger.
 
 ## AI content disclosure (Steamworks Content Survey draft, PLAN O11)
 
@@ -87,7 +93,7 @@ Paste this into the Content Survey's AI-generated content section. The owner fil
 reviews it before submitting the page (see RELEASE_CHECKLIST.md, Steam step 9).
 
 ```
-Pre-generated content: Yes. Three image textures in the game were created with an AI image-generation tool during development and reviewed by the developer: a painted afternoon sky panorama, a porcelain surface texture, and a painting of a vacant chair shown as a mural inside the game. The prompts used are kept by the developer. No other AI-generated images are used.
+Pre-generated content: Yes. Six image textures in the game were created with an AI image-generation tool during development and reviewed by the developer: three painted sky panoramas (a cold alpine sky, an afternoon sky and a violet nightmare sky), a slate rock texture, a porcelain surface texture, and a painting of a vacant chair shown as a mural inside the game. The prompts used are kept by the developer. No other AI-generated images are used.
 
 Live-generated content: No. The game does not generate any AI content at runtime. Its 3D models, animation and audio are created by the developer's own code, and no third-party assets are bundled.
 ```

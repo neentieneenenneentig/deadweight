@@ -4,14 +4,14 @@ Play Console > Policy > App content > Content ratings. Every app needs an IARC r
 questionnaire must be redone whenever new content changes an answer. Official guide:
 [Content ratings](https://support.google.com/googleplay/android-developer/answer/9898843?hl=en).
 
-Answer from what the build contains. The guidance below matches the v1.0 design.
+Answer from what the build contains. The guidance below matches the build of 2026-11-06 (the Floodworks, the Foundry and the four highland errands).
 
 | Topic | What the game contains | Answer |
 | --- | --- | --- |
 | Category | A game | Game (not "Reference, news or educational", not "Social") |
-| Violence | The player smashes **porcelain tea hounds, clockwork sentries and ceramic drones**. They shatter; no humans or animals are hurt. | Yes: fantasy violence against non-human porcelain and clockwork automatons |
+| Violence | The player smashes **porcelain tea hounds, clockwork sentries and ceramic drones**. They shatter; no humans or animals are hurt. The player can be hurt by falls, bites, teacup mines (a small cartoon blast), geysers and boiling mud, with no injury shown. Princess Capybara and the rubber ducks are never in danger. | Yes: fantasy violence against non-human porcelain and clockwork automatons |
 | Blood and gore | None. Automatons shatter without blood. | No |
-| Fear / horror | An absurdist, quiet department of vacant chairs and doors to nowhere, with hostile automatons; no horror imagery or jump scares | No |
+| Fear / horror | An absurdist department of vacant chairs and doors to nowhere, and snowy highlands, with hostile automatons. The Foundry has an ominous animated violet sky, but no horror creatures, gore or jump scares | No |
 | Sexuality, nudity | None | No |
 | Language | None | No |
 | Controlled substances | None | No |

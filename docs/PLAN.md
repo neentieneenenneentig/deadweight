@@ -71,7 +71,7 @@ from the start.** The code should simply be ready by then.
 | O7 | After R5 (+R3) | Create the Steam app page and submit it for Coming Soon review. |
 | O8 | Each milestone | Play the build on a real Android phone and on a PC with a gamepad. Write notes in `docs/PLAYTEST.md`. |
 | O9 | Early | Check the name: search Steam, Google Play and trademark databases for "Deadweight" / "Dead Weight", and decide whether to keep it. |
-| O11 | With O7 (Steam page) | In the Steamworks **Content Survey**, fill in the AI-generated content disclosure. Pre-generated: the sky, porcelain texture and mural in `assets/dreamscape/` (prompts in `PROMPTS.md`). No live-generated content. Task R7 drafts the text. |
+| O11 | With O7 (Steam page) | In the Steamworks **Content Survey**, fill in the AI-generated content disclosure. Pre-generated: the six textures in `assets/dreamscape/` (three skies, slate, porcelain, mural; prompts in `PROMPTS.md`). No live-generated content. Tasks R7 and R9 draft the text. |
 | O10 | Before launch | Set the price and release date, then do a final review of store pages and builds. |
 
 ## 5. Milestones and order

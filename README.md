@@ -1,18 +1,20 @@
 # DEADWEIGHT
 
 First-person movement action for PC (Steam: Windows, Linux, Steam Deck) and Android (Google Play).
-Your legs are slow and the ground is hostile. Your one real tool is a fishing rod that casts
+Your legs are slow and the floor is lava. Your one real tool is a fishing rod that casts
 impossibly heavy weights: cast, lock the spool, and the weight drags you into the sky. Reel in, cut
-loose, recast in mid-air. Raid an impossible public works department for salvage, outfly porcelain
-tea hounds, clockwork sentries and drones, and extract through a campaign of contrasting worlds.
+loose, recast in mid-air. Run absurd errands across snowy highlands for a capybara princess in a
+hot tub, raid an impossible public works department for salvage, and outfly porcelain tea hounds,
+clockwork sentries and drones.
 
 The starting look is a cold alpine landscape: snow, slate, frozen lakes and irregular pines.
 The later Foundry levels enter **The Department of Unfinished Gravity**, with nightmare skies,
 bright dream palettes and impossible furniture. The softer painted sky is reserved for the
 Spillway. See [the art notes](docs/DREAMSCAPE.md) for research, assets and capture commands.
 
-**Status:** a playable prototype (one level, the full raid loop, rod physics, two enemy kinds,
-touch controls) with a working release pipeline. Version 1.0 is being built task by task:
+**Status:** a full campaign (tutorial, six department raids, four highland errands, a practice
+range and the highlands preview) with a working release pipeline, waiting on owner playtests and
+store steps. Work is tracked task by task:
 
 | Document | What it covers |
 | --- | --- |
@@ -103,7 +105,7 @@ powershell -ExecutionPolicy Bypass -File tools/build.ps1 -Target All
   workshop, achievements, settings and the menus.
 - `tests/`: headless suites run by `tests/run_all.ps1`.
 
-Models, animation and sound are generated in code. The dreamscape's sky, porcelain surface and
-in-world mural use original AI-generated textures in `assets/dreamscape/`; their exact prompts
-are recorded there. Engine credits and licences are in
+Models, animation and sound are generated in code. Six textures (three sky panoramas, the slate
+and porcelain surfaces and the in-world mural) are original AI-generated images in
+`assets/dreamscape/`; their exact prompts are recorded there. Engine credits and licences are in
 `THIRD_PARTY_NOTICES.txt`, which ships with every build.

@@ -86,6 +86,8 @@ var _clock_label: Label
 var _target_label: Label
 var _practice_label: Label
 var _objective_panel: PanelContainer
+## Width of the objectives panel (top right); its 14 px padding leaves 234 px for the text.
+const OBJECTIVE_WIDTH: float = 262.0
 var _loot_label: Label
 var _bonus_label: Label
 var _mission_label: Label
@@ -420,6 +422,10 @@ func _build_objectives() -> void:
 	_loot_label = _label(objective, "SALVAGE   0 / 3", 20, AMBER)
 	_bonus_label = _label(objective, "BONUS   NONE THIS RAID", 14, CYAN)
 	_mission_label = _label(objective, "RECOVER THE MARKED CASES", 11, MUTED)
+	# A level's own mission can be longer than the panel ("BRING BACK HER RUBBER DUCK'S THREE
+	# DUCKLINGS"): it wraps inside the panel instead of pushing the panel off the right edge.
+	_mission_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_mission_label.custom_minimum_size = Vector2(OBJECTIVE_WIDTH - 28.0, 0.0)
 	_extract_bar = _bar(objective, CYAN, 4)
 	_extract_bar.visible = false
 
@@ -524,8 +530,8 @@ func _reflow() -> void:
 	_practice_label.position = Vector2(mid_x - 120.0, top + 80.0)
 	_practice_label.size = Vector2(240, 20)
 	var objectives_top: float = top + (TOUCH_TOP_OFFSET if touch_enabled else 0.0)
-	_objective_panel.position = Vector2(right - 262.0, objectives_top)
-	_objective_panel.size = Vector2(262, 112)
+	_objective_panel.position = Vector2(right - OBJECTIVE_WIDTH, objectives_top)
+	_objective_panel.size = Vector2(OBJECTIVE_WIDTH, 112)
 
 	# Centre: the ring is centred on the screen, its state text hangs below it.
 	_reticle.position = Vector2(mid_x - 80.0, mid_y - 80.0)

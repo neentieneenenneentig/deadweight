@@ -36,25 +36,28 @@ Cast impossibly heavy weights, lock the line and fly. Offline, no ads.
 
 ## Full description [4000]
 
-Paste the body, a blank line, then the closing for your model: 1,436 characters with closing A,
-1,381 with closing B.
+Paste the body, a blank line, then the closing for your model: 1,772 characters with closing A,
+1,717 with closing B.
 
 ```
-Your legs are slow and the ground is hostile. Your one real tool is a fishing rod that casts impossibly heavy weights.
+Your legs are slow and the floor is lava. Your one real tool is a fishing rod that casts impossibly heavy weights.
 
 Cast a weight, lock the spool, and it drags you off your feet and into the sky. Reel in to climb, cut loose to keep your speed, recast in mid-air before you hit the ground. The line is physical and honest: it only pulls when it is taut, you keep every bit of momentum you earn, and every cast kicks you back.
 
-RAID, THEN GET OUT
-The department's halls are full of salvage cases, and its staff will defend every one: porcelain tea hounds, alarm-clock sentries and ceramic drones. Grab every case, reach the extraction pad and hold it while the clock runs down.
+THE FLOOR IS LAVA
+Ice and old paving crack under your boots. Teacup mines beep before they blow. Giant marbles roll down the hill, geysers throw you skyward and the meltwater rises. Porcelain tea hounds outrun you on foot, so stay in the air: hit something fast enough and it shatters.
+
+ERRANDS FOR A PRINCESS
+Princess Capybara is soaking in her hot tub in the snowy highlands, and she keeps losing things: her rubber duck, her bath salts, her yuzu, her duck's three ducklings. Bring them all back.
 
 THE DEPARTMENT OF UNFINISHED GRAVITY
-Giant empty chairs, doors that open onto nothing and deadpan notices, all under a painted afternoon sky. Quiet, solemn and faintly comic.
+Below the snowline, a public works department still guards its salvage with porcelain hounds, alarm-clock sentries and ceramic drones. Grab every case, reach the extraction pad and hold it while the clock runs down.
 
 FEATURES
 • Rope physics you can master: free spool, lock, reel, cut and recast
-• Short raids of one to four minutes with bronze, silver and gold medal times
-• Hand-built levels, a tutorial and a practice range
-• Smash guards with a swinging weight, or finish them with your sidearm
+• Four open highland errands, six department raids, a tutorial and a practice range
+• Runs of one to six minutes with bronze, silver and gold medal times
+• A style multiplier that climbs the longer you stay airborne
 • Six workshop upgrade tracks to spend your salvage on
 • Touch controls designed for phones, plus full gamepad support
 • Plays completely offline. No ads, no accounts, no data collection
@@ -89,6 +92,6 @@ One price, the whole game. No ads, no extra purchases.
 | Asset | Play requirement | File |
 | --- | --- | --- |
 | App icon | 512×512 PNG, 32-bit, ≤ 1 MB | store/art/google-play/icon_512.png |
-| Feature graphic | 1024×500 JPG or 24-bit PNG | store/art/play_feature_graphic_placeholder_1024x500.png (R6 replaces it) |
-| Phone screenshots | 2–8, 16:9 or 9:16, 320–3840 px per side | R6. For the first closed test, landscape captures from the game are enough. |
+| Feature graphic | 1024×500 JPG or 24-bit PNG | store/art/google-play/play_feature_graphic_1024x500.png (the giant duck on the frozen lake) |
+| Phone screenshots | 2–8, 16:9 or 9:16, 320–3840 px per side | store/art/screenshots/touch_*_2400x1080.png (touch_05 is the highlands) |
 | 7- and 10-inch tablet screenshots | optional, but needed to be featured on tablets | R6 |
