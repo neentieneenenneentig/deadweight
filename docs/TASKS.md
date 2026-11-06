@@ -404,6 +404,13 @@ takes a yaw). Pars 250/145 from the route. Needs owner tuning: wave speed, deck 
 material with a primitive box (SurfaceTool keeps only indexed triangles when the two mix): drawn
 nowhere, still solid, in the Floodworks levels and the tutorial since V2. Fixed with `_indexed()`;
 world_test guards it.
+**P2 — Princess Capybara, modelled (done, lead, 2026-11-06).** The princess was six boxes. She is now
+a painted low-poly capybara (`DreamProps.princess_mesh()`): a barrel body low in the water, the long
+square-nosed head, sleepy half-lidded eyes, small round ears, paws on the water, a striped towel
+turban and a gold crown with a red stone, at 1.2x in the tub (`PRINCESS_SCALE`). Two box colliders
+keep her solid (world_test rays her head from above and the front). The tub gains iron hoops and
+soft steam (radial-faded particle quads, Medium and High only). Shared by h01 to h04 and the valley.
+
 ### R9 — Store pages, art and AI disclosure catch up with v2 (done, lead, 2026-11-06)
 **Why:** the store copy, key art and screenshots still showed the v1 game (afternoon sky,
 checkerboard department, "short raids of one to four minutes"), and the AI disclosure, notices and

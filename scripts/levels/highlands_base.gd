@@ -20,6 +20,7 @@ const TUB_HILL := Vector2(110.0, 30.0)          # radius, height of the princess
 const PAD_XZ := Vector2(282.0, -242.0)
 const DUCK_XZ := Vector2(-250.0, -330.0)
 const WEST_LAKE := Vector3(-200.0, -90.0, 75.0)    # x, z, radius
+const PRINCESS_SCALE := 1.2                       # the painted princess model, in her tub
 const EAST_LAKE := Vector3(190.0, 150.0, 55.0)
 const BIG_DUCK_XZ := Vector2(-200.0, -90.0)
 
@@ -113,24 +114,86 @@ func _build_ground() -> void:
 	water(Vector3(0.0, Terrain.WATER_Y, 0.0), Vector2(SIZE, SIZE), false)
 
 
-## Princess Capybara, in a wooden hot tub, wearing a crown and a towel. She is solid; so is the tub.
+## Princess Capybara, in a wooden hot tub, wearing a crown and a towel turban. She is solid (two
+## boxes under the painted model); so is the tub. Steam rises off the water on Medium and High.
 func _build_hot_tub() -> void:
 	var base: Vector3 = _floor(TUB_XZ)
 	cylinder(base + Vector3(0.0, 0.55, 0.0), 2.8, 1.1, "rust")
 	cylinder(base + Vector3(0.0, 1.08, 0.0), 2.55, 0.06, "glass", false)
-	# Facing the pad (+z), half in the water.
-	block(base + Vector3(0.0, 0.7, 0.0), Vector3(1.4, 1.0, 1.7), "fur")
-	block(base + Vector3(0.0, 1.35, 0.95), Vector3(0.95, 0.8, 0.95), "fur")
-	block(base + Vector3(0.0, 1.35, 1.55), Vector3(0.75, 0.55, 0.45), "fur_dark")
-	for side: float in [-1.0, 1.0]:
-		block(base + Vector3(side * 0.38, 2.15, 0.7), Vector3(0.18, 0.18, 0.12), "fur_dark")
-		block(base + Vector3(side * 0.3, 1.78, 1.43), Vector3(0.1, 0.1, 0.04), "dark")
-	block(base + Vector3(0.0, 2.15, 0.95), Vector3(0.8, 0.12, 0.8), "snow")
-	block(base + Vector3(0.0, 2.27, 0.95), Vector3(0.5, 0.18, 0.5), "yellow")
-	for x: float in [-0.18, 0.0, 0.18]:
-		block(base + Vector3(x, 2.45, 1.18), Vector3(0.08, 0.2, 0.06), "yellow")
+	# Two iron hoops round the staves, flush on the tub.
+	for y: float in [0.22, 0.88]:
+		cylinder(base + Vector3(0.0, y, 0.0), 2.84, 0.1, "dark", false)
+	var princess := MeshInstance3D.new()
+	princess.name = "PrincessCapybara"
+	princess.mesh = DreamProps.princess_mesh()
+	var painted := StandardMaterial3D.new()
+	painted.vertex_color_use_as_albedo = true
+	painted.vertex_color_is_srgb = true
+	painted.roughness = 0.85
+	princess.material_override = painted
+	princess.position = base
+	princess.scale = Vector3.ONE * PRINCESS_SCALE
+	add_child(princess)
+	var body := BoxShape3D.new()
+	body.size = Vector3(1.8, 1.3, 2.6) * PRINCESS_SCALE
+	add_world_collider(body, Transform3D(Basis.IDENTITY, base + Vector3(0.0, 0.95, -0.2) * PRINCESS_SCALE))
+	var head := BoxShape3D.new()
+	head.size = Vector3(1.0, 1.4, 1.7) * PRINCESS_SCALE
+	add_world_collider(head, Transform3D(Basis.IDENTITY, base + Vector3(0.0, 2.2, 0.85) * PRINCESS_SCALE))
+	if quality >= 1:
+		add_child(_tub_steam(base + Vector3(0.0, 1.15, 0.0)))
 	_sign(tub_sign, base + Vector3(-5.0, 0.0, 4.5), Vector2(5.4, 2.0))
 	light(base + Vector3(0.0, 4.0, 0.0), Color("ffe3b0"), 1.2, 18.0)
+
+
+## Soft puffs of steam off the tub: a few slow, fading spheres, no text and nothing to stand on.
+func _tub_steam(at: Vector3) -> CPUParticles3D:
+	var steam := CPUParticles3D.new()
+	steam.name = "TubSteam"
+	steam.position = at
+	steam.amount = 18
+	steam.lifetime = 3.2
+	steam.preprocess = 3.2
+	steam.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	steam.emission_box_extents = Vector3(1.7, 0.05, 1.7)
+	steam.direction = Vector3.UP
+	steam.spread = 12.0
+	steam.gravity = Vector3(0.0, 0.25, 0.0)
+	steam.initial_velocity_min = 0.25
+	steam.initial_velocity_max = 0.5
+	steam.scale_amount_min = 0.7
+	steam.scale_amount_max = 1.3
+	var grow := Curve.new()
+	grow.add_point(Vector2(0.0, 0.4))
+	grow.add_point(Vector2(1.0, 1.4))
+	steam.scale_amount_curve = grow
+	var fade := Gradient.new()
+	fade.colors = PackedColorArray([Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.45), Color(1, 1, 1, 0.0)])
+	fade.offsets = PackedFloat32Array([0.0, 0.3, 1.0])
+	steam.color_ramp = fade
+	# A soft round puff: a camera-facing quad with a radial fade, so no hard edge shows.
+	var soft := GradientTexture2D.new()
+	soft.fill = GradientTexture2D.FILL_RADIAL
+	soft.fill_from = Vector2(0.5, 0.5)
+	soft.fill_to = Vector2(1.0, 0.5)
+	soft.width = 64
+	soft.height = 64
+	var edge := Gradient.new()
+	edge.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	soft.gradient = edge
+	var puff := QuadMesh.new()
+	puff.size = Vector2(1.6, 1.6)
+	var look := StandardMaterial3D.new()
+	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	look.vertex_color_use_as_albedo = true
+	look.albedo_color = Color("eef4f6")
+	look.albedo_texture = soft
+	look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	puff.material = look
+	steam.mesh = puff
+	steam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return steam
 
 
 ## A rubber duck the size of a house, afloat in the west lake. Solid: land on it.

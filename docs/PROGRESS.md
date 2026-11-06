@@ -769,3 +769,13 @@ Template:
   objectives panel off the right edge of the screen. The mission line now wraps inside the panel
   (`OBJECTIVE_WIDTH`), and hud_test lays out the longest catalog objective wording at all six sizes
   (12 failures without the fix).
+
+## 2026-11-06: P2 Princess Capybara, modelled
+- Model: Claude Opus 5.5 (lead), owner away ("continue").
+- The princess was six boxes (the R9 store shot showed it). New painted low-poly capybara in
+  `scripts/dream_props.gd` (`princess_mesh()`, vertex coloured, one draw call): barrel body low in
+  the water, long square-nosed head with a darker muzzle, sleepy half-lidded eyes, round ears, paws
+  on the water, a striped towel turban and a gold crown with a red stone. Shown at 1.2x
+  (`PRINCESS_SCALE` in highlands_base) with two box colliders under her, so she stays solid.
+- The tub gets two iron hoops and soft steam (radial-faded billboard particles, off on Low).
+- world_test: rays from above and from the front stop on her head. hud_13 store shot re-taken.

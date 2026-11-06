@@ -47,6 +47,71 @@ static func _box(surface: SurfaceTool, at: Vector3, size: Vector3) -> void:
 	shape.size = size
 	surface.append_from(shape, 0, Transform3D(Basis.IDENTITY, at))
 
+static var _princess: ArrayMesh
+
+## Princess Capybara in her hot tub, vertex coloured, in tub space: the tub floor is y 0, the water
+## line is y 1.08 and she faces +z. A barrel body low in the water, the long square-nosed head
+## resting above it, sleepy half-lidded eyes, small round ears, a towel turban and a gold crown
+## with a red stone. About 1.9 m wide and 2.9 m tall at scale 1 (the tub shows her at 1.2, paws on
+## the water); the level gives her box colliders.
+static func princess_mesh() -> ArrayMesh:
+	if _princess != null:
+		return _princess
+	var fur := Color("a9896c")
+	var fur_light := Color("bb9b7a")
+	var muzzle := Color("7a5a45")
+	var dark := Color("231b18")
+	var towel := Color("f1efe6")
+	var stripe := Color("6f9fae")
+	var gold := Color("e2b33c")
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Body: a wide barrel, its back just out of the water.
+	_painted(tool, _ball(1.0), Transform3D(Basis.from_scale(Vector3(0.95, 0.72, 1.2)), Vector3(0, 0.95, -0.35)), fur)
+	# Shoulders and neck rise toward the head.
+	_painted(tool, _ball(0.7), Transform3D(Basis.from_scale(Vector3(1.05, 1.0, 0.9)), Vector3(0, 1.35, 0.3)), fur)
+	# Head: long and box-like, the nose tipped a little down.
+	var head := Basis(Vector3.RIGHT, 0.12).scaled(Vector3(0.82, 0.86, 1.35))
+	_painted(tool, _ball(0.55), Transform3D(head, Vector3(0, 1.95, 0.75)), fur_light)
+	# The broad, blunt muzzle and its two nostrils.
+	_painted(tool, _ball(0.36), Transform3D(Basis.from_scale(Vector3(1.15, 0.85, 0.85)), Vector3(0, 1.8, 1.35)), muzzle)
+	for side: float in [-1.0, 1.0]:
+		_painted(tool, _ball(0.04), Transform3D(Basis.from_scale(Vector3(1.0, 0.6, 1.0)), Vector3(side * 0.15, 1.92, 1.62)), dark)
+		# Sleepy eyes: a dark eye under a fur lid that covers its top half.
+		_painted(tool, _ball(0.09), Transform3D(Basis.IDENTITY, Vector3(side * 0.39, 2.12, 1.02)), dark)
+		_painted(tool, _ball(0.1), Transform3D(Basis.from_scale(Vector3(1.0, 0.45, 1.0)), Vector3(side * 0.4, 2.19, 1.02)), fur_light)
+		# Small round ears, out from under the towel.
+		_painted(tool, _ball(0.14), Transform3D(Basis.from_scale(Vector3(0.6, 1.0, 1.0)), Vector3(side * 0.45, 2.3, 0.45)), muzzle)
+		# Front paws on the water, either side of the chin.
+		_painted(tool, _ball(0.17), Transform3D(Basis.from_scale(Vector3(1.0, 0.55, 1.4)), Vector3(side * 0.38, 0.95, 1.05)), muzzle)
+	# Towel turban: two folded rolls with a blue stripe, then the crown on top.
+	_painted(tool, _ball(0.42), Transform3D(Basis.from_scale(Vector3(1.0, 0.45, 1.05)), Vector3(0, 2.42, 0.5)), towel)
+	_painted(tool, _ball(0.33), Transform3D(Basis.from_scale(Vector3(1.0, 0.5, 1.0)), Vector3(0, 2.56, 0.48)), towel)
+	var band := CylinderMesh.new()
+	band.top_radius = 0.38
+	band.bottom_radius = 0.4
+	band.height = 0.05
+	band.radial_segments = 14
+	_painted(tool, band, Transform3D(Basis.IDENTITY, Vector3(0, 2.45, 0.5)), stripe)
+	var ring := CylinderMesh.new()
+	ring.top_radius = 0.24
+	ring.bottom_radius = 0.22
+	ring.height = 0.12
+	ring.radial_segments = 12
+	_painted(tool, ring, Transform3D(Basis.IDENTITY, Vector3(0, 2.72, 0.48)), gold)
+	var point := CylinderMesh.new()
+	point.top_radius = 0.0
+	point.bottom_radius = 0.07
+	point.height = 0.2
+	point.radial_segments = 6
+	for k in range(5):
+		var angle: float = float(k) * TAU / 5.0 + PI * 0.5
+		_painted(tool, point, Transform3D(Basis.IDENTITY, Vector3(cos(angle) * 0.21, 2.86, 0.48 + sin(angle) * 0.21)), gold)
+	_painted(tool, _ball(0.06), Transform3D(Basis.IDENTITY, Vector3(0, 2.72, 0.72)), Color("c8243a"))
+	_princess = tool.commit()
+	return _princess
+
+
 ## Pickup models for absurd objectives (W4), vertex coloured, centred on the floor point's axis:
 ## "duck" (a rubber duck), "towel" (a folded striped towel), "firewood" (a bundle of logs),
 ## "salts" (a jar of pink bath salts), "sponge" (a sea sponge, holes and all), "yuzu" (a knobbly

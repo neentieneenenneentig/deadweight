@@ -949,6 +949,15 @@ func _test_ducklings() -> void:
 			if not space.intersect_ray(query).is_empty() and deck_y - ground > 1.0:
 				open = false
 	_check(open, "nothing solid lies under the paving: a broken slab drops the player to the ground")
+	# Princess Capybara is a painted model: it must stop the player like it looks it should.
+	var highlands: Dictionary = (level.get_script() as GDScript).get_base_script().get_script_constant_map()
+	var tub: Vector3 = level.call("_floor", highlands["TUB_XZ"])
+	var scale: float = float(highlands["PRINCESS_SCALE"])
+	var crown_ray := PhysicsRayQueryParameters3D.create(tub + Vector3(0.0, 6.0, 0.6 * scale), tub + Vector3(0.0, 1.2, 0.6 * scale), LevelBase.LAYER_WORLD)
+	var crown_hit: Dictionary = space.intersect_ray(crown_ray)
+	var snout_ray := PhysicsRayQueryParameters3D.create(tub + Vector3(0.0, 1.9 * scale, 5.0), tub + Vector3(0.0, 1.9 * scale, 0.0), LevelBase.LAYER_WORLD)
+	var snout_hit: Dictionary = space.intersect_ray(snout_ray)
+	_check(not crown_hit.is_empty() and (crown_hit["position"] as Vector3).y > tub.y + 2.5 * scale and not snout_hit.is_empty() and (snout_hit["position"] as Vector3).z > tub.z + 1.3 * scale, "Princess Capybara is solid: her head stops a ray from above and from the front")
 	var worst: float = PlayerScript.landing_damage(sqrt(2.0 * 12.0 * deepest))
 	_check(deepest > 10.0 and worst < 100.0, "the deepest fall from the deck (%.1f m) hurts (%.0f) without killing" % [deepest, worst])
 	var head: Vector3 = level.call("on_line", 0.0)

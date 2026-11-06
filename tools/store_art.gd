@@ -95,7 +95,7 @@ const LIVE_SHOTS: Dictionary = {
 	"hud_10_highlands_giant_duck": {"level": "h01", "from": Vector3(-172, -0.4, -52), "aim": Vector3(-200, 9, -86), "latch": false, "power": 0.5, "practice": true, "track": true, "frames": 35},
 	"hud_11_ducklings_aqueduct": {"level": "h04", "from": Vector3(160.1, 25.8, -442.8), "aim": Vector3(209.5, 31, -388.2), "latch": false, "power": 1.0, "track": true, "frames": 45},
 	"hud_12_bath_salts_kettle": {"level": "h02", "from": Vector3(-180, 7.5, 232), "aim": Vector3(-198, 22, 256), "latch": false, "power": 0.5, "practice": true, "track": true, "frames": 35},
-	"hud_13_princess_hot_tub": {"level": "h01", "from": Vector3(301.0, 47.7, -253.0), "aim": Vector3(300, 48.4, -260), "latch": false, "cast": false, "practice": true, "frames": 10},
+	"hud_13_princess_hot_tub": {"level": "h01", "from": Vector3(303.5, 47.7, -252.5), "aim": Vector3(300, 49.6, -260), "latch": false, "cast": false, "practice": true, "frames": 10},
 	"touch_01_sluice_gate_sentry_beam": {"level": "l01", "from": Vector3(-8, 1, -30), "aim": Vector3(-22, 3.6, -46), "latch": false, "power": 0.3, "frames": 40},
 	"touch_02_overflow_causeway_gantry": {"level": "l03", "from": Vector3(0, 1, -26), "aim": Vector3(-12, 8.54, -38), "power": 0.8, "lift": 3.0, "reel_frames": 60, "swing": Vector3(-800.0, 250.0, 480.0), "practice": true, "track": true, "look": "velocity", "min_speed": 15.0, "frames": 150},
 	"touch_03_crane_yard_arm": {"level": "l05", "from": Vector3(0, 1, -10), "aim": Vector3(5, 14.99, -22), "power": 0.8, "lift": 4.0, "reel": true, "practice": true, "track": true, "look": "velocity", "frames": 90},
