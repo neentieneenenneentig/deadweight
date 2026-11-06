@@ -73,6 +73,7 @@ func _run() -> void:
 	_test_nature_lod()
 	await _test_yuzu_run()
 	await _test_ducklings()
+	await _test_starfall()
 	_test_merge_mix()
 	_scene.queue_free()
 	await _frames(3)
@@ -85,7 +86,8 @@ func _test_framework() -> void:
 	var campaign: Array[String] = Catalog.campaign_ids()
 	_check(campaign.has("l01") and not campaign.has("l09") and not campaign.has("range"), "catalog lists only the campaign levels that exist")
 	var ids: Array[String] = Catalog.all_ids()
-	_check(ids.size() == 16 and ids[7] == "h01" and ids[8] == "h02" and ids[9] == "h03" and ids[10] == "h04" and ids[14] == "range" and ids[15] == "valley", "catalog lists all sixteen levels: h01 to h04 after l06, then the range and the highlands preview last")
+	_check(ids.size() == 17 and ids[7] == "h01" and ids[8] == "h02" and ids[9] == "h03" and ids[10] == "h04" and ids[11] == "h05" and ids[15] == "range" and ids[16] == "valley", "catalog lists all seventeen levels: h01 to h05 after l06, then the range and the highlands preview last")
+	_check(campaign[campaign.size() - 1] == "h05", "STARFALL is the last errand of the campaign (its win shows the ending)")
 	var details: Dictionary = Catalog.info("l01")
 	_check(details["available"] and details["title"] == "SLUICE GATE" and details["zone"] == "floodworks", "catalog merges the level INFO")
 	_check(not Catalog.info("l09")["available"], "levels without a script are unavailable")
@@ -970,6 +972,66 @@ func _test_ducklings() -> void:
 		for cell: Dictionary in (fields[index]["cells"] as Dictionary).values():
 			scheduled = scheduled and float(cell["due"]) >= 0.0
 	_check(scheduled, "once she has all three ducklings every slab on the deck is due to collapse")
+	holder.queue_free()
+	await _frames(2)
+
+
+## H05: the Gravity Works' ramp is solid and walkable all the way round to the deck, the mast and
+## crow's nest are solid, the lift throws past the deck, the night look is the Foundry's sky, and
+## every star taken quickens the starfall.
+func _test_starfall() -> void:
+	var holder := Node3D.new()
+	_scene.add_child(holder)
+	var dummy := Node3D.new()
+	holder.add_child(dummy)
+	var level: Node3D = Catalog.create("h05")
+	holder.add_child(level)
+	level.call("build", dummy, false)
+	var constants: Dictionary = (level.get_script() as GDScript).get_script_constant_map()
+	await _frames(2)
+	var space: PhysicsDirectSpaceState3D = level.get_world_3d().direct_space_state
+	var floor_point: Vector3 = level.get("works_floor")
+	var top: float = float(constants["WORKS_TOP"])
+	var turn: float = float(level.get("ramp_turn"))
+	var solid: bool = true
+	var worst_step: float = 0.0
+	var last: float = NAN
+	var k: float = 0.0
+	while k <= turn:
+		for r: float in [float(constants["CORE_RADIUS"]) + 0.6, float(constants["RAMP_OUTER"]) - 0.4]:
+			var surface: Vector3 = level.call("ramp_point", k, r)
+			var hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(surface + Vector3.UP * 1.5, surface + Vector3.DOWN * 0.5, LevelBase.LAYER_WORLD))
+			solid = solid and not hit.is_empty() and absf((hit["position"] as Vector3).y - surface.y) < 0.1
+		var middle: float = (level.call("ramp_point", k, 9.75) as Vector3).y
+		if not is_nan(last):
+			worst_step = maxf(worst_step, middle - last)
+		last = middle
+		k += 0.05
+	_check(solid, "the Gravity Works' ramp is solid from its foot to the deck, edge to edge")
+	_check(worst_step < 0.25 and absf(last - (floor_point.y + top)) < 0.3, "the ramp climbs evenly (%.2f m per step) and arrives level with the deck" % worst_step)
+	level.call("bake_navigation", true)
+	await _frames(1)
+	var foot: Vector3 = level.call("ramp_point", 0.3, 9.75)
+	var deck: Vector3 = floor_point + Vector3(3.5, top, 0.0)
+	var path: PackedVector3Array = level.call("get_nav_path", foot, deck)
+	_check(path.size() > 2 and path[path.size() - 1].distance_to(deck) < 1.6, "a hound can walk the ramp from its foot to the deck")
+	var nest_y: float = floor_point.y + top + float(constants["MAST"]) + (constants["NEST"] as Vector3).y
+	var nest_hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(floor_point + Vector3(1.5, nest_y + 3.0, 1.5), floor_point + Vector3(1.5, top, 1.5), LevelBase.LAYER_WORLD))
+	var mast_hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(floor_point + Vector3(3.0, top + 5.0, 0.0), floor_point + Vector3(0.0, top + 5.0, 0.0), LevelBase.LAYER_WORLD))
+	_check(not nest_hit.is_empty() and absf((nest_hit["position"] as Vector3).y - nest_y) < 0.1 and not mast_hit.is_empty(), "the mast and the crow's nest are solid")
+	var power: float = float(constants["LIFT_POWER"])
+	var throw: float = power * power / (2.0 * 9.8)
+	_check(throw > top + 2.0 and throw < top + float(constants["MAST"]), "the public lift throws past the deck (%.0f m) but not up to the crow's nest" % throw)
+	var night: Dictionary = level.get("look_override")
+	_check(str(night.get("sky", "")) == "nightmare", "the highlands are under the Foundry's night sky")
+	var traps: Node3D = level.call("traps")
+	_check(not bool(traps.call("is_hunting")), "stars fall far off until the first star is taken")
+	var periods: Array[float] = []
+	for count in range(1, 4):
+		level.set("collected_loot", count)
+		level.call("_on_star_taken", "case", 1)
+		periods.append(float((traps.get("_starfall") as Dictionary)["hunt_period"]))
+	_check(bool(traps.call("is_hunting")) and periods[0] > periods[1] and periods[1] > periods[2], "each star taken quickens the hunt (%s s)" % str(periods))
 	holder.queue_free()
 	await _frames(2)
 

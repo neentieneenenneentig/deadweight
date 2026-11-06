@@ -144,6 +144,7 @@ require the rod. Validated automatically with a navigation-mesh test.
 | ZONE_FLOODWORKS | Drained | Complete every Floodworks level (tutorial excluded). |
 | ZONE_FOUNDRY | Cooled Off | Complete every Foundry level. |
 | ZONE_SPILLWAY | Over the Top | Complete every Spillway level. |
+| ZONE_HIGHLANDS | Bath Time | Run every errand for Princess Capybara. |
 | GOLD_ANY | Gold Standard | Earn any gold medal. |
 | GOLD_ALL | Master Angler | Earn gold on every campaign level (tutorial excluded). |
 | FULLY_RIGGED | Fully Rigged | Max out every workshop upgrade. |

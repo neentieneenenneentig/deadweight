@@ -38,6 +38,7 @@ func _run() -> void:
 	await _test_geyser()
 	await _test_mud()
 	await _test_flood()
+	await _test_starfall()
 	_scene.queue_free()
 	await _frames(3)
 	print("TRAPS TEST: %d checks, %d failures" % [_checks, _failures])
@@ -203,6 +204,40 @@ func _test_flood() -> void:
 	await _seconds(1.0)
 	_check(is_equal_approx(float(_traps.call("flood_level")), 4.0), "the flood rises to its end height and stops")
 	_check(float(_player.get("health")) < 100.0, "the player under the flood takes damage")
+
+
+func _test_starfall() -> void:
+	# Out on a wide floor of its own, away from the flood of the test before.
+	_floor(Vector3(0.0, -3.5, 0.0), Vector3(420.0, 1.0, 420.0))
+	var ground := Vector3(-80.0, -3.0, -80.0)
+	await _place(ground + Vector3.UP * 0.95)
+	_player.set("health", 100.0)
+	_check(bool(_traps.call("strike_star", ground)), "a star can be called down on a point")
+	_check(bool(_traps.call("strike_star", ground + Vector3(16.0, 0.0, 0.0))), "and another, far from the player")
+	await _seconds(0.5)
+	_check(is_equal_approx(float(_player.get("health")), 100.0) and (_traps.call("live_strikes") as Array).size() == 2, "the rings show first: no damage before the strike")
+	await _seconds(1.5)
+	var hurt: float = 100.0 - float(_player.get("health"))
+	_check(hurt > 30.0 and hurt < 60.0, "a star landing at the player's feet hurts, but one alone does not kill (%.0f damage)" % hurt)
+	_check((_traps.call("live_strikes") as Array).is_empty(), "both strikes land and clear")
+	# Idle stars land far off; hunting stars land near the player.
+	_traps.call("starfall", Rect2(-200.0, -200.0, 400.0, 400.0), 0.3, 0.3, 11)
+	await _place(ground + Vector3.UP * 0.95)
+	await _seconds(0.5)
+	var far_reach: float = ((_traps.get_script() as GDScript).get_script_constant_map()["STAR_FAR"] as Vector2).x - 0.5
+	var far: bool = true
+	for target: Vector3 in _traps.call("live_strikes"):
+		far = far and Vector2(target.x - ground.x, target.z - ground.z).length() >= far_reach
+	_check(far and not (_traps.call("live_strikes") as Array).is_empty(), "idle stars land far from the player")
+	await _seconds(1.8)
+	_traps.call("hunt_starfall", 0.3)
+	await _seconds(0.4)
+	var near: bool = false
+	for target: Vector3 in _traps.call("live_strikes"):
+		near = near or Vector2(target.x - ground.x, target.z - ground.z).length() < 6.0
+	_check(near, "once hunting, the stars land on the player")
+	_traps.set("_starfall", {})
+	await _seconds(1.8)
 
 
 func _place(at: Vector3) -> void:

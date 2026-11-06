@@ -28,8 +28,8 @@ until the clock runs down.
 ## Setting
 
 The highlands are a cold, painted alpine valley of snowfields, frozen lakes and dark pines, where a
-capybara princess sends you after her rubber duck, her bath salts, her yuzu and her duck's
-ducklings. Below them, the Department of Unfinished Gravity keeps building long after anyone
+capybara princess sends you after her rubber duck, her bath salts, her yuzu, her duck's
+ducklings and, on the night the department finally finishes gravity, three fallen stars. Below them, the Department of Unfinished Gravity keeps building long after anyone
 remembers why: sluice gates and pump rows in the frozen Floodworks, kilns and cranes in the Foundry
 under a violet nightmare sky. Its doors open onto nothing, and its notices are deadpan and gravely
 polite. The tone is deadpan and absurd, with a quiet, solemn streak.
@@ -38,7 +38,7 @@ polite. The tone is deadpan and absurd, with a quiet, solemn streak.
 
 - Rope physics you can master: tension-only line, inherited momentum, casting recoil, free spool,
   lock, reel and cut.
-- Four open highland errands, six department raids, a tutorial and a practice range.
+- Five open highland errands, six department raids, a tutorial and a practice range.
 - Runs of one to six minutes with bronze, silver and gold medal times.
 - The floor is lava: cracking ice and paving, teacup mines, rolling marbles, geysers and floods.
 - A style multiplier that climbs the longer you stay airborne.

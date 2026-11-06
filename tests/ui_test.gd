@@ -484,6 +484,28 @@ func _test_pause_and_result_buttons() -> void:
 	await _press(_ui.get_screen("result"), "RETRY")
 	_check(_count_emits("restart_requested") == 1, "lost result: RETRY emits restart_requested")
 
+	# The last errand won: the ending, and CREDITS in place of NEXT RAID.
+	_ui.hide_all()
+	var ending: Dictionary = _won_result()
+	ending["next_level"] = ""
+	ending["campaign_end"] = true
+	_ui.show_result(ending)
+	await _frames(FOCUS_FRAMES)
+	var final_screen: Control = _ui.get_screen("result")
+	var credits_button: Button = _find_button(final_screen, "CREDITS")
+	var hidden_next: Button = _find_button(final_screen, "NEXT RAID")
+	_check(credits_button != null and credits_button.is_visible_in_tree() and _focus_owner() == credits_button and not hidden_next.is_visible_in_tree(), "ending result: CREDITS replaces NEXT RAID and has the focus")
+	var told: bool = false
+	for node: Node in final_screen.find_children("*", "Label", true, false):
+		told = told or (node as Label).text.begins_with("Princess Capybara has her rubber duck")
+	_check(told, "ending result: the epilogue is shown")
+	await _press(final_screen, "CREDITS")
+	_check(_ui.current_screen() == "credits", "ending result: CREDITS opens the credits")
+	_ui.hide_all()
+	_ui.show_result(_won_result())
+	await _frames(FOCUS_FRAMES)
+	_check(not _find_button(_ui.get_screen("result"), "CREDITS").is_visible_in_tree(), "an ordinary won result has no CREDITS button")
+
 
 # --- Settings ------------------------------------------------------------------------------------
 

@@ -410,6 +410,23 @@ square-nosed head, sleepy half-lidded eyes, small round ears, paws on the water,
 turban and a gold crown with a red stone, at 1.2x in the tub (`PRINCESS_SCALE`). Two box colliders
 keep her solid (world_test rays her head from above and the front). The tub gains iron hoops and
 soft steam (radial-faded particle quads, Medium and High only). Shared by h01 to h04 and the valley.
+**H05 — Starfall, and the ending (done, lead, 2026-11-06).** Fifth and last highland errand
+(`scripts/levels/h05_starfall.gd`, after h04, `tools/run.ps1 -Level h05`). The department has
+finally finished gravity, and now it works on the stars: three have come down, at night, under the
+Foundry's sky (`look_override` in level_base). One is on the Gravity Works, the department's own
+36 m tower: a ramp winds twice round a concrete core to the deck (the long way, on foot) and a
+geyser beside it, signed PUBLIC LIFT, throws you past the deck (the short way, with the rod). One is
+on Star Hill, whose crown marbles roll at whoever climbs. One smokes in a crater inside two rings of
+teacup mines. The North Star is on the crow's nest atop the Works' mast (bonus, rod only). New trap
+`starfall()`: a gold ring and a ray of light mark the ground for 1.6 s, then the star strikes (a
+mine-sized blast that also kills hounds). Stars land far off until the first is taken; then they
+aim where the player is running, every 5, 3 and 1.6 s as she carries one, two and three. Pars
+345/195 from the route (1225 m). Winning it is the end of the campaign: the result shows an
+epilogue and a CREDITS button (`campaign_end`). The Works' bake needs monotone regions
+(`nav_partition`): watershed regions wrap round the core and the bake dropped part of the ramp.
+Also: highland errands now count for Bring Something Back, Untouched and Ghost (they were missed),
+and a new achievement, Bath Time, for every errand. Needs owner tuning: hunt periods, blast size,
+the ramp's slope.
 
 ### R9 — Store pages, art and AI disclosure catch up with v2 (done, lead, 2026-11-06)
 **Why:** the store copy, key art and screenshots still showed the v1 game (afternoon sky,

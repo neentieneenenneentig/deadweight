@@ -770,6 +770,38 @@ Template:
   (`OBJECTIVE_WIDTH`), and hud_test lays out the longest catalog objective wording at all six sizes
   (12 failures without the fix).
 
+## 2026-11-06: H05 Starfall, and the ending
+- Model: Claude Opus 5.5 (lead), owner away ("continue").
+- New raid **h05 "Starfall"** (`scripts/levels/h05_starfall.gd`, last in the campaign,
+  `tools/run.ps1 -Level h05`): the Department of Unfinished Gravity has finished gravity, and now the
+  stars fall. Night over the highlands under the Foundry's animated sky (new `look_override` on
+  level_base, merged over the zone preset). Three fallen stars: on the deck of the Gravity Works (a
+  36 m concrete core with a solid ramp winding twice round it, one trimesh; a PUBLIC LIFT geyser
+  throws 40 m, past the deck), on Star Hill (a new 32 m mound with three marbles on its crown, each
+  let go when the player climbs that side), and in a smoking crater (a sunken mound, glowing embers,
+  two rings of teacup mines). Bonus: the North Star on the crow's nest 14 m above the deck.
+- traps.gd `starfall(area, period, hunt_period)`, `hunt_starfall(period)`, `strike_star()`: a gold
+  ring on the ground and a faint ray of light up the way the star comes, 1.6 s, then a blast (45 at
+  the centre, 5.5 m, throws, kills hounds). Idle stars land 45 to 160 m away; carrying stars makes
+  them aim ahead of the player, every 5 / 3 / 1.6 s for one / two / three stars. New death cause
+  "star" with a TRY THIS line.
+- The ending: winning the last campaign level sets `campaign_end` in the result; the result screen
+  shows THE END, an epilogue and a CREDITS button in place of NEXT RAID.
+- Achievements: highland errands were not counted as campaign extractions (FIRST_EXTRACT, UNTOUCHED,
+  GHOST used DESIGN's raid list); they now use the catalog's campaign. New ZONE_HIGHLANDS "Bath
+  Time": run every errand for the princess (17 achievements; DESIGN and achievements.md updated).
+- Navmesh: the spiral ramp lost a stretch of its first turn under watershed regions (they wrap
+  round the core and overlap themselves). Level option `nav_partition`; h05 uses monotone (same
+  bake time, 0.4 s). Layers also fixed it but took 76 s.
+- highlands_base `_sign()` shrinks its text to fit the board ("(UNLESS YOU HAVE THE DUCKLINGS)" ran
+  off the tub sign in h04).
+- Store copy: five errands, falling stars in the content notes (Steam, Play 1,792 / 1,737, press
+  kit, content rating, README).
+- Tests: traps (strike timing, damage, idle far, hunting near), world (catalog of 17, h05 last; the
+  ramp solid and even from foot to deck; a nav path up it; mast and nest solid; lift height; night
+  sky; the hunt quickens), ui (ending result, CREDITS), meta (errand extraction, Bath Time), flow.
+  Captures in `.tools/captures/H05/`.
+
 ## 2026-11-06: P2 Princess Capybara, modelled
 - Model: Claude Opus 5.5 (lead), owner away ("continue").
 - The princess was six boxes (the R9 store shot showed it). New painted low-poly capybara in

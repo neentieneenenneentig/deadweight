@@ -18,6 +18,7 @@ const LIST := [
 	{"id": "ZONE_FLOODWORKS", "title": "Drained", "desc": "Complete every Floodworks level (tutorial excluded)."},
 	{"id": "ZONE_FOUNDRY", "title": "Cooled Off", "desc": "Complete every Foundry level."},
 	{"id": "ZONE_SPILLWAY", "title": "Over the Top", "desc": "Complete every Spillway level."},
+	{"id": "ZONE_HIGHLANDS", "title": "Bath Time", "desc": "Run every errand for Princess Capybara."},
 	{"id": "GOLD_ANY", "title": "Gold Standard", "desc": "Earn any gold medal."},
 	{"id": "GOLD_ALL", "title": "Master Angler", "desc": "Earn gold on every campaign level (tutorial excluded)."},
 	{"id": "FULLY_RIGGED", "title": "Fully Rigged", "desc": "Max out every workshop upgrade."},
@@ -32,6 +33,7 @@ const ZONE_LEVELS := {
 	"ZONE_FLOODWORKS": ["l01", "l02", "l03"],
 	"ZONE_FOUNDRY": ["l04", "l05", "l06"],
 	"ZONE_SPILLWAY": ["l07", "l08", "l09"],
+	"ZONE_HIGHLANDS": ["h01", "h02", "h03", "h04", "h05"],
 }
 const UpgradesScript = preload("res://scripts/upgrades.gd")
 
@@ -60,7 +62,12 @@ static func title_of(id: String) -> String:
 static func end_of_run(run: Dictionary, profile: RefCounted) -> Array[String]:
 	var earned: Array[String] = []
 	var level_id: String = str(run.get("level_id", ""))
-	if bool(run.get("won", false)) and CAMPAIGN.has(level_id):
+	# Any level in the campaign as built counts, the highland errands included (the catalog knows
+	# them; CAMPAIGN is DESIGN's original raid list, kept for the completion awards).
+	var campaign: Array = CAMPAIGN
+	if profile != null and profile.has_method("campaign_ids"):
+		campaign = profile.call("campaign_ids")
+	if bool(run.get("won", false)) and (campaign.has(level_id) or CAMPAIGN.has(level_id)):
 		earned.append("FIRST_EXTRACT")
 		if level_id == "tutorial":
 			earned.append("GRADUATE")

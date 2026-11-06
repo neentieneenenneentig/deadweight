@@ -36,8 +36,8 @@ Cast impossibly heavy weights, lock the line and fly. Offline, no ads.
 
 ## Full description [4000]
 
-Paste the body, a blank line, then the closing for your model: 1,772 characters with closing A,
-1,717 with closing B.
+Paste the body, a blank line, then the closing for your model: 1,792 characters with closing A,
+1,737 with closing B.
 
 ```
 Your legs are slow and the floor is lava. Your one real tool is a fishing rod that casts impossibly heavy weights.
@@ -48,14 +48,14 @@ THE FLOOR IS LAVA
 Ice and old paving crack under your boots. Teacup mines beep before they blow. Giant marbles roll down the hill, geysers throw you skyward and the meltwater rises. Porcelain tea hounds outrun you on foot, so stay in the air: hit something fast enough and it shatters.
 
 ERRANDS FOR A PRINCESS
-Princess Capybara is soaking in her hot tub in the snowy highlands, and she keeps losing things: her rubber duck, her bath salts, her yuzu, her duck's three ducklings. Bring them all back.
+Princess Capybara is soaking in her hot tub in the snowy highlands, and she keeps losing things: her rubber duck, her bath salts, her yuzu, her duck's three ducklings, three fallen stars. Bring them all back.
 
 THE DEPARTMENT OF UNFINISHED GRAVITY
 Below the snowline, a public works department still guards its salvage with porcelain hounds, alarm-clock sentries and ceramic drones. Grab every case, reach the extraction pad and hold it while the clock runs down.
 
 FEATURES
 • Rope physics you can master: free spool, lock, reel, cut and recast
-• Four open highland errands, six department raids, a tutorial and a practice range
+• Five open highland errands, six department raids, a tutorial and a practice range
 • Runs of one to six minutes with bronze, silver and gold medal times
 • A style multiplier that climbs the longer you stay airborne
 • Six workshop upgrade tracks to spend your salvage on

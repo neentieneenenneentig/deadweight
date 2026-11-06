@@ -20,9 +20,14 @@ extends Node3D
 ##                (the player, the weight) and scalds hounds. A tool, not a damage source.
 ##   mud_pool     boiling mud on the ground: it hurts the player who wades in and cooks hounds.
 ##                A zero-damage hazard box keeps it off the hounds' navmesh.
+##   starfall     stars that come down out of the sky (H05). A glowing ring marks the ground for
+##                STAR_WARN, then the star strikes it: a blast like a mine's. Idle stars land far
+##                from the player; once hunt_starfall() is called they aim where the player is
+##                running, so the safe place is in the air.
 ## Everything is solid where it looks solid, and nothing here floats text.
 
 const FX = preload("res://scripts/fx.gd")
+const DreamPropsScript = preload("res://scripts/dream_props.gd")
 
 const CRACK_TIME := 1.4              # seconds from first step to the plate giving way
 const REGROW_TIME := 10.0
@@ -51,6 +56,18 @@ const GEYSER_MOUND := 0.7            # mound height above the floor point
 const MUD_DPS := 35.0
 const MUD_ENEMY_DPS := 60.0
 
+const STAR_WARN := 1.6               # seconds the ring shows on the ground before the strike
+const STAR_BLAST := 5.5
+const STAR_DAMAGE := 45.0            # at the centre, before damage_scale; falls off to 0 at STAR_BLAST
+const STAR_THROW := 12.0
+const STAR_ENEMY_DAMAGE := 400.0
+const STAR_DROP := 150.0             # metres from where a star appears to where it strikes
+const STAR_LEAD := 1.0               # seconds of the player's ground velocity a hunting star leads by
+const STAR_SCATTER := 3.5            # metres of random miss on a hunting star
+const STAR_FAR := Vector2(45.0, 160.0)   # an idle star lands this far from the player
+const STAR_POOL := 5                 # strikes in the air at once, at most
+const SHAFT_LENGTH := 90.0           # the faint shaft of light that marks a strike from afar
+
 const FLOOD_DPS := 30.0
 const FLOOD_DROWN := 1.5             # seconds under the flood before a hound drowns
 
@@ -63,6 +80,9 @@ var _run_tempo: float = 1.0            # marble runs release this many times as 
 var _flood: Dictionary = {}
 var _geysers: Array[Dictionary] = []
 var _muds: Array[Dictionary] = []
+var _starfall: Dictionary = {}
+var _strikes: Array[Dictionary] = []
+var _star_rng := RandomNumberGenerator.new()
 var _clock: float = 0.0
 var _tempo: float = 1.0                # geysers erupt this many times as often (set_geyser_tempo)
 var _scan_clock: float = 0.0
@@ -336,6 +356,76 @@ func mud_pool(center: Vector3, radius: float) -> void:
 
 
 ## Current flood height, or -INF before it starts.
+## Stars fall inside area (level x/z) every period seconds while the level runs, landing far from
+## the player, until hunt_starfall() makes them fall every hunt_period seconds where the player is
+## heading.
+func starfall(area: Rect2, period: float, hunt_period: float, seed_value: int = 9001) -> void:
+	_star_rng.seed = seed_value
+	_starfall = {"area": area, "period": maxf(period, 0.2), "hunt_period": maxf(hunt_period, 0.2), "hunting": false, "clock": period * 0.5}
+
+
+## From now on stars aim at the player, every period seconds (the built hunt_period if period <= 0).
+## Called again with a shorter period, the hunt quickens.
+func hunt_starfall(period: float = -1.0) -> void:
+	if _starfall.is_empty():
+		return
+	if period > 0.0:
+		_starfall["hunt_period"] = maxf(period, 0.2)
+	_starfall["hunting"] = true
+	_starfall["clock"] = minf(float(_starfall["clock"]), 1.0)
+
+
+func is_hunting() -> bool:
+	return not _starfall.is_empty() and bool(_starfall["hunting"])
+
+
+## Marks target (a point on the ground) and strikes it STAR_WARN seconds later. Returns false when
+## STAR_POOL strikes are already in the air.
+func strike_star(target: Vector3, normal: Vector3 = Vector3.UP) -> bool:
+	var strike: Dictionary = {}
+	for record: Dictionary in _strikes:
+		if not bool(record["live"]):
+			strike = record
+			break
+	if strike.is_empty():
+		if _strikes.size() >= STAR_POOL:
+			return false
+		strike = _new_strike()
+		_strikes.append(strike)
+	# In from high up and off to one side, so the streak reads against the sky.
+	var side: float = _star_rng.randf_range(0.0, TAU)
+	var come_from: Vector3 = Vector3(cos(side) * 0.55, 1.0, sin(side) * 0.55).normalized()
+	strike["live"] = true
+	strike["target"] = target
+	strike["from"] = target + come_from * STAR_DROP
+	strike["timer"] = STAR_WARN
+	var mark: MeshInstance3D = strike["mark"]
+	mark.visible = true
+	var up: Vector3 = normal.normalized() if normal.length() > 0.1 else Vector3.UP
+	var across: Vector3 = up.cross(Vector3.FORWARD if absf(up.z) < 0.9 else Vector3.RIGHT).normalized()
+	mark.global_transform = Transform3D(Basis(across, up, across.cross(up)) * Basis.from_scale(Vector3(1.0, 0.15, 1.0)), target + up * 0.08)
+	var star: Node3D = strike["star"]
+	star.visible = true
+	star.global_position = strike["from"]
+	(strike["trail"] as Node3D).visible = true
+	# A faint ray of light from the ring up the way the star is coming, narrowing to nothing: it
+	# shows a strike from far off. Light, not a pole: nothing to stand on and nothing that looks it.
+	var shaft: MeshInstance3D = strike["shaft"]
+	shaft.visible = true
+	shaft.global_transform = Transform3D(_basis_along(come_from), target + come_from * SHAFT_LENGTH * 0.5)
+	_sound("hazard_zap", target, -2.0)
+	return true
+
+
+## The strikes in the air now, as their targets. For tests.
+func live_strikes() -> Array[Vector3]:
+	var targets: Array[Vector3] = []
+	for record: Dictionary in _strikes:
+		if bool(record["live"]):
+			targets.append(record["target"])
+	return targets
+
+
 func flood_level() -> float:
 	if _flood.is_empty() or not bool(_flood["running"]):
 		return -INF
@@ -361,6 +451,7 @@ func _physics_process(delta: float) -> void:
 	_clock += delta
 	_update_geysers(player)
 	_update_muds(player, delta)
+	_update_starfall(player, delta)
 
 
 func _cell_under(field: Dictionary, point: Vector3) -> Dictionary:
@@ -704,6 +795,164 @@ func _update_muds(player: Node3D, delta: float) -> void:
 				hostile.call("take_damage", MUD_ENEMY_DPS * delta, "mud")
 		# A slow boil: the surface breathes.
 		(record["view"] as MeshInstance3D).scale.y = 1.0 + sin(_clock * 3.0 + center.x) * 0.5
+
+
+func _update_starfall(player: Node3D, delta: float) -> void:
+	for record: Dictionary in _strikes:
+		if not bool(record["live"]):
+			continue
+		record["timer"] = float(record["timer"]) - delta
+		var t: float = clampf(1.0 - float(record["timer"]) / STAR_WARN, 0.0, 1.0)
+		var target: Vector3 = record["target"]
+		var from: Vector3 = record["from"]
+		var at: Vector3 = from.lerp(target, t)
+		var back: Vector3 = (from - target).normalized()
+		var spin: float = float(record["timer"]) * 9.0
+		var star: Node3D = record["star"]
+		star.global_transform = Transform3D(Basis(Vector3.UP, spin).scaled(Vector3.ONE * 4.0), at)
+		var trail: Node3D = record["trail"]
+		trail.global_transform = Transform3D(_basis_along(back), at + back * 9.0)
+		var mark: MeshInstance3D = record["mark"]
+		var pulse: float = 0.55 + 0.45 * sin(t * 26.0)
+		(mark.material_override as StandardMaterial3D).albedo_color.a = 0.35 + 0.6 * t * pulse
+		var shaft: MeshInstance3D = record["shaft"]
+		(shaft.material_override as StandardMaterial3D).albedo_color.a = 0.03 + 0.12 * t
+		if float(record["timer"]) <= 0.0:
+			_star_land(record, player)
+	if _starfall.is_empty():
+		return
+	_starfall["clock"] = float(_starfall["clock"]) - delta
+	if float(_starfall["clock"]) > 0.0:
+		return
+	var hunting: bool = bool(_starfall["hunting"])
+	_starfall["clock"] = float(_starfall["hunt_period" if hunting else "period"])
+	var hit: Dictionary = _ground_at(_star_aim(player, hunting))
+	if not hit.is_empty():
+		strike_star(hit["position"], hit["normal"])
+
+
+## Where the next star comes down (x, z): ahead of the player when hunting, else somewhere far off.
+func _star_aim(player: Node3D, hunting: bool) -> Vector2:
+	var area: Rect2 = _starfall["area"]
+	var here := Vector2(player.global_position.x, player.global_position.z)
+	var turn: float = _star_rng.randf_range(0.0, TAU)
+	var aim: Vector2
+	if hunting:
+		var run := Vector2.ZERO
+		if player is RigidBody3D:
+			var velocity: Vector3 = (player as RigidBody3D).linear_velocity
+			run = Vector2(velocity.x, velocity.z)
+		aim = here + run * STAR_LEAD + Vector2(cos(turn), sin(turn)) * _star_rng.randf_range(0.0, STAR_SCATTER)
+	else:
+		aim = here + Vector2(cos(turn), sin(turn)) * _star_rng.randf_range(STAR_FAR.x, STAR_FAR.y)
+	return Vector2(clampf(aim.x, area.position.x, area.end.x), clampf(aim.y, area.position.y, area.end.y))
+
+
+## The first solid thing straight down at (x, z): {"position", "normal", ...}, or {} for nothing.
+func _ground_at(xz: Vector2) -> Dictionary:
+	var query := PhysicsRayQueryParameters3D.create(Vector3(xz.x, 600.0, xz.y), Vector3(xz.x, -200.0, xz.y), 1)
+	return get_world_3d().direct_space_state.intersect_ray(query)
+
+
+func _star_land(record: Dictionary, player: Node3D) -> void:
+	record["live"] = false
+	(record["mark"] as Node3D).visible = false
+	(record["star"] as Node3D).visible = false
+	(record["trail"] as Node3D).visible = false
+	(record["shaft"] as Node3D).visible = false
+	var at: Vector3 = record["target"]
+	FX.explosion(level, at + Vector3.UP * 0.5, Color("ffd36a"), 2.6)
+	_sound("drone_shot", at, 6.0)
+	var offset: Vector3 = player.global_position - at
+	var distance: float = offset.length()
+	if distance < STAR_BLAST:
+		var falloff: float = 1.0 - distance / STAR_BLAST
+		player.call("take_damage", STAR_DAMAGE * falloff * float(level.get("damage_scale")), "star", at)
+		var away: Vector3 = Vector3(offset.x, 0.0, offset.z).normalized() * 0.6 + Vector3.UP
+		if player is RigidBody3D:
+			(player as RigidBody3D).linear_velocity += away.normalized() * STAR_THROW * falloff
+		if player.has_method("add_shake"):
+			player.call("add_shake", 0.8 * falloff)
+	elif distance < STAR_BLAST * 6.0 and player.has_method("add_shake"):
+		player.call("add_shake", 0.25 * (1.0 - distance / (STAR_BLAST * 6.0)))
+	for hostile: Node in (level.get("_enemies") as Array):
+		if is_instance_valid(hostile) and (hostile as Node3D).global_position.distance_to(at) < STAR_BLAST:
+			hostile.call("take_damage", STAR_ENEMY_DAMAGE, "star")
+
+
+## One strike's nodes: the ring on the ground, the star and its streak. Reused once it lands.
+func _new_strike() -> Dictionary:
+	var mark := MeshInstance3D.new()
+	var ring := TorusMesh.new()
+	ring.inner_radius = STAR_BLAST - 0.8
+	ring.outer_radius = STAR_BLAST
+	ring.rings = 32
+	ring.ring_segments = 4
+	mark.mesh = ring
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glow.albedo_color = Color(1.0, 0.82, 0.4, 0.3)
+	mark.material_override = glow
+	mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mark.visible = false
+	add_child(mark)
+	var star := MeshInstance3D.new()
+	star.mesh = DreamPropsScript.pickup_mesh("star")
+	var shine := StandardMaterial3D.new()
+	shine.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	shine.vertex_color_use_as_albedo = true
+	shine.vertex_color_is_srgb = true
+	shine.cull_mode = BaseMaterial3D.CULL_DISABLED
+	star.material_override = shine
+	star.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	star.visible = false
+	add_child(star)
+	var trail := MeshInstance3D.new()
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.0
+	cone.bottom_radius = 0.9
+	cone.height = 18.0
+	cone.radial_segments = 8
+	cone.rings = 1
+	trail.mesh = cone
+	var streak := StandardMaterial3D.new()
+	streak.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	streak.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	streak.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	streak.albedo_color = Color(1.0, 0.8, 0.45, 0.55)
+	trail.material_override = streak
+	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	trail.visible = false
+	add_child(trail)
+	var shaft := MeshInstance3D.new()
+	var column := CylinderMesh.new()
+	column.top_radius = 0.0
+	column.bottom_radius = 0.7
+	column.height = SHAFT_LENGTH
+	column.radial_segments = 8
+	column.rings = 1
+	column.cap_top = false
+	column.cap_bottom = false
+	shaft.mesh = column
+	var beam := StandardMaterial3D.new()
+	beam.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	beam.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	beam.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	beam.cull_mode = BaseMaterial3D.CULL_DISABLED
+	beam.albedo_color = Color(1.0, 0.85, 0.5, 0.1)
+	shaft.material_override = beam
+	shaft.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	shaft.visible = false
+	add_child(shaft)
+	return {"live": false, "mark": mark, "star": star, "trail": trail, "shaft": shaft, "target": Vector3.ZERO, "from": Vector3.ZERO, "timer": 0.0}
+
+
+## A basis whose y axis runs along direction: the trail cone's point (its top) trails back along it.
+static func _basis_along(direction: Vector3) -> Basis:
+	var y: Vector3 = direction.normalized()
+	var x: Vector3 = y.cross(Vector3.UP if absf(y.y) < 0.95 else Vector3.RIGHT).normalized()
+	return Basis(x, y, x.cross(y))
 
 
 ## Every geyser erupts tempo times as often (1 is the built rhythm).

@@ -138,7 +138,7 @@ func _test_upgrades() -> void:
 # --- Achievements table -----------------------------------------------------------------------
 
 func _test_achievement_table() -> void:
-	_eq(Achievements.LIST.size(), 16, "sixteen achievements")
+	_eq(Achievements.LIST.size(), 17, "seventeen achievements")
 	_eq(Achievements.find("FIRST_CAST")["title"], "Gone Fishing", "find known id")
 	_expect(Achievements.find("NOPE").is_empty(), "unknown id finds nothing")
 	var design: Array[Dictionary] = _design_achievements()
@@ -555,6 +555,10 @@ func _test_achievement_rules() -> void:
 	_expect(not earned.has("UNTOUCHED") and not earned.has("GHOST"), "no stealth awards without enemies")
 	var clean: Array[String] = Achievements.end_of_run(_run("l01", true, 90.0), profile)
 	_expect(clean.has("UNTOUCHED") and clean.has("GHOST"), "clean run earns both")
+	var with_errands: RefCounted = Profile.new()
+	with_errands.catalog = load("res://scripts/level_catalog.gd")
+	var errand: Array[String] = Achievements.end_of_run(_run("h05", true, 90.0), with_errands)
+	_expect(errand.has("FIRST_EXTRACT") and errand.has("UNTOUCHED"), "a highland errand counts as a campaign extraction")
 	var hit: Array[String] = Achievements.end_of_run(_run("l01", true, 90.0, {"damage_taken": 12.0, "shots": 4}), profile)
 	_expect(not hit.has("UNTOUCHED") and not hit.has("GHOST"), "damaged shooter earns neither")
 	var lost: Array[String] = Achievements.end_of_run(_run("l01", false, 90.0), profile)
@@ -570,6 +574,11 @@ func _test_achievement_rules() -> void:
 		profile.levels[id] = {"completed": true, "medal": 3, "bonus_found": [0, 1]}
 	_expect(Achievements.progress_unlocks(profile).has("ZONE_FLOODWORKS"), "floodworks cleared")
 	_expect(not Achievements.progress_unlocks(profile).has("ZONE_FOUNDRY"), "foundry not cleared")
+	for id: String in ["h01", "h02", "h03", "h04"]:
+		profile.levels[id] = {"completed": true, "medal": 1}
+	_expect(not Achievements.progress_unlocks(profile).has("ZONE_HIGHLANDS"), "four errands of five are not Bath Time")
+	profile.levels["h05"] = {"completed": true, "medal": 1}
+	_expect(Achievements.progress_unlocks(profile).has("ZONE_HIGHLANDS"), "every errand for the princess earns Bath Time")
 	for id: String in Achievements.CAMPAIGN:
 		profile.levels[id] = {"completed": true, "medal": 3, "bonus_found": [0, 1]}
 	var all: Array[String] = Achievements.progress_unlocks(profile)

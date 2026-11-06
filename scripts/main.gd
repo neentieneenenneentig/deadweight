@@ -507,6 +507,8 @@ func _build_result(won: bool, cause: String) -> Dictionary:
 		if not next_id.is_empty() and not profile.is_unlocked(next_id):
 			next_id = ""
 	_next_level = next_id
+	# Winning the last errand of the campaign ends the story (the result shows the ending).
+	var campaign_end: bool = won and not practice and profile.campaign_ids().has(level_id) and profile.next_campaign_id(level_id).is_empty()
 	return {
 		"won": won, "level_id": level_id, "title": str(info.get("title", level_id)), "time": elapsed,
 		"cases": int(run["cases"]), "total_cases": int(level.get("total_loot")),
@@ -516,6 +518,7 @@ func _build_result(won: bool, cause: String) -> Dictionary:
 		"best_time": float(reward["best_time"]), "new_best": bool(reward["new_best"]),
 		"par_silver": float(info.get("par_silver", 0.0)), "par_gold": float(info.get("par_gold", 0.0)),
 		"bank": int(profile.bank), "next_level": next_id, "achievements": titles, "cause": cause,
+		"campaign_end": campaign_end,
 		"stats": {
 			"max_speed": float(run["max_speed"]), "max_airtime": float(run["max_airtime"]),
 			"casts": int(run["casts"]), "kills": int(run["kills"]), "damage_taken": float(run["damage_taken"]),
@@ -944,7 +947,7 @@ func _on_player_died(source: String) -> void:
 	if state == "playing":
 		_sfx("death")
 	# A hard landing names itself, however close an enemy is.
-	_finish(false, source if source in ["impact", "mine", "boulder", "flood", "mud"] else _death_cause())
+	_finish(false, source if source in ["impact", "mine", "boulder", "flood", "mud", "star"] else _death_cause())
 
 
 ## Landing and footstep cues come from the player's signals (A4). Only a live raid makes sound.

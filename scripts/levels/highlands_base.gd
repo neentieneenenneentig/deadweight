@@ -227,7 +227,15 @@ func _sign(text: String, base: Vector3, size: Vector2, yaw: float = 0.0) -> void
 	for side: float in [-1.0, 1.0]:
 		var post: Vector3 = turn * Vector3(side * (size.x * 0.5 - 0.3), 0.0, -0.1)
 		box(Vector3(center.x + post.x, base.y + 0.9, center.z + post.z), Vector3(0.18, 1.8 + size.y * 0.5, 0.18), "dark", true, yaw)
-	var face: Label3D = label(text, center + turn * Vector3(0.0, 0.0, 0.1), 36, Color("fff4dc"), 0.012, false, yaw)
+	# The text shrinks to fit the board, so no line runs off its edge.
+	var pixel: float = 0.012
+	var widest: float = 0.0
+	for line: String in text.split("
+"):
+		widest = maxf(widest, ThemeDB.fallback_font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 36).x)
+	if widest * pixel > size.x - 0.4:
+		pixel = (size.x - 0.4) / widest
+	var face: Label3D = label(text, center + turn * Vector3(0.0, 0.0, 0.1), 36, Color("fff4dc"), pixel, false, yaw)
 	face.double_sided = false
 
 ## The top of the giant duck's head, where something small and absurd can be left for the rod.

@@ -12,9 +12,9 @@ The later Foundry levels enter **The Department of Unfinished Gravity**, with ni
 bright dream palettes and impossible furniture. The softer painted sky is reserved for the
 Spillway. See [the art notes](docs/DREAMSCAPE.md) for research, assets and capture commands.
 
-**Status:** a full campaign (tutorial, six department raids, four highland errands, a practice
-range and the highlands preview) with a working release pipeline, waiting on owner playtests and
-store steps. Work is tracked task by task:
+**Status:** a full campaign (tutorial, six department raids, five highland errands with an
+ending, a practice range and the highlands preview) with a working release pipeline, waiting on
+owner playtests and store steps. Work is tracked task by task:
 
 | Document | What it covers |
 | --- | --- |
@@ -23,6 +23,7 @@ store steps. Work is tracked task by task:
 | [docs/EXECUTOR_BRIEF.md](docs/EXECUTOR_BRIEF.md) | Rules for any model or person doing a task |
 | [docs/DESIGN.md](docs/DESIGN.md) / [docs/CONTRACT.md](docs/CONTRACT.md) | The v1.0 game and the module APIs |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | What each task changed |
+| [docs/PLAYTEST_QUESTS.md](docs/PLAYTEST_QUESTS.md) | A checklist for playing the whole game, with the tuning questions |
 | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) | Step by step to Steam and Google Play |
 
 ## Play a build

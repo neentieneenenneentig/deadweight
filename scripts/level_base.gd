@@ -204,12 +204,19 @@ var outer_top: float = NAN
 var outer_material: String = "concrete"
 ## False skips the Department dreamscape props (open-world levels have their own scenery).
 var dreamscape: bool = true
+## Keys of the zone's look (ZONES) that this level replaces, set in _design: a highland night under
+## the Foundry's sky, say ({"sky": "nightmare", "ambient": ...}).
+var look_override: Dictionary = {}
 ## Navmesh cell size in metres. A level with a very large floor may raise it to keep the bake fast;
 ## the map follows it, so the server never sees a mismatch.
 var nav_cell_size: float = NAV_CELL_SIZE
 ## Step height between navmesh cells. On a slope neighbouring cells differ by tan(slope) x cell size,
 ## so a level with big cells must raise this or its hills come out unwalkable (1 m cells need 0.8).
 var nav_max_climb: float = NAV_MAX_CLIMB
+## How the bake splits the walkable area into regions. Watershed suits most levels. Its regions can
+## wrap round and overlap themselves, so on a ramp that winds round a tower it drops pieces of the
+## ramp; monotone regions never overlap (and bake as fast).
+var nav_partition: NavigationMesh.SamplePartitionType = NavigationMesh.SAMPLE_PARTITION_WATERSHED
 ## Open-world levels bake only this box (empty = everything): the slopes beyond it are mountains.
 var nav_bounds: AABB = AABB()
 ## Open-world levels can swap heavy colliders for cheap stand-ins in the bake: the bodies here are
@@ -456,7 +463,7 @@ func floor_text(text: String, point: Vector3, font_size: int = 40, color: Color 
 
 ## A required case: all of them must be collected before extraction unlocks.
 ## look picks the model (W4): "case" (the salvage case), "duck", "towel", "firewood", "salts", "sponge",
-## "yuzu", "yuzu_gold", "duckling" or "duckling_gold".
+## "yuzu", "yuzu_gold", "duckling", "duckling_gold", "star" or "star_north".
 func case_at(floor_point: Vector3, title: String, look: String = "case") -> void:
 	total_loot += 1
 	_case_spots.append({"floor_point": floor_point, "title": title, "look": look})
@@ -745,6 +752,7 @@ func _new_navigation_mesh() -> NavigationMesh:
 	mesh.agent_height = NAV_AGENT_HEIGHT
 	mesh.agent_max_climb = nav_max_climb
 	mesh.agent_max_slope = NAV_MAX_SLOPE
+	mesh.sample_partition_type = nav_partition
 	if nav_bounds.has_volume():
 		mesh.filter_baking_aabb = nav_bounds
 	return mesh
@@ -1453,7 +1461,7 @@ func _process(delta: float) -> void:
 
 
 func _build_environment() -> void:
-	var preset: Dictionary = ZONES[zone]
+	var preset: Dictionary = (ZONES[zone] as Dictionary).merged(look_override, true)
 	_environment = Environment.new()
 	_environment.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
@@ -1525,6 +1533,12 @@ func _add_pickup(floor_point: Vector3, title: String, kind: String, index: int, 
 		painted.vertex_color_use_as_albedo = true
 		painted.vertex_color_is_srgb = true
 		painted.roughness = 0.4
+		if look.begins_with("star"):
+			# A fallen star still shines: it glows in its own colour and shows both faces.
+			painted.cull_mode = BaseMaterial3D.CULL_DISABLED
+			painted.emission_enabled = true
+			painted.emission = Color("ffd36a") if look == "star" else Color("cfe6ff")
+			painted.emission_energy_multiplier = 1.6
 		body.material_override = painted
 		body.scale = Vector3.ONE * 1.6
 	body.position.y = 0.4

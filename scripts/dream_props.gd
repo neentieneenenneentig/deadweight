@@ -116,7 +116,8 @@ static func princess_mesh() -> ArrayMesh:
 ## "duck" (a rubber duck), "towel" (a folded striped towel), "firewood" (a bundle of logs),
 ## "salts" (a jar of pink bath salts), "sponge" (a sea sponge, holes and all), "yuzu" (a knobbly
 ## citrus with a leaf), "yuzu_gold" (the same, gilded), "duckling" (a small rubber duck with a tuft),
-## "duckling_gold" (the same, gilded).
+## "duckling_gold" (the same, gilded), "star" (a fallen star: a puffy five-pointed star, warm gold)
+## and "star_north" (the same, ice white).
 static var _looks: Dictionary = {}
 
 static func pickup_mesh(look: String) -> ArrayMesh:
@@ -140,6 +141,10 @@ static func pickup_mesh(look: String) -> ArrayMesh:
 			_painted(tool, _block(Vector3(0.03, 0.09, 0.03)), Transform3D(Basis(Vector3.RIGHT, -0.4), Vector3(0, 0.33, 0.1)), body)
 			for side: float in [-1.0, 1.0]:
 				_painted(tool, _ball(0.025), Transform3D(Basis.IDENTITY, Vector3(side * 0.07, 0.22, 0.24)), Color("1d1d22"))
+		"star", "star_north":
+			var gold: Color = Color("ffd75e") if look == "star" else Color("e6f3ff")
+			var core: Color = Color("fff1b8") if look == "star" else Color("ffffff")
+			star_into(tool, 0.42, 0.19, 0.16, gold, core)
 		"towel":
 			for k in range(4):
 				var stripe: Color = Color("e3e8e5") if k % 2 == 0 else Color("779ea9")
@@ -198,6 +203,35 @@ static func pickup_mesh(look: String) -> ArrayMesh:
 			_painted(tool, _block(Vector3(0.5, 0.04, 0.06)), Transform3D(Basis.IDENTITY, Vector3(0, 0.0, 0.0)), Color("d9403a"))
 	_looks[look] = tool.commit()
 	return _looks[look]
+
+## A puffy five-pointed star standing in the xy plane, centred on the origin: ten rim points
+## (outer, inner, ...) joined to a front and a back apex thickness out of the plane. The tips take
+## rim, the apexes centre. Flat shaded.
+static func star_into(tool: SurfaceTool, outer: float, inner: float, thickness: float, rim: Color, centre: Color) -> void:
+	var points: Array[Vector3] = []
+	for k in range(10):
+		var angle: float = PI * 0.5 + float(k) * TAU / 10.0
+		var reach: float = outer if k % 2 == 0 else inner
+		points.append(Vector3(cos(angle) * reach, sin(angle) * reach, 0.0))
+	for apex: Vector3 in [Vector3(0.0, 0.0, thickness), Vector3(0.0, 0.0, -thickness)]:
+		for k in range(10):
+			var a: Vector3 = points[k]
+			var b: Vector3 = points[(k + 1) % 10]
+			if apex.z < 0.0:
+				var swap: Vector3 = a
+				a = b
+				b = swap
+			var normal: Vector3 = (a - apex).cross(b - apex).normalized()
+			tool.set_normal(normal)
+			tool.set_color(centre)
+			tool.add_vertex(apex)
+			tool.set_normal(normal)
+			tool.set_color(rim)
+			tool.add_vertex(a)
+			tool.set_normal(normal)
+			tool.set_color(rim)
+			tool.add_vertex(b)
+
 
 static func _ball(radius: float) -> SphereMesh:
 	var mesh := SphereMesh.new()

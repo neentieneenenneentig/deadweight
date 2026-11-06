@@ -13,6 +13,7 @@ const CAUSES := {
 	"boulder": "FLATTENED BY A MARBLE",
 	"flood": "WENT UNDER WITH THE MELTWATER",
 	"mud": "BOILED IN THE MUD",
+	"star": "HIT BY A FALLING STAR",
 	"hazard": "KILLED BY A HAZARD",
 }
 const TRY_THIS := {
@@ -25,8 +26,13 @@ const TRY_THIS := {
 	"boulder": "A marble rolls when you walk under its slope. Get airborne or get sideways.",
 	"flood": "Once the duck is taken the water rises. Stay on the hills and travel by line, not by foot.",
 	"mud": "Boiling mud hurts to wade through. Ride a geyser over it: stand on the vent while it hisses.",
+	"star": "A falling star lands where you are running, inside the gold ring. Change direction when a ring lights up, or be in the air when it lands.",
 	"hazard": "Glowing floors and water hurt. Cross them in the air.",
 }
+## The last campaign errand, won: the story is over (for now).
+const ENDING_TITLE := "THE END"
+const ENDING_TEXT := "Princess Capybara has her rubber duck, her firewood, three jars of bath salts, three yuzu, three ducklings and three stars that used to be in the sky. The water is hot. She is, for the moment, satisfied."
+const ENDING_NOTE := "The Department of Unfinished Gravity thanks you for your patience. Every errand stays open for better times and gold medals."
 const TRY_THIS_DEFAULT := "Spend banked salvage in the Workshop: a longer spool and stronger plating make every raid easier."
 const MAX_ACHIEVEMENT_ROWS := 3
 
@@ -35,6 +41,7 @@ var _title: Label
 var _body: VBoxContainer
 var _bank_chip: Label
 var _next: Button
+var _credits: Button
 var _retry: Button
 var _levels: Button
 var _menu: Button
@@ -59,6 +66,7 @@ func build() -> void:
 	_levels = button(footer, "LEVELS", "", func() -> void: ui.call("show_level_select"))
 	_retry = button(footer, "RETRY", "", func() -> void: ui.emit_signal("restart_requested"))
 	_next = button(footer, "NEXT RAID", "PrimaryButton", func() -> void: ui.emit_signal("next_level_requested"))
+	_credits = button(footer, "CREDITS", "PrimaryButton", func() -> void: ui.call("show_credits"))
 
 
 func open(args: Dictionary = {}) -> void:
@@ -74,6 +82,8 @@ func refresh() -> void:
 func primary_focus() -> Control:
 	if _next != null and _next.visible:
 		return _next
+	if _credits != null and _credits.visible:
+		return _credits
 	return _retry
 
 
@@ -93,6 +103,10 @@ func _populate() -> void:
 	_title.text = str(_result.get("title", "")).to_upper()
 	_bank_chip.text = UiTheme.format_int(int(_result.get("bank", ui.call("bank"))))
 	_next.visible = won and not next_level.is_empty()
+	var ending: bool = won and bool(_result.get("campaign_end", false))
+	_credits.visible = ending
+	if ending:
+		_overline.text = ENDING_TITLE
 	_retry.text = "REPLAY" if won else "RETRY"
 	# Touch scaling makes the cards taller than a 16:9 screen: let the body scroll, never the footer.
 	var scroll: ScrollContainer = scroller(_body)
@@ -153,6 +167,11 @@ func _build_right(parent: Node, won: bool) -> void:
 	var card: PanelContainer = panel(parent, "Glass")
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var column: VBoxContainer = vbox(card, 8)
+	if won and bool(_result.get("campaign_end", false)):
+		label(column, ENDING_TITLE, "OverlineCyan")
+		wrap_label(column, ENDING_TEXT, "Body")
+		wrap_label(column, ENDING_NOTE, "BodyMuted")
+		rule(column)
 	label(column, "SALVAGE", "Overline")
 	var cases: String = "%d / %d" % [int(_result.get("cases", 0)), int(_result.get("total_cases", 0))]
 	var bonus: String = "%d / %d" % [int(_result.get("bonus", 0)), int(_result.get("total_bonus", 0))]

@@ -22,10 +22,10 @@ DEADWEIGHT is a first-person movement game about a fishing rod that throws weigh
 The line is physical and honest: it only pulls when it is taut, you keep every bit of speed you earn, and a cast kicks you back. Learn how the weight swings and you will cross whole valleys without touching the floor.
 
 [h2]The floor is lava[/h2]
-The ground is where things go wrong. Ice and old paving crack under your boots and give way. Teacup mines beep once before they go off. Giant marbles come rolling down the hill, geysers throw you into the sky, and the meltwater rises. Porcelain tea hounds outrun you on foot, so stay in the air: hit something fast enough and it shatters, and the longer you fly, the higher your style multiplier climbs.
+The ground is where things go wrong. Ice and old paving crack under your boots and give way. Teacup mines beep once before they go off. Giant marbles come rolling down the hill, geysers throw you into the sky, the meltwater rises, and one night the stars start falling. Porcelain tea hounds outrun you on foot, so stay in the air: hit something fast enough and it shatters, and the longer you fly, the higher your style multiplier climbs.
 
 [h2]Errands for a princess[/h2]
-Princess Capybara is soaking in her hot tub on a hill in the snowy highlands, and she keeps losing things. Her rubber duck. Her firewood. Three jars of bath salts from a boiling geyser basin. Three yuzu from the top of a giant toy marble run. Her rubber duck's three ducklings, who wandered up a crumbling aqueduct. Bring them all back.
+Princess Capybara is soaking in her hot tub on a hill in the snowy highlands, and she keeps losing things. Her rubber duck. Her firewood. Three jars of bath salts from a boiling geyser basin. Three yuzu from the top of a giant toy marble run. Her rubber duck's three ducklings, who wandered up a crumbling aqueduct. And, on the night the department finally finishes gravity, three stars that have fallen out of the sky. Bring them all back.
 
 [h2]The Department of Unfinished Gravity[/h2]
 Below the snowline an official public works department keeps building long after anyone remembers what the works were for: sluice gates and pump rows in the frozen Floodworks, and kilns and cranes in the Foundry under a violet nightmare sky. Doors open onto nothing and the notices are deadpan and very polite. Porcelain tea hounds, alarm-clock sentries and ceramic drones guard every salvage case. Grab them all, reach the extraction pad and hold it while the clock runs down.
@@ -33,7 +33,7 @@ Below the snowline an official public works department keeps building long after
 [h2]Features[/h2]
 [list]
 [*] Rope physics you can master: tension-only line, inherited momentum, casting recoil, free spool, lock, reel and cut.
-[*] A campaign of hand-built levels: four open highland errands, six department raids, a tutorial and a practice range.
+[*] A campaign of hand-built levels: five open highland errands, six department raids, a tutorial and a practice range.
 [*] Replayable runs of one to six minutes, with bronze, silver and gold medal times on every level.
 [*] Cracking ice, teacup mines, rolling marbles, geysers and rising floods, and a style multiplier for staying airborne.
 [*] Swing a weight into a hound, sentry or drone fast enough and it shatters. A sidearm covers the rest.
@@ -83,9 +83,9 @@ price; accept them unless you have a reason not to.
 No mature content: no blood, gore, sexual content, strong language or gambling. Violence is
 limited to fantasy violence against non-human porcelain and clockwork automatons (tea hounds,
 sentries and drones). They shatter. There is no blood, and no humans or animals are harmed. The
-player can be hurt by falls, bites, teacup mines (a small cartoon blast), geysers and boiling mud,
-with no injury shown. The Foundry has an ominous animated violet sky, but no horror creatures,
-gore or jump scares. Princess Capybara and the rubber ducks are never in danger.
+player can be hurt by falls, bites, teacup mines and falling stars (small cartoon blasts), geysers
+and boiling mud, with no injury shown. The Foundry and the last highland errand have an ominous animated violet
+sky, but no horror creatures, gore or jump scares. Princess Capybara and the rubber ducks are never in danger.
 
 ## AI content disclosure (Steamworks Content Survey draft, PLAN O11)
 

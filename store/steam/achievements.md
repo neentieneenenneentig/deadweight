@@ -1,6 +1,6 @@
 # Steam achievements
 
-The game tracks these 16 achievements itself (docs/DESIGN.md, scripts/achievements.gd). Mirroring
+The game tracks these 17 achievements itself (docs/DESIGN.md, scripts/achievements.gd). Mirroring
 them on Steam needs the GodotSteam integration, planned for v1.1, so **don't add them in Steamworks
 for v1.0**: an achievement the game can't unlock looks broken on the store page.
 
@@ -26,6 +26,7 @@ When v1.1 adds GodotSteam:
 | ZONE_FLOODWORKS | Drained | Complete every Floodworks level (tutorial excluded). | No |
 | ZONE_FOUNDRY | Cooled Off | Complete every Foundry level. | No |
 | ZONE_SPILLWAY | Over the Top | Complete every Spillway level. | No (v1.1) |
+| ZONE_HIGHLANDS | Bath Time | Run every errand for Princess Capybara. | No |
 | GOLD_ANY | Gold Standard | Earn any gold medal. | No |
 | GOLD_ALL | Master Angler | Earn gold on every campaign level (tutorial excluded). | No |
 | FULLY_RIGGED | Fully Rigged | Max out every workshop upgrade. | No |
